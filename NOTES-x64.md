@@ -113,6 +113,64 @@ Boxedwine shutdown
 ```
 (identical to running the binaries natively; hello_c takes ~0.3 s wall time including startup.)
 
-Known limits / next steps: no threads (clone) or fork/execve for x64 yet, no dynamic linking test
-yet (ld-linux-x86-64), no SSSE3/SSE4/AVX, fcntl locks/select/statfs structs not converted, images
-above 4GB (Windows PE default base 0x140000000) need relocation or a 64-bit MMU.
+### Approach 1, step 2: dynamic linking, threads, fork/exec (commit 5501b20a)
+
+- **Dynamic linking**: a PIE `gcc -O1` hello linked against the host glibc runs with
+  `/lib64/ld-linux-x86-64.so.2` + `libc.so.6` copied into a guest root (ld.so is loaded at
+  0xF0000000, libc and the PIE are mmapped from BoxedWine's VFS):
+  `boxedwine -root /workspace/x64-dynroot -nozip -novideo /bin/dynhello` → `dynamic x86-64 hello, argc=1`.
+- **Threads**: clone/clone3 create a new X64CPU thread (CLONE_SETTLS → guest FS base); LOCK-prefixed
+  read-modify-write ops, XCHG, CMPXCHG8B/16B use host atomics on guest RAM (atomic load + CAS,
+  instruction retried on contention), since every guest thread is a real host thread.
+- **fork/vfork/execve**: forked children keep an X64CPU; `execve` swaps the thread's CPU object
+  when the new image has the other architecture (old CPU retired, `platformThreadRun` follows
+  `thread->cpu`), so i386 → x86-64 and x86-64 → i386 exec both work.
+- Test `x64/tests/mt_threads.c` (4 threads × 100k mutex-protected increments, `__thread` TLS, fork +
+  waitpid exit status, fork + execv):
+  ```
+  boxedwine -root <root> -nozip -novideo /bin/mt_threads /bin/hello64
+  threads: counter=400000 tls-sum=604
+  fork: child running
+  fork: child exit status=42
+  hello from x86-64 guest
+  exec /bin/hello64: status=0
+  ```
+  (identical to native; also with `/bin/hello32` as the exec target, and `x64/tests/exec32to64.S`
+  — an i386 program that execve()s `/bin/hello64` — prints `hello from x86-64 guest`.)
+
+### Approach 1: performance
+
+`bench.c` (fib(32) + 50M-iteration xorshift loop + 5M double loop, `gcc -O2 -static`):
+native 0.10 s, BoxedWine x64 interpreter 12.1 s (~120x). callgrind on a reduced run: ~270 host
+instructions per guest instruction; 41% in `step()` (prefix/opcode dispatch), 17% `decodeModrm`,
+7% `alu`, 6% `getFlags`. The interpreter re-decodes every instruction; a pre-decoded block cache
+would give a few x, but game-level speed needs a JIT or native execution (see recommendation).
+
+## Approach 3 — integrate an existing emulator (Blink) — evaluated, not adopted
+
+Built jart/blink `f006a4fc` (`./configure && make`, 3 s) in `/workspace/x64-approach3`.
+- `blink hello64` → `hello from x86-64 guest`. `blink hello_c` → **SIGSEGV** (glibc stdio/exit path
+  crashes in this Blink build; raw `write()` + `_exit` works).
+- Same `bench.c`: native 0.10 s; Blink JIT 0.77 s (7.7x); Blink `-j` (no JIT) 12.2 s (~122x);
+  BoxedWine x64 interpreter 12.1 s. → Our interpreter is on par with Blink's interpreter.
+- Integration: Blink's CPU core (~9k lines + 4.4k SSE + 1.3k x87) is cleanly separated only on the
+  CPU→syscall edge (`OpSyscall`); its memory model (own linear map / page tables, needs host
+  `mmap MAP_FIXED` + SIGSEGV) conflicts with BoxedWine's KMemory, its syscall layer (22k lines)
+  duplicates BoxedWine's kernel, and it is POSIX-only (no MSVC build: `__int128`, `__builtin_*`,
+  inline asm, sigaction/siglongjmp). Its JIT only targets x86-64/aarch64 hosts and needs RWX/W^X
+  code memory, same constraint as any JIT on Xbox.
+- Verdict: no advantage over the native BoxedWine X64CPU for an Xbox (MSVC/UWP) build; useful as a
+  reference for a future JIT (its "path" JIT design is small: ~6k lines).
+
+## Approach 4 — WoW64 — feasibility analysis (no code)
+
+- Wine's new WoW64 (Wine 9+, `--enable-archs=i386,x86_64`) runs **32-bit PE code inside a 64-bit
+  Unix process**; 32-bit code is entered via a 0x23 code segment (x86-64 host) or via a CPU backend
+  DLL (`wow64cpu.dll` natively, `xtajit`/FEX/`wowbox64.dll` box64 on ARM64, see Hangover). There is
+  no "reverse WoW64": x86-64 instructions cannot execute in a 32-bit context, and a 32-bit
+  infrastructure cannot host 64-bit PE code without a 64-bit CPU core underneath.
+- What WoW64 *does* offer: the 64-bit Unix side + thunking is exactly how BoxedWine would host 32-bit
+  games once the 64-bit guest path exists (run Wine64 with new-WoW64 → both 32-bit and 64-bit PE).
+  i.e. WoW64 is a consumer of approach 1, not an alternative to it.
+- Wine-on-Windows-host precedent: none found (Hangover targets ARM64 Linux). On Xbox, Wine's Unix
+  side has to be provided by an emulated Linux (BoxedWine) — that is the BoxedWine model.
