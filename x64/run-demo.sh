@@ -14,4 +14,4 @@ ROOT="$REPO/x64/out/root"
 mkdir -p "$ROOT/bin" "$ROOT/tmp"
 cp "$REPO"/x64/tests/out/* "$ROOT/bin/"
 if [ $# -eq 0 ]; then set -- /bin/hello64; fi
-exec "$BW" -root "$ROOT" -nozip -novideo "$@"
+exec "$BW" -root "$ROOT" -w / -nozip -novideo "$@"

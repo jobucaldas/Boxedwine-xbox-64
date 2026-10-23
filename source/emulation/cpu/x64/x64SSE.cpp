@@ -19,6 +19,34 @@
 #include "boxedwine.h"
 #include "x64CPU.h"
 #include <math.h>
+#include <cfenv>
+
+// SSE arithmetic runs on the host FPU, so the guest MXCSR rounding mode and
+// sticky exception flags are kept in the host floating point environment of the
+// (per guest thread) host thread and synchronized on LDMXCSR/STMXCSR/FXSAVE/FXRSTOR.
+static const struct { U32 guest; int host; } mxcsrFlags[] = {
+    { 0x01, FE_INVALID }, { 0x04, FE_DIVBYZERO }, { 0x08, FE_OVERFLOW }, { 0x10, FE_UNDERFLOW }, { 0x20, FE_INEXACT }
+};
+
+void x64SyncMxcsrToHost(X64CPU* cpu) {
+    static const int modes[4] = { FE_TONEAREST, FE_DOWNWARD, FE_UPWARD, FE_TOWARDZERO };
+    std::fesetround(modes[(cpu->mxcsr >> 13) & 3]);
+    std::feclearexcept(FE_ALL_EXCEPT);
+    for (auto& f : mxcsrFlags) {
+        if (cpu->mxcsr & f.guest) {
+            std::feraiseexcept(f.host);
+        }
+    }
+}
+
+void x64SyncMxcsrFromHost(X64CPU* cpu) {
+    int host = std::fetestexcept(FE_ALL_EXCEPT);
+    for (auto& f : mxcsrFlags) {
+        if (host & f.host) {
+            cpu->mxcsr |= f.guest;
+        }
+    }
+}
 
 // SSE / SSE2 / SSE3 subset for the x86-64 interpreter (the baseline every
 // x86-64 program may assume). Prefix selects the variant:
@@ -69,6 +97,9 @@ static inline T fop(int op, T a, T b) {
 template <typename T>
 static inline bool fcmp(int pred, T a, T b) {
     bool unord = (a != a) || (b != b);
+    if (unord && (pred & 3) != 0 && (pred & 3) != 3) {
+        std::feraiseexcept(FE_INVALID); // LT/LE/NLT/NLE predicates signal on QNaN
+    }
     switch (pred & 7) {
     case 0: return !unord && a == b;
     case 1: return !unord && a < b;
@@ -212,7 +243,12 @@ bool X64CPU::stepSSE(U8 op) {
             a = D.fd[0];
         }
         U32 f = getFlags() & ~(CF | PF | AF | ZF | SF | OF);
-        if (a != a || b != b) f |= ZF | PF | CF;
+        if (a != a || b != b) {
+            f |= ZF | PF | CF;
+            if (op == 0x2F) {
+                std::feraiseexcept(FE_INVALID); // COMIS* signals on QNaN, UCOMIS* only on SNaN
+            }
+        }
         else if (a < b) f |= CF;
         else if (a == b) f |= ZF;
         rflags = f;

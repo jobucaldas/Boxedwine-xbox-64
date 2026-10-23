@@ -65,13 +65,10 @@ static U64 bridge(X64CPU* cpu, U32 nr32, U64 a1 = 0, U64 a2 = 0, U64 a3 = 0, U64
 // Per-thread scratch page in guest memory, used to stage i386 structs that
 // are then converted to their x86-64 layout.
 static U32 scratch(X64CPU* cpu) {
-    static thread_local KThread* owner = nullptr;
-    static thread_local U32 page = 0;
-    if (owner != cpu->thread || !page) {
-        page = cpu->memory->mmap(cpu->thread, 0, 8192, K_PROT_READ | K_PROT_WRITE, K_MAP_PRIVATE | K_MAP_ANONYMOUS, -1, 0);
-        owner = cpu->thread;
+    if (!cpu->scratchPage) {
+        cpu->scratchPage = cpu->memory->mmap(cpu->thread, 0, 8192, K_PROT_READ | K_PROT_WRITE, K_MAP_PRIVATE | K_MAP_ANONYMOUS, -1, 0);
     }
-    return page;
+    return cpu->scratchPage;
 }
 
 static bool isError(U32 result) {
@@ -124,6 +121,23 @@ static void convertStat(KMemory* m, U32 src, U64 dst) {
     m->memcpy((U32)dst, d, 144);
 }
 
+// struct statfs64 (i386, 84 bytes) -> struct statfs (x86-64, 120 bytes)
+static void convertStatfs(X64CPU* cpu, U32 src, U64 dst) {
+    KMemory* m = cpu->memory;
+    cpu->write64(dst + 0, m->readd(src + 0));        // f_type
+    cpu->write64(dst + 8, m->readd(src + 4));        // f_bsize
+    for (int i = 0; i < 5; i++) {                    // f_blocks .. f_ffree
+        cpu->write64(dst + 16 + i * 8, m->readq(src + 8 + i * 8));
+    }
+    cpu->write64(dst + 56, m->readq(src + 48));      // f_fsid
+    cpu->write64(dst + 64, m->readd(src + 56));      // f_namelen
+    cpu->write64(dst + 72, m->readd(src + 60));      // f_frsize
+    cpu->write64(dst + 80, m->readd(src + 64));      // f_flags
+    for (int i = 0; i < 4; i++) {
+        cpu->write64(dst + 88 + i * 8, 0);
+    }
+}
+
 // struct iovec[] (16 bytes each) -> i386 iovec[] (8 bytes each)
 static U32 convertIov(X64CPU* cpu, U64 iov, U64 count) {
     U32 s = scratch(cpu);
@@ -137,6 +151,161 @@ static U32 convertIov(X64CPU* cpu, U64 iov, U64 count) {
         cpu->memory->writed(s + i * 8 + 4, (U32)len);
     }
     return s;
+}
+
+
+// struct msghdr (x86-64, 56 bytes) <-> i386 msghdr (28 bytes) staged in the
+// scratch page: [0] msghdr, [64] iovec[], [2048] control buffer.
+#define SCRATCH_MSGHDR 0
+#define SCRATCH_IOV 64
+#define SCRATCH_CONTROL 2048
+#define SCRATCH_CONTROL_SIZE 4096
+
+static U32 convertMsgToI386(X64CPU* cpu, U64 msg, bool forRecv) {
+    U32 s = scratch(cpu);
+    KMemory* m = cpu->memory;
+    U64 name = cpu->read64(msg);
+    U32 namelen = cpu->read32(msg + 8);
+    U64 iov = cpu->read64(msg + 16);
+    U64 iovlen = cpu->read64(msg + 24);
+    U64 control = cpu->read64(msg + 32);
+    U64 controllen = cpu->read64(msg + 40);
+    if (iovlen > 200) {
+        iovlen = 200;
+    }
+    for (U32 i = 0; i < iovlen; i++) {
+        m->writed(s + SCRATCH_IOV + i * 8, (U32)cpu->read64(iov + i * 16));
+        m->writed(s + SCRATCH_IOV + i * 8 + 4, (U32)cpu->read64(iov + i * 16 + 8));
+    }
+    U32 control32 = 0;
+    U32 controllen32 = 0;
+    if (control && controllen) {
+        control32 = s + SCRATCH_CONTROL;
+        if (forRecv) {
+            controllen32 = SCRATCH_CONTROL_SIZE;
+        } else {
+            // convert each cmsghdr: {u64 len; int level; int type; data} -> {u32 len; int level; int type; data}
+            U64 pos = 0;
+            while (pos + 16 <= controllen) {
+                U64 len = cpu->read64(control + pos);
+                if (len < 16 || pos + len > controllen) {
+                    break;
+                }
+                U32 dataLen = (U32)(len - 16);
+                m->writed(control32 + controllen32, 12 + dataLen);
+                m->writed(control32 + controllen32 + 4, cpu->read32(control + pos + 8));
+                m->writed(control32 + controllen32 + 8, cpu->read32(control + pos + 12));
+                for (U32 i = 0; i < dataLen; i++) {
+                    m->writeb(control32 + controllen32 + 12 + i, cpu->read8(control + pos + 16 + i));
+                }
+                controllen32 += (12 + dataLen + 3) & ~3;
+                pos += (len + 7) & ~7ULL;
+            }
+        }
+    }
+    m->writed(s + 0, (U32)name);
+    m->writed(s + 4, namelen);
+    m->writed(s + 8, s + SCRATCH_IOV);
+    m->writed(s + 12, (U32)iovlen);
+    m->writed(s + 16, control32);
+    m->writed(s + 20, controllen32);
+    m->writed(s + 24, cpu->read32(msg + 48));
+    return s;
+}
+
+static void convertRecvMsgFromI386(X64CPU* cpu, U32 s, U64 msg) {
+    KMemory* m = cpu->memory;
+    cpu->write32(msg + 8, m->readd(s + 4)); // namelen
+    cpu->write32(msg + 48, m->readd(s + 24)); // flags
+    U64 control = cpu->read64(msg + 32);
+    U64 controllen = cpu->read64(msg + 40);
+    U32 control32 = m->readd(s + 16);
+    U32 controllen32 = m->readd(s + 20);
+    U64 out = 0;
+    if (control && control32) {
+        U32 pos = 0;
+        while (pos + 12 <= controllen32) {
+            U32 len = m->readd(control32 + pos);
+            if (len < 12 || pos + len > controllen32) {
+                break;
+            }
+            U32 dataLen = len - 12;
+            if (out + 16 + dataLen > controllen) {
+                cpu->write32(msg + 48, cpu->read32(msg + 48) | 0x8); // MSG_CTRUNC
+                break;
+            }
+            cpu->write64(control + out, 16 + dataLen);
+            cpu->write32(control + out + 8, m->readd(control32 + pos + 4));
+            cpu->write32(control + out + 12, m->readd(control32 + pos + 8));
+            for (U32 i = 0; i < dataLen; i++) {
+                cpu->write8(control + out + 16 + i, m->readb(control32 + pos + 12 + i));
+            }
+            out += (16 + dataLen + 7) & ~7ULL;
+            pos += (len + 3) & ~3;
+        }
+    }
+    cpu->write64(msg + 40, out);
+}
+
+static U64 x64Select(X64CPU* cpu, U64 nfds, U64 r, U64 w, U64 e, U64 timeout) {
+    U32 s = scratch(cpu);
+    U32 ts = 0;
+    if (timeout) {
+        ts = s + 4000;
+        cpu->memory->writeq(ts, cpu->read64(timeout));
+        cpu->memory->writeq(ts + 8, cpu->read64(timeout + 8) * 1000);
+    }
+    return bridge(cpu, 413, nfds, r, w, e, ts, 0); // pselect6_time64
+}
+
+static U64 x64Pselect6(X64CPU* cpu, U64 nfds, U64 r, U64 w, U64 e, U64 timeout, U64 sig) {
+    U32 s = scratch(cpu);
+    U32 sig32 = 0;
+    if (sig) {
+        sig32 = s + 4032;
+        cpu->memory->writed(sig32, (U32)cpu->read64(sig));
+        cpu->memory->writed(sig32 + 4, (U32)cpu->read64(sig + 8));
+    }
+    return bridge(cpu, 413, nfds, r, w, e, timeout, sig32);
+}
+
+static U64 x64Ppoll(X64CPU* cpu, U64 fds, U64 nfds, U64 ts) {
+    S32 timeout = -1;
+    if (ts) {
+        U64 sec = cpu->read64(ts);
+        U64 nsec = cpu->read64(ts + 8);
+        U64 ms = sec * 1000 + (nsec + 999999) / 1000000;
+        timeout = ms > 0x7FFFFFFF ? 0x7FFFFFFF : (S32)ms;
+    }
+    return bridge(cpu, 168, fds, nfds, (U32)timeout);
+}
+
+// struct flock (x86-64, 32 bytes) <-> struct flock64 (i386, 24 bytes)
+static U64 x64Fcntl(X64CPU* cpu, U64 fd, U64 cmd, U64 arg) {
+    bool lockCmd = (cmd >= 5 && cmd <= 7) || (cmd >= 36 && cmd <= 38);
+    if (!lockCmd) {
+        return bridge(cpu, 221, fd, cmd, arg);
+    }
+    U32 s = scratch(cpu) + 4096;
+    KMemory* m = cpu->memory;
+    m->writew(s, cpu->read16(arg));
+    m->writew(s + 2, cpu->read16(arg + 2));
+    m->writeq(s + 4, cpu->read64(arg + 8));
+    m->writeq(s + 12, cpu->read64(arg + 16));
+    m->writed(s + 20, cpu->read32(arg + 24));
+    U32 cmd32 = (U32)cmd;
+    if (cmd >= 5 && cmd <= 7) {
+        cmd32 = (U32)cmd + 7; // F_GETLK64..F_SETLKW64
+    }
+    U32 result = (U32)bridge(cpu, 221, fd, cmd32, s);
+    if (!isError(result) && (cmd == 5 || cmd == 36)) {
+        cpu->write16(arg, m->readw(s));
+        cpu->write16(arg + 2, m->readw(s + 2));
+        cpu->write64(arg + 8, m->readq(s + 4));
+        cpu->write64(arg + 16, m->readq(s + 12));
+        cpu->write32(arg + 24, m->readd(s + 20));
+    }
+    return result;
 }
 
 static U64 rtSigaction(X64CPU* cpu, U64 sig, U64 act, U64 oact) {
@@ -271,6 +440,30 @@ static U64 x64Execve(X64CPU* cpu, U64 path, U64 argv, U64 envp) {
     return cpu->thread->process->execve(cpu->thread, p, args, envs);
 }
 
+static U64 x64Sigpending(X64CPU* cpu, U64 set, U64 size) {
+    KThread* thread = cpu->thread;
+    U64 pending = (thread->pendingSignals | thread->process->pendingSignals) & thread->sigMask;
+    if (size == 4) cpu->write32(set, (U32)pending);
+    else cpu->write64(set, pending);
+    return 0;
+}
+
+static U64 x64Sigsuspend(X64CPU* cpu, U64 maskAddress, U64 size) {
+    KThread* thread = cpu->thread;
+    U64 tmpMask = size == 4 ? cpu->read32(maskAddress) : cpu->read64(maskAddress);
+    U64 oldMask = thread->sigMask;
+    thread->sigMask = tmpMask;
+    while (!thread->terminating && !((thread->pendingSignals | thread->process->pendingSignals) & ~tmpMask)) {
+        BOXEDWINE_CRITICAL_SECTION_WITH_CONDITION(thread->sigWaitCond);
+        BOXEDWINE_CONDITION_WAIT_TIMEOUT(thread->sigWaitCond, 10);
+    }
+    // the handler runs with (and sigreturn restores) the original mask
+    thread->sigMask = oldMask;
+    cpu->r[0] = (U64)-K_EINTR;
+    x64DeliverPendingSignal(cpu, tmpMask);
+    return (U64)-K_CONTINUE;
+}
+
 static U64 x64Exit(X64CPU* cpu, U64 code, bool group) {
     U32 nr32 = group ? 252 : 1;
     return bridge(cpu, nr32, code);
@@ -303,6 +496,7 @@ static U64 doSyscall64(X64CPU* cpu, U64 nr, U64 a1, U64 a2, U64 a3, U64 a4, U64 
     case 13: return rtSigaction(cpu, a1, a2, a3);       // rt_sigaction
     case 14: return cpu->thread->sigprocmask((U32)a1, (U32)a2, (U32)a3, (U32)a4);
     case 15: return x64Sigreturn(cpu);                  // rt_sigreturn
+
     case 16: return bridge(cpu, 54, a1, a2, a3);        // ioctl
     case 17: return cpu->thread->process->pread64(cpu->thread, (FD)a1, (U32)a2, (U32)a3, a4);
     case 18: return cpu->thread->process->pwrite64(cpu->thread, (FD)a1, (U32)a2, (U32)a3, a4);
@@ -310,6 +504,7 @@ static U64 doSyscall64(X64CPU* cpu, U64 nr, U64 a1, U64 a2, U64 a3, U64 a4, U64 
     case 20: return bridge(cpu, 146, a1, convertIov(cpu, a2, a3), a3); // writev
     case 21: return bridge(cpu, 33, a1, a2);            // access
     case 22: return bridge(cpu, 42, a1);                // pipe
+    case 23: return x64Select(cpu, a1, a2, a3, a4, a5); // select
     case 24: return bridge(cpu, 158);                   // sched_yield
     case 25: return bridge(cpu, 163, a1, a2, a3, a4, a5); // mremap
     case 26: return bridge(cpu, 144, a1, a2, a3);       // msync
@@ -319,6 +514,29 @@ static U64 doSyscall64(X64CPU* cpu, U64 nr, U64 a1, U64 a2, U64 a3, U64 a4, U64 
     case 33: return bridge(cpu, 63, a1, a2);            // dup2
     case 35: return bridge(cpu, 407, 0, 0, a1, a2);     // nanosleep -> clock_nanosleep_time64
     case 39: return bridge(cpu, 20);                    // getpid
+    case 41: return bridge(cpu, 359, a1, a2, a3);       // socket
+    case 42: return bridge(cpu, 362, a1, a2, a3);       // connect
+    case 43: return bridge(cpu, 364, a1, a2, a3, 0);    // accept -> accept4
+    case 44: return bridge(cpu, 369, a1, a2, a3, a4, a5, a6); // sendto
+    case 45: return bridge(cpu, 371, a1, a2, a3, a4, a5, a6); // recvfrom
+    case 46: {                                          // sendmsg
+        U32 m32 = convertMsgToI386(cpu, a2, false);
+        return bridge(cpu, 370, a1, m32, a3);
+    }
+    case 47: {                                          // recvmsg
+        U32 m32 = convertMsgToI386(cpu, a2, true);
+        U32 result = (U32)bridge(cpu, 372, a1, m32, a3);
+        if (!isError(result)) convertRecvMsgFromI386(cpu, m32, a2);
+        return result;
+    }
+    case 48: return bridge(cpu, 373, a1, a2);           // shutdown
+    case 49: return bridge(cpu, 361, a1, a2, a3);       // bind
+    case 50: return bridge(cpu, 363, a1, a2);           // listen
+    case 51: return bridge(cpu, 367, a1, a2, a3);       // getsockname
+    case 52: return bridge(cpu, 368, a1, a2, a3);       // getpeername
+    case 53: return bridge(cpu, 360, a1, a2, a3, a4);   // socketpair
+    case 54: return bridge(cpu, 366, a1, a2, a3, a4, a5); // setsockopt
+    case 55: return bridge(cpu, 365, a1, a2, a3, a4, a5); // getsockopt
     case 56: return x64Clone(cpu, a1, a2, a3, a4, a5);  // clone
     case 57: return x64Clone(cpu, 17 /* SIGCHLD */, 0, 0, 0, 0); // fork
     case 58: return x64Clone(cpu, K_CLONE_VM | K_CLONE_VFORK | 17, 0, 0, 0, 0); // vfork
@@ -339,7 +557,7 @@ static U64 doSyscall64(X64CPU* cpu, U64 nr, U64 a1, U64 a2, U64 a3, U64 a4, U64 
         }
         return result;
     }
-    case 72: return bridge(cpu, 221, a1, a2, a3);       // fcntl -> fcntl64
+    case 72: return x64Fcntl(cpu, a1, a2, a3);          // fcntl
     case 73: return bridge(cpu, 143, a1, a2);           // flock
     case 74: return bridge(cpu, 118, a1);               // fsync
     case 75: return bridge(cpu, 148, a1);               // fdatasync
@@ -410,7 +628,16 @@ static U64 doSyscall64(X64CPU* cpu, U64 nr, U64 a1, U64 a2, U64 a3, U64 a4, U64 
     case 119: return bridge(cpu, 210, a1, a2, a3);      // setresgid
     case 120: return bridge(cpu, 211, a1, a2, a3);      // getresgid
     case 121: return bridge(cpu, 132, a1);              // getpgid
+    case 127: return x64Sigpending(cpu, a1, a2);        // rt_sigpending
+    case 128: return bridge(cpu, 421, a1, a2, a3, a4);  // rt_sigtimedwait -> time64
+    case 130: return x64Sigsuspend(cpu, a1, a2);        // rt_sigsuspend
     case 131: return sigaltstack64(cpu, a1, a2);        // sigaltstack
+    case 137: case 138: {                               // statfs, fstatfs
+        U32 s = scratch(cpu);
+        U32 result = (U32)bridge(cpu, nr == 137 ? 268 : 269, a1, 84, s);
+        if (!isError(result)) convertStatfs(cpu, s, a2);
+        return result;
+    }
     case 157: return bridge(cpu, 172, a1, a2, a3, a4, a5); // prctl
     case 158: return arch_prctl(cpu, a1, a2);           // arch_prctl
     case 160: return bridge(cpu, 340, 0, a1, a2, 0);    // setrlimit -> prlimit64
@@ -443,15 +670,21 @@ static U64 doSyscall64(X64CPU* cpu, U64 nr, U64 a1, U64 a2, U64 a3, U64 a4, U64 
         if (!isError(result)) convertStat(memory, s, a3);
         return result;
     }
+    case 221: return 0;                                 // fadvise64 (advisory)
     case 263: return bridge(cpu, 301, a1, a2, a3);      // unlinkat
     case 264: return bridge(cpu, 302, a1, a2, a3, a4);  // renameat
     case 266: return bridge(cpu, 304, a1, a2, a3);      // symlinkat
     case 267: return bridge(cpu, 305, a1, a2, a3, a4);  // readlinkat
     case 268: return bridge(cpu, 306, a1, a2, a3);      // fchmodat
     case 269: return bridge(cpu, 307, a1, a2, a3);      // faccessat
+    case 270: return x64Pselect6(cpu, a1, a2, a3, a4, a5, a6); // pselect6
+    case 271: return x64Ppoll(cpu, a1, a2, a3);         // ppoll (sigmask ignored)
+    case 281: return bridge(cpu, 256, a1, a2, a3, a4);  // epoll_pwait (sigmask ignored)
+    case 288: return bridge(cpu, 364, a1, a2, a3, a4);  // accept4
     case 273: return 0;                                 // set_robust_list (robust futexes not emulated)
     case 280: return bridge(cpu, 412, a1, a2, a3, a4);  // utimensat -> time64
     case 284: return bridge(cpu, 328, a1, 0);           // eventfd
+    case 289: return bridge(cpu, 327, a1, a2, a3, a4);  // signalfd4
     case 290: return bridge(cpu, 328, a1, a2);          // eventfd2
     case 291: return bridge(cpu, 329, a1);              // epoll_create1
     case 292: return bridge(cpu, 330, a1, a2, a3);      // dup3
@@ -487,6 +720,15 @@ void ksyscall64(X64CPU* cpu) {
         return;
     }
     U32 r32 = (U32)result;
+    if (cpu->thread->startSignal && !cpu->thread->terminating) {
+        // a signal interrupted a blocking call: restart it after the handler
+        cpu->thread->startSignal = false;
+        if (r32 != (U32)-K_CONTINUE) {
+            cpu->rip = startRip - 2;
+            x64DeliverPendingSignal(cpu, cpu->thread->sigMask);
+            return;
+        }
+    }
     if (r32 == (U32)-K_WAIT) {
         cpu->rip = startRip - 2; // restart the syscall instruction
         return;
@@ -501,4 +743,7 @@ void ksyscall64(X64CPU* cpu) {
         klog_fmt("x64 syscall %d(%llx, %llx, %llx, %llx) = %llx", (int)nr, (unsigned long long)cpu->r[7], (unsigned long long)cpu->r[6], (unsigned long long)cpu->r[2], (unsigned long long)cpu->r[10], (unsigned long long)result);
     }
     cpu->r[0] = result;
+    if (cpu->thread->pendingSignals | cpu->thread->process->pendingSignals) {
+        x64DeliverPendingSignal(cpu, cpu->thread->sigMask);
+    }
 }

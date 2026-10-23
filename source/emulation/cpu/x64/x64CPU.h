@@ -83,6 +83,9 @@ public:
     void invalidateFetchCache() { fetchPage = ~0ULL; }
     void restartInstruction() { rip = instStart; }
 
+    // guest page used by the syscall layer to stage i386 structs (0 = not allocated yet)
+    U32 scratchPage = 0;
+
     // 64-bit signal frame support
     U64 sigAltStack = 0;
     U64 sigAltStackSize = 0;
@@ -167,6 +170,10 @@ private:
 };
 
 void ksyscall64(X64CPU* cpu);
+// delivers the lowest pending signal not blocked by mask; returns true if one was delivered
+bool x64DeliverPendingSignal(X64CPU* cpu, U64 mask);
+void x64SyncMxcsrToHost(X64CPU* cpu);
+void x64SyncMxcsrFromHost(X64CPU* cpu);
 void x64RunSignal(X64CPU* cpu, U32 signal);
 U64 x64Sigreturn(X64CPU* cpu);
 

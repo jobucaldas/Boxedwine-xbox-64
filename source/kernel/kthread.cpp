@@ -1009,6 +1009,26 @@ void KThread::signalIllegalInstruction(int code) {
 }
 
 bool KThread::runSignals() {
+    if (this->process->isX64) {
+        // x86-64 threads deliver their own signals (64-bit frames) from X64CPU::run
+        // and after each syscall; here we only wake a thread blocked in the kernel.
+        U64 todo = (this->process->pendingSignals | this->pendingSignals) & ~this->sigMask;
+        if (todo && this != KThread::currentThread()) {
+            BOXEDWINE_CONDITION cond;
+            {
+                BOXEDWINE_CRITICAL_SECTION_WITH_MUTEX(this->waitingCondSync);
+                cond = this->waitingCond;
+                if (cond) {
+                    this->startSignal = true;
+                }
+            }
+            if (cond) {
+                BOXEDWINE_CRITICAL_SECTION_WITH_CONDITION(cond);
+                BOXEDWINE_CONDITION_SIGNAL_ALL(cond);
+            }
+        }
+        return false;
+    }
     U64 mask = this->inSignal ? this->inSigMask : this->sigMask;
     U64 todoProcess = this->process->pendingSignals & ~mask;
     U64 todoThread = this->pendingSignals & ~mask;
@@ -1460,6 +1480,11 @@ void OPCALL onExitSignal(CPU* cpu, DecodedOp* op) {
 
 // interrupted and condStartWaitTime are pushed because syscall's during the signal will clobber them
 void KThread::runSignal(U32 signal, U32 trapNo, U32 errorNo) {
+    if (this->process->isX64) {
+        // the i386 frame builder must not touch an x86-64 thread; X64CPU delivers it
+        this->queuePendingSignal(signal);
+        return;
+    }
     KSigAction* action = &this->process->sigActions[signal];
     if (action->handlerAndSigAction==K_SIG_DFL) {
         //klog("%x/%x default runSignal %d", this->id, this->process->id, signal);

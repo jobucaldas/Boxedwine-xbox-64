@@ -74,6 +74,7 @@ X64CPU::X64CPU(KMemory* memory) : CPU(memory) {
     }
     memset(x, 0, sizeof(x));
     big = 1;
+    fpu.FINIT(); // Linux starts processes with the x87 control word 0x37F
 }
 
 DecodedOp* X64CPU::getOp(U32 eip, U32 flags) {
@@ -91,6 +92,9 @@ void X64CPU::reset() {
     lfOp = LF_NONE;
     rflags = 0x202;
     mxcsr = 0x1F80;
+    fpu.FINIT();
+    x64SyncMxcsrToHost(this);
+    scratchPage = 0; // execve reset the address space
     invalidateFetchCache();
 }
 
@@ -1055,21 +1059,8 @@ void X64CPU::run() {
     if (thread->terminating) {
         return;
     }
-    if (thread->pendingSignals) {
-        U64 mask = thread->sigMask;
-        U64 todo = (thread->pendingSignals | thread->process->pendingSignals) & ~mask;
-        if (todo) {
-            for (U32 i = 0; i < 64; i++) {
-                if (todo & (1ULL << i)) {
-                    {
-                        BOXEDWINE_CRITICAL_SECTION_WITH_MUTEX(thread->pendingSignalsMutex);
-                        thread->pendingSignals &= ~(1ULL << i);
-                    }
-                    x64RunSignal(this, i + 1);
-                    return;
-                }
-            }
-        }
+    if ((thread->pendingSignals | thread->process->pendingSignals) && x64DeliverPendingSignal(this, thread->sigMask)) {
+        return;
     }
     for (U32 i = 0; i < 100000; i++) {
         step();
@@ -1079,7 +1070,7 @@ void X64CPU::run() {
         }
         if (syscallInvalidatedFetch) {
             syscallInvalidatedFetch = false;
-            if (thread->terminating || thread->pendingSignals || yield || thread->cpu != this) {
+            if (thread->terminating || thread->pendingSignals || thread->process->pendingSignals || yield || thread->cpu != this) {
                 return;
             }
         }
@@ -1723,6 +1714,7 @@ void X64CPU::step0F() {
         switch (ext) {
         case 0: // FXSAVE
         case 4: { // XSAVE (legacy region only)
+            x64SyncMxcsrFromHost(this);
             write16(address, fpu.CW());
             write16(address + 2, fpu.SW());
             write8(address + 4, 0);
@@ -1737,6 +1729,7 @@ void X64CPU::step0F() {
         case 5: { // XRSTOR
             fpu.SetCW(read16(address));
             mxcsr = read32(address + 24);
+            x64SyncMxcsrToHost(this);
             for (int i = 0; i < 16; i++) {
                 readXmm(address + 160 + i * 16, x[i]);
             }
@@ -1744,8 +1737,10 @@ void X64CPU::step0F() {
         }
         case 2:
             mxcsr = read32(address);
+            x64SyncMxcsrToHost(this);
             return;
         case 3:
+            x64SyncMxcsrFromHost(this);
             write32(address, mxcsr);
             return;
         default: // CLFLUSH etc

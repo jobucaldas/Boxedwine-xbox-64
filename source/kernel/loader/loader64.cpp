@@ -346,6 +346,37 @@ void x64RunSignal(X64CPU* cpu, U32 signal) {
     cpu->invalidateFetchCache();
 }
 
+bool x64DeliverPendingSignal(X64CPU* cpu, U64 mask) {
+    KThread* thread = cpu->thread;
+    KProcess* process = thread->process.get();
+    for (U32 i = 0; i < 64; i++) {
+        U64 bit = 1ULL << i;
+        if (mask & bit) {
+            continue;
+        }
+        bool found = false;
+        {
+            BOXEDWINE_CRITICAL_SECTION_WITH_MUTEX(thread->pendingSignalsMutex);
+            if (thread->pendingSignals & bit) {
+                thread->pendingSignals &= ~bit;
+                found = true;
+            }
+        }
+        if (!found) {
+            BOXEDWINE_CRITICAL_SECTION_WITH_MUTEX(process->pendingSignalsMutex);
+            if (process->pendingSignals & bit) {
+                process->pendingSignals &= ~bit;
+                found = true;
+            }
+        }
+        if (found) {
+            x64RunSignal(cpu, i + 1);
+            return true;
+        }
+    }
+    return false;
+}
+
 U64 x64Sigreturn(X64CPU* cpu) {
     U64 uc = cpu->r[4];
     U64 mc = uc + 40;
