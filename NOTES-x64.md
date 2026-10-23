@@ -138,6 +138,40 @@ Boxedwine shutdown
   (identical to native; also with `/bin/hello32` as the exec target, and `x64/tests/exec32to64.S`
   — an i386 program that execve()s `/bin/hello64` — prints `hello from x86-64 guest`.)
 
+### Approach 1, step 3: conformance suite + real Debian amd64 userland (commit 3e61bff8)
+
+Conformance (`x64/tests/compare.sh`: each `t_*` test runs natively and under BoxedWine, stdout diffed):
+| test | covers | result |
+|---|---|---|
+| `t_int` | 8–64-bit ALU, div/mod, `__int128`, rol/ror/rcl/rcr/shld/shrd/bsf/bsr/bswap/bt*/adc/sbb/cmpxchg/xadd/lahf/sahf/setcc | PASS |
+| `t_str` | mem*/str* on all sizes 0..300 × alignments 0..15, qsort/bsearch, printf/scanf/strtol | PASS |
+| `t_misc` | setjmp/longjmp, SIGSEGV/SIGFPE handlers + siglongjmp, raise/sigprocmask/sigpending, file I/O, stat, readdir, env | PASS |
+| `t_fp` | SSE float/double, rounding modes, fenv exception flags, libm, strtod, **x87 long double** | FAIL only on long double: BoxedWine's shared x87 core keeps registers as doubles (64-bit mantissa, 80-bit range lost) |
+
+Bugs found and fixed by the suite: late delivery of self-raised signals (i386 frame builder
+consumed them), `rt_sigpending` missing, x87 control word 0 (single precision) instead of 0x37F,
+MXCSR rounding/flags ignored (now kept in the host fenv), COMISD/CMPPD not signalling invalid on NaN.
+
+Debian trixie amd64 `debootstrap --variant=minbase` root (`/workspace/x64-debroot`, 250 MB):
+BoxedWine's VFS doesn't follow host symlinks in a `-root` dir, it uses `<name>.link` files →
+`x64/tools/symlinks-to-boxedwine.py <root>` converts them (309 links, merged-/usr).
+```
+boxedwine -root /workspace/x64-debroot -w / -nozip -novideo /bin/bash -c \
+  'echo $((6*7)); ls /usr | head -3; echo pipe:$(echo abc | tr a-z A-Z); python3 -c "import os,threading; print(os.getcwd(), threading.active_count())"'
+42
+bin
+games
+include
+pipe:ABC
+/ 1
+boxedwine ... /usr/bin/python3 -c 'import sys; print(sum(range(100)), sys.version)'
+4950 3.13.5 (main, Aug 10 2026, 12:06:59) [GCC 14.2.0]          (0.6 s wall)
+```
+i.e. stock dynamically linked distro binaries (bash, coreutils, python3 3.13) run: ld.so, libc,
+fork/exec pipelines, command substitution, locale fallback, threads.
+Added for this: sockets (+ sendmsg/recvmsg msghdr/cmsg conversion), select/pselect6/ppoll,
+fcntl locks, statfs, epoll_pwait, signalfd4, rt_sigsuspend/sigtimedwait, interrupted-syscall restart.
+
 ### Approach 1: performance
 
 `bench.c` (fib(32) + 50M-iteration xorshift loop + 5M double loop, `gcc -O2 -static`):
