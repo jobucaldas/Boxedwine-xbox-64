@@ -22,6 +22,7 @@
 
 #include "kscheduler.h"
 #include "loader.h"
+#include "loader/loader64.h"
 #include "kstat.h"
 #include "bufferaccess.h"
 #include "ksignal.h"
@@ -1170,7 +1171,11 @@ KThread* KProcess::startProcess(BString currentDirectory, const std::vector<BStr
         for (U32 i=0;i<envValues.size();i++) {
             env.push_back(envValues[i]);
         }
-        setupThreadStack(thread, thread->cpu, this->name, args, env);
+        if (this->isX64) {
+            x64SetupMainThread(thread, args, env);
+        } else {
+            setupThreadStack(thread, thread->cpu, this->name, args, env);
+        }
 
         this->currentDirectory = currentDirectory;
 

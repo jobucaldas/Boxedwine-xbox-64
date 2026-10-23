@@ -23,6 +23,7 @@
 #include "../io/fsfilenode.h"
 #include "bufferaccess.h"
 #include "kstat.h"
+#include "loader/loader64.h"
 #include <cstdlib>
 
 static bool signalIsIgnoredByDefault(U32 signal) {
@@ -1596,6 +1597,9 @@ U32 pageFaultError(bool protectionFault, bool writeFault, bool executeFault) {
 }
 
 void KThread::seg_mapper(U32 address, bool readFault, bool writeFault, bool throwException, bool executeFault) {
+    if (this->process->isX64) {
+        x64SegFault(this, address, false);
+    }
     if (this->process->sigActions[K_SIGSEGV].handlerAndSigAction!=K_SIG_IGN && this->process->sigActions[K_SIGSEGV].handlerAndSigAction!=K_SIG_DFL) {
         this->process->sigActions[K_SIGSEGV].sigInfo[0] = K_SIGSEGV;
         this->process->sigActions[K_SIGSEGV].sigInfo[1] = 0;
@@ -1612,6 +1616,9 @@ void KThread::seg_mapper(U32 address, bool readFault, bool writeFault, bool thro
 
 // motorhead demo installer, tomb raider 3 demo will trigger this
 void KThread::seg_access(U32 address, bool readFault, bool writeFault, bool throwException, bool executeFault) {
+    if (this->process->isX64) {
+        x64SegFault(this, address, true);
+    }
     if (this->process->sigActions[K_SIGSEGV].handlerAndSigAction!=K_SIG_IGN && this->process->sigActions[K_SIGSEGV].handlerAndSigAction!=K_SIG_DFL) {
 
         this->process->sigActions[K_SIGSEGV].sigInfo[0] = K_SIGSEGV;

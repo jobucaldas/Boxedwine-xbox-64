@@ -189,6 +189,7 @@ private:
     friend KMemoryData* getMemData(KMemory* memory);
     friend KMemoryData;
     friend class NormalCPU;
+    friend class CPU;
 
     struct PreparedCodeInvalidationBlock {
         U32 address;
