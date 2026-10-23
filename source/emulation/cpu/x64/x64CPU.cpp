@@ -19,6 +19,7 @@
 #include "boxedwine.h"
 #include "x64CPU.h"
 #include "x64Math.h"
+#include "x64Atomic.h"
 #include "ksignal.h"
 
 enum {
@@ -488,6 +489,9 @@ void X64CPU::setReg(int reg, int bits, U64 value) {
 
 U64 X64CPU::readRM(int bits) {
     if (isMem) {
+        if (lockPrefix) {
+            return lockedRead(ea(), bits);
+        }
         return readMem(ea(), bits);
     }
     return getReg(rmField, bits);
@@ -495,10 +499,39 @@ U64 X64CPU::readRM(int bits) {
 
 void X64CPU::writeRM(int bits, U64 value) {
     if (isMem) {
-        writeMem(ea(), bits, value);
+        if (lockPrefix) {
+            lockedWrite(ea(), bits, value);
+        } else {
+            writeMem(ea(), bits, value);
+        }
     } else {
         setReg(rmField, bits, value);
     }
+}
+
+U64 X64CPU::lockedRead(U64 address, int bits) {
+    lockPtr = nullptr;
+    U32 len = bits / 8;
+    if (!(address >> 32) && ((address & 0xFFF) + len) <= K_PAGE_SIZE) {
+        U8* p = memory->getRamPtr((U32)address, len, true);
+        if (p) {
+            lockPtr = p;
+            lockOld = x64AtomicLoad(p, bits);
+            return lockOld;
+        }
+    }
+    return readMem(address, bits);
+}
+
+void X64CPU::lockedWrite(U64 address, int bits, U64 value) {
+    if (lockPtr) {
+        if (!x64AtomicCas(lockPtr, bits, lockOld, value)) {
+            lockRetry = true;
+        }
+        lockPtr = nullptr;
+        return;
+    }
+    writeMem(address, bits, value);
 }
 
 // ---------------------------------------------------------------- ALU helpers
@@ -1040,9 +1073,13 @@ void X64CPU::run() {
     }
     for (U32 i = 0; i < 100000; i++) {
         step();
+        if (lockRetry) {
+            lockRetry = false;
+            rip = instStart;
+        }
         if (syscallInvalidatedFetch) {
             syscallInvalidatedFetch = false;
-            if (thread->terminating || thread->pendingSignals || yield) {
+            if (thread->terminating || thread->pendingSignals || yield || thread->cpu != this) {
                 return;
             }
         }
@@ -1056,6 +1093,8 @@ void X64CPU::step() {
     adSize = false;
     repPrefix = 0;
     segPrefix = 0;
+    lockPrefix = false;
+    lockPtr = nullptr;
 
     U8 op;
     while (true) {
@@ -1064,7 +1103,7 @@ void X64CPU::step() {
         case 0x66: opSize = true; continue;
         case 0x67: adSize = true; continue;
         case 0xF2: case 0xF3: repPrefix = op; continue;
-        case 0xF0: continue;
+        case 0xF0: lockPrefix = true; continue;
         case 0x26: case 0x2E: case 0x36: case 0x3E: continue;
         case 0x64: segPrefix = 4; continue;
         case 0x65: segPrefix = 5; continue;
@@ -1239,18 +1278,14 @@ void X64CPU::step() {
         setLogic(bits, readRM(bits) & getReg(regField, bits));
         return;
     }
-    case 0x86: {
-        decodeModrm();
-        U64 a = readRM(8);
-        writeRM(8, getReg(regField, 8));
-        setReg(regField, 8, a);
-        return;
-    }
+    case 0x86:
     case 0x87: {
-        int bits = opBits();
+        int bits = op == 0x86 ? 8 : opBits();
         decodeModrm();
+        lockPrefix = isMem;
         U64 a = readRM(bits);
         writeRM(bits, getReg(regField, bits));
+        if (lockRetry) return;
         setReg(regField, bits, a);
         return;
     }
@@ -1644,7 +1679,7 @@ void X64CPU::step0F() {
                 bitOffset = (U64)off & (bits - 1);
             }
         }
-        U64 v = isMem ? readMem(address, bits) : getReg(rmField, bits);
+        U64 v = isMem ? (lockPrefix && kind != 0 ? lockedRead(address, bits) : readMem(address, bits)) : getReg(rmField, bits);
         U64 bit = 1ULL << bitOffset;
         U32 f = getFlags() & ~CF;
         if (v & bit) f |= CF;
@@ -1653,8 +1688,12 @@ void X64CPU::step0F() {
         if (kind == 1) v |= bit;
         else if (kind == 2) v &= ~bit;
         else v ^= bit;
-        if (isMem) writeMem(address, bits, v);
-        else setReg(rmField, bits, v);
+        if (isMem) {
+            if (lockPrefix) lockedWrite(address, bits, v);
+            else writeMem(address, bits, v);
+        } else {
+            setReg(rmField, bits, v);
+        }
         return;
     }
     case 0xA4: case 0xA5: case 0xAC: case 0xAD: {
@@ -1796,8 +1835,9 @@ void X64CPU::step0F() {
         U64 dst = readRM(bits);
         U64 src = getReg(regField, bits);
         U64 res = alu(0, bits, dst, src);
-        setReg(regField, bits, dst);
         writeRM(bits, res);
+        if (lockRetry) return;
+        setReg(regField, bits, dst);
         return;
     }
     case 0xC3: { // MOVNTI
@@ -1813,20 +1853,45 @@ void X64CPU::step0F() {
             U64 address = ea();
             U32 f = getFlags() & ~ZF;
             if (rex & 8) { // CMPXCHG16B
-                U64 lo = read64(address), hi = read64(address + 8);
-                if (lo == r[0] && hi == r[2]) {
-                    write64(address, r[3]);
-                    write64(address + 8, r[1]);
-                    f |= ZF;
+                U8* p = (!(address >> 32) && (address & 0xFFF) <= 0xFF0) ? memory->getRamPtr((U32)address, 16, true) : nullptr;
+                if (p) {
+                    U64 expected[2] = { r[0], r[2] };
+                    if (x64AtomicCas128(p, expected, r[3], r[1])) {
+                        f |= ZF;
+                    } else {
+                        r[0] = expected[0];
+                        r[2] = expected[1];
+                    }
                 } else {
-                    r[0] = lo;
-                    r[2] = hi;
+                    U64 lo = read64(address), hi = read64(address + 8);
+                    if (lo == r[0] && hi == r[2]) {
+                        write64(address, r[3]);
+                        write64(address + 8, r[1]);
+                        f |= ZF;
+                    } else {
+                        r[0] = lo;
+                        r[2] = hi;
+                    }
                 }
             } else { // CMPXCHG8B
-                U64 v = read64(address);
                 U64 cmp = (U64)(U32)r[0] | ((U64)(U32)r[2] << 32);
-                if (v == cmp) {
-                    write64(address, (U64)(U32)r[3] | ((U64)(U32)r[1] << 32));
+                U64 desired = (U64)(U32)r[3] | ((U64)(U32)r[1] << 32);
+                U8* p = (!(address >> 32) && (address & 0xFFF) <= 0xFF8) ? memory->getRamPtr((U32)address, 8, true) : nullptr;
+                U64 v;
+                bool ok;
+                if (p) {
+                    v = x64AtomicLoad(p, 64);
+                    ok = v == cmp && x64AtomicCas(p, 64, cmp, desired);
+                    if (v == cmp && !ok) {
+                        lockRetry = true;
+                        return;
+                    }
+                } else {
+                    v = read64(address);
+                    ok = v == cmp;
+                    if (ok) write64(address, desired);
+                }
+                if (ok) {
                     f |= ZF;
                 } else {
                     r[0] = (U32)v;

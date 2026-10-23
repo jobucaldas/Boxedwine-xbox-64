@@ -119,6 +119,7 @@ public:
     U32 alternateStack = 0;
     U32 alternateStackSize = 0;
     CPU* cpu = nullptr;
+    CPU* retiredCpu = nullptr; // previous CPU after an execve switched between i386 and x86-64
     KProcessPtr process;
     KMemory* const memory;
     bool interrupted = false;

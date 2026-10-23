@@ -163,19 +163,39 @@ static U64 pushString(X64CPU* cpu, const char* s) {
     return cpu->r[4];
 }
 
-X64CPU* x64ConvertThread(KThread* thread) {
+void x64ReplaceThreadCpu(KThread* thread) {
     CPU* old = thread->cpu;
-    X64CPU* cpu = new X64CPU(thread->memory);
+    CPU* cpu = CPU::allocCPU(thread->memory);
     cpu->thread = thread;
-    cpu->r[4] = old ? old->reg[4].u32 : 0;
+    cpu->reg[4].u32 = old->reg[4].u32;
+    cpu->eip.u32 = old->eip.u32;
+    if (thread->process->isX64) {
+        ((X64CPU*)cpu)->r[4] = old->reg[4].u32;
+    }
     thread->cpu = cpu;
-    delete old;
-    return cpu;
+    delete thread->retiredCpu;
+    thread->retiredCpu = old;
 }
 
-void x64SetupMainThread(KThread* thread, const std::vector<BString>& args, std::vector<BString>& env) {
+void x64CloneCpu(KThread* thread, KThread* from) {
+    X64CPU* cpu = (X64CPU*)thread->cpu;
+    cpu->clone64((X64CPU*)from->cpu);
+    cpu->sigAltStack = ((X64CPU*)from->cpu)->sigAltStack;
+    cpu->sigAltStackSize = ((X64CPU*)from->cpu)->sigAltStackSize;
+}
+
+void x64ForkChild(KThread* thread, U32 childStack) {
+    X64CPU* cpu = (X64CPU*)thread->cpu;
+    cpu->r[0] = 0;
+    if (childStack) {
+        cpu->r[4] = childStack;
+    }
+}
+
+void x64SetupMainThread(KThread* thread, const std::vector<BString>& args, const std::vector<BString>& env) {
     KProcess* process = thread->process.get();
-    X64CPU* cpu = x64ConvertThread(thread);
+    X64CPU* cpu = (X64CPU*)thread->cpu;
+    cpu->r[4] = cpu->reg[4].u32; // top of the stack from KThread::setupStack
     cpu->rip = process->entry;
 
     U64 randomBytes[2] = { ((U64)rand() << 32) ^ rand(), ((U64)rand() << 32) ^ rand() };

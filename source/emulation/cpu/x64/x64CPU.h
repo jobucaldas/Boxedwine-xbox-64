@@ -142,6 +142,15 @@ private:
     void setReg(int reg, int bits, U64 value);
     U64 readRM(int bits);
     void writeRM(int bits, U64 value);
+
+    // LOCK prefix: atomic load in readRM, compare-and-swap in writeRM; on a
+    // lost race the whole instruction is retried.
+    bool lockPrefix = false;
+    bool lockRetry = false;
+    U8* lockPtr = nullptr;
+    U64 lockOld = 0;
+    U64 lockedRead(U64 address, int bits);
+    void lockedWrite(U64 address, int bits, U64 value);
     U64 readMem(U64 address, int bits);
     void writeMem(U64 address, int bits, U64 value);
 

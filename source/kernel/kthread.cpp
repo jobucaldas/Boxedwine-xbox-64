@@ -56,6 +56,8 @@ KThread::~KThread() {
     CPU* cpu = this->cpu;
     this->cpu = nullptr;
     delete cpu;
+    delete this->retiredCpu;
+    this->retiredCpu = nullptr;
 }
 
 void KThread::cleanup() {
@@ -1647,6 +1649,9 @@ void KThread::clone(KThread* from) {
     this->waitingForSignalToEndMaskToRestore = from->waitingForSignalToEndMaskToRestore;
     this->cpu->clone(from->cpu);
     this->cpu->thread = this;
+    if (this->process->isX64) {
+        x64CloneCpu(this, from);
+    }
 }
 
 U32 KThread::modify_ldt(U32 func, U32 ptr, U32 count) {

@@ -47,9 +47,13 @@ static inline bool platformThreadShouldStop(CPU* cpu) {
     return cpu->thread->terminating;
 }
 
-static NO_INLINE void platformThreadRun(CPU* cpu) {
+static NO_INLINE void platformThreadRun(CPU*& cpu) {
     do {
         cpu->run();
+        // execve between i386 and x86-64 images replaces the thread's CPU object
+        if (cpu->thread->cpu != cpu) {
+            cpu = cpu->thread->cpu;
+        }
         cpu->thread->waitForPtraceResume();
     } while (!platformThreadShouldStop(cpu));
 }
@@ -82,6 +86,9 @@ static void platformThread(CPU* cpu) {
 #endif
             break;
         } catch (...) {
+            if (cpu->thread->cpu != cpu) {
+                cpu = cpu->thread->cpu;
+            }
             if (!cpu->thread->terminating) {
                 cpu->nextOp = cpu->getNextOp();
             }

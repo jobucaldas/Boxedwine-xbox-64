@@ -24,8 +24,13 @@ class X64CPU;
 bool isElf64X64(const U8* header, U32 len);
 BString getInterpreter64(FsOpenNode* openNode);
 bool loadProgram64(KThread* thread, FsOpenNode* openNode);
-X64CPU* x64ConvertThread(KThread* thread);
-void x64SetupMainThread(KThread* thread, const std::vector<BString>& args, std::vector<BString>& env);
+// Replaces thread->cpu with a CPU matching process->isX64 (keeps ESP/EIP). The
+// old CPU stays alive in thread->retiredCpu because it may still be on the stack.
+void x64ReplaceThreadCpu(KThread* thread);
+// thread->cpu must already be an X64CPU
+void x64SetupMainThread(KThread* thread, const std::vector<BString>& args, const std::vector<BString>& env);
+void x64CloneCpu(KThread* thread, KThread* from);
+void x64ForkChild(KThread* thread, U32 childStack);
 void x64SegFault(KThread* thread, U32 address, bool accessError);
 
 #endif

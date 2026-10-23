@@ -30,6 +30,15 @@
 
 U32 ksyscallI386(CPU* cpu, U32 nr);
 
+// same values as the K_CLONE_* flags private to kprocess.cpp
+#define K_CLONE_VM                0x00000100
+#define K_CLONE_VFORK             0x00004000
+#define K_CLONE_THREAD            0x00010000
+#define K_CLONE_SETTLS            0x00080000
+#define K_CLONE_PARENT_SETTID     0x00100000
+#define K_CLONE_CHILD_CLEARTID    0x00200000
+#define K_CLONE_CHILD_SETTID      0x01000000
+
 static U32 syscallLog64 = 0;
 
 static void initLog() {
@@ -195,6 +204,73 @@ static U64 x64Mmap(X64CPU* cpu, U64 addr, U64 len, U64 prot, U64 flags, U64 fd, 
     return cpu->memory->mmap(cpu->thread, (U32)addr, (U32)len, (S32)prot, (S32)flags, (FD)fd, off);
 }
 
+static U64 x64Clone(X64CPU* cpu, U64 flags, U64 newsp, U64 ptid, U64 ctid, U64 tls) {
+    KThread* thread = cpu->thread;
+    KProcess* process = thread->process.get();
+    if (flags & K_CLONE_THREAD) {
+        KThread* newThread = process->createThread();
+        X64CPU* nc = (X64CPU*)newThread->cpu;
+        nc->clone64(cpu);
+        nc->r[0] = 0;
+        if (newsp) {
+            nc->r[4] = newsp;
+        }
+        if (flags & K_CLONE_SETTLS) {
+            nc->fsBase = tls;
+        }
+        newThread->sigMask = thread->sigMask;
+        if (flags & K_CLONE_CHILD_CLEARTID) {
+            newThread->clear_child_tid = (U32)ctid;
+        }
+        if ((flags & K_CLONE_PARENT_SETTID) && ptid) {
+            cpu->write32(ptid, newThread->id);
+        }
+        if ((flags & K_CLONE_CHILD_SETTID) && ctid) {
+            cpu->write32(ctid, newThread->id);
+        }
+        U32 id = newThread->id;
+        scheduleThread(newThread);
+        return id;
+    }
+    return process->clone(thread, (U32)flags & ~(U32)K_CLONE_SETTLS, (U32)newsp, (U32)ptid, 0, (U32)ctid);
+}
+
+static U64 x64Clone3(X64CPU* cpu, U64 args, U64 size) {
+    if (size < 64) {
+        return (U64)-K_EINVAL;
+    }
+    U64 flags = cpu->read64(args);
+    U64 childTid = cpu->read64(args + 16);
+    U64 parentTid = cpu->read64(args + 24);
+    U64 exitSignal = cpu->read64(args + 32);
+    U64 stack = cpu->read64(args + 40);
+    U64 stackSize = cpu->read64(args + 48);
+    U64 tls = cpu->read64(args + 56);
+    return x64Clone(cpu, flags | (exitSignal & 0xFF), stack ? stack + stackSize : 0, parentTid, childTid, tls);
+}
+
+static void readStringArray64(X64CPU* cpu, U64 address, std::vector<BString>& results) {
+    if (!address) {
+        return;
+    }
+    for (U32 i = 0; i < 4096; i++) {
+        U64 p = cpu->read64(address + i * 8);
+        if (!p) {
+            break;
+        }
+        results.push_back(cpu->memory->readString((U32)p));
+    }
+}
+
+static U64 x64Execve(X64CPU* cpu, U64 path, U64 argv, U64 envp) {
+    std::vector<BString> args;
+    std::vector<BString> envs;
+    BString p = cpu->memory->readString((U32)path);
+    readStringArray64(cpu, argv, args);
+    readStringArray64(cpu, envp, envs);
+    return cpu->thread->process->execve(cpu->thread, p, args, envs);
+}
+
 static U64 x64Exit(X64CPU* cpu, U64 code, bool group) {
     U32 nr32 = group ? 252 : 1;
     return bridge(cpu, nr32, code);
@@ -243,6 +319,10 @@ static U64 doSyscall64(X64CPU* cpu, U64 nr, U64 a1, U64 a2, U64 a3, U64 a4, U64 
     case 33: return bridge(cpu, 63, a1, a2);            // dup2
     case 35: return bridge(cpu, 407, 0, 0, a1, a2);     // nanosleep -> clock_nanosleep_time64
     case 39: return bridge(cpu, 20);                    // getpid
+    case 56: return x64Clone(cpu, a1, a2, a3, a4, a5);  // clone
+    case 57: return x64Clone(cpu, 17 /* SIGCHLD */, 0, 0, 0, 0); // fork
+    case 58: return x64Clone(cpu, K_CLONE_VM | K_CLONE_VFORK | 17, 0, 0, 0, 0); // vfork
+    case 59: return x64Execve(cpu, a1, a2, a3);         // execve
     case 60: return x64Exit(cpu, a1, false);            // exit
     case 61: {                                          // wait4
         if (a4) {
@@ -369,7 +449,7 @@ static U64 doSyscall64(X64CPU* cpu, U64 nr, U64 a1, U64 a2, U64 a3, U64 a4, U64 
     case 267: return bridge(cpu, 305, a1, a2, a3, a4);  // readlinkat
     case 268: return bridge(cpu, 306, a1, a2, a3);      // fchmodat
     case 269: return bridge(cpu, 307, a1, a2, a3);      // faccessat
-    case 273: return bridge(cpu, 311, a1, a2);          // set_robust_list
+    case 273: return 0;                                 // set_robust_list (robust futexes not emulated)
     case 280: return bridge(cpu, 412, a1, a2, a3, a4);  // utimensat -> time64
     case 284: return bridge(cpu, 328, a1, 0);           // eventfd
     case 290: return bridge(cpu, 328, a1, a2);          // eventfd2
@@ -382,6 +462,7 @@ static U64 doSyscall64(X64CPU* cpu, U64 nr, U64 a1, U64 a2, U64 a3, U64 a4, U64 
     case 319: return bridge(cpu, 356, a1, a2);          // memfd_create
     case 332: return bridge(cpu, 383, a1, a2, a3, a4, a5); // statx
     case 334: return (U64)-K_ENOSYS;                    // rseq
+    case 435: return x64Clone3(cpu, a1, a2);            // clone3
     case 439: return bridge(cpu, 439, a1, a2, a3, a4);  // faccessat2
     default:
         break;
