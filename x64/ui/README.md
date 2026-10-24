@@ -139,3 +139,40 @@ with the unchanged wineboot-attempt blocker; build and whitespace checks exited
 0. Linux capture: `/workspace/x64-run/videos/R5-O3.mp4` (H.264, 35 seconds),
 reviewed final frame `/workspace/x64-run/v2/R5/O3-final.png`. Display capture is
 HOST-ONLY; its live launch evidence is `out/launch-kmh5tjaa/`, status blocked.
+
+O4 records the visible, live demo on an exclusively owned Linux Xvfb display:
+
+```sh
+bash -n x64/ui/record.sh
+x64/ui/record.sh O4
+ffprobe -v error -select_streams v:0 -show_entries stream=codec_name -show_entries format=duration -of default=noprint_wrappers=1 /workspace/x64-run/videos/R5-O4.mp4
+make -C x64/uwp-host all
+git diff --check
+```
+
+The recorder refuses an occupied/reserved :99, starts Xvfb at 1280x720, runs
+curses inside xterm and captures with ffmpeg x11grab/H.264. `--demo-evidence`
+drives the actual `Shell.dispatch` with timed login approval, all three tiles,
+Install and Launch. Screens/actions remain visible for two or more seconds;
+the final blocked result holds for five seconds. No saved routing evidence is
+used as UI input. Demo adapter children have a 20-second timeout plus cleanup;
+the xterm has a 54-second timeout and recording a 58-second ceiling. Cleanup
+signals only owned processes and finalizes capture on failed runs too.
+
+Video: `/workspace/x64-run/videos/R5-O4.mp4`. Evidence lives under
+`/workspace/x64-run/v2/R5/O4/`: raw launch/install and UI logs, separate
+`launch.exit`, `ui.exit`, `xterm.exit`, `capture.exit`, scenario actions/result,
+ffprobe metadata and `final.png`. `scenario.json` links the unique live O2
+child log; that log references the unchanged harness's raw reports/traces.
+Capture succeeds only for a completed expected blocked scenario, successful
+UI/capture statuses and a nonempty H.264 video no longer than 60 seconds.
+Unexpected launch failures retain their logs/status and fail capture acceptance.
+The final screenshot must also be reviewed for readable UI and LAUNCH BLOCKED.
+
+The footage is labeled “Linux prototype — Xbox validation pending”. Capture,
+encoding and focus/navigation are HOST-ONLY. The live Launch button goes
+THROUGH O2 -> existing harness -> run_via_wine -> real Wine loader/ntdll -> shim
+-> selected uwph Linux backend operations. The same batch separately includes
+launcher-only stock Wine controls and an unrouted stock Linux wineserver.
+`launch.exit=2` is the unchanged wineboot-attempt gate, not runtime acceptance.
+Capture success proves neither physical Xbox execution nor UWP compatibility.

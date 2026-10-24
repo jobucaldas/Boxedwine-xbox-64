@@ -2,10 +2,12 @@
 import argparse
 from concurrent.futures import ThreadPoolExecutor
 import curses
+import json
+from pathlib import Path
 import time
 
 from model import OfflineSteamBackend
-from runtime import Runtime
+from runtime import Runtime, run
 
 
 class Shell:
@@ -122,7 +124,52 @@ def headless(shell, scenario):
     return shell.result.exit_code
 
 
-def visible(stdscr, shell):
+class VisibleDemo:
+    """Timed inputs through the interactive dispatcher; no replayed results."""
+
+    def __init__(self, evidence):
+        self.evidence = Path(evidence)
+        self.started = time.monotonic()
+        self.next_at = self.started + 3
+        self.step = 0
+        self.actions = ('activate', 'right', 'right', 'left', 'left',
+                        'down', 'activate', 'right', 'activate')
+        self.finished = None
+
+    def tick(self, shell):
+        now = time.monotonic()
+        if shell.future is not None or now < self.next_at:
+            return
+        if self.step in (7, 9):
+            result = shell.result
+            name = 'install' if self.step == 7 else 'launch'
+            if not (self.evidence / (name + '.exit')).exists():
+                (self.evidence / (name + '.exit')).write_text(str(result.exit_code) + '\n')
+                (self.evidence / (name + '.log')).write_text(result.output + '\n')
+                if name == 'install' and result.exit_code != 0:
+                    raise RuntimeError('demo install failed')
+        if self.step < len(self.actions):
+            action = self.actions[self.step]
+            shell.dispatch(action)
+            self.step += 1
+            self.next_at = now + 2
+        elif self.finished is None:
+            result = shell.result
+            good = result.status == 'blocked' and result.exit_code == 2
+            (self.evidence / 'scenario.json').write_text(json.dumps({
+                'completed': good, 'actions': list(self.actions),
+                'launch_status': result.status, 'launch_exit': result.exit_code,
+                'live_child_log': result.log_path,
+                'label': 'Linux prototype — Xbox validation pending'}, indent=2) + '\n')
+            (self.evidence / 'ui.log').write_text('\n'.join(shell.logs) + '\n')
+            if not good:
+                raise RuntimeError('expected live LAUNCH BLOCKED / exit 2')
+            self.finished = now
+        elif now - self.finished >= 5:
+            shell.quit = True
+
+
+def visible(stdscr, shell, demo=None):
     curses.curs_set(0)
     stdscr.timeout(100)
     keys = {curses.KEY_LEFT: 'left', curses.KEY_RIGHT: 'right',
@@ -131,6 +178,8 @@ def visible(stdscr, shell):
             27: 'back', ord('b'): 'back'}
     while not shell.quit:
         shell.poll()
+        if demo:
+            demo.tick(shell)
         stdscr.erase()
         height, width = stdscr.getmaxyx()
         rows = ['Linux prototype — Xbox validation pending',
@@ -168,12 +217,19 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--headless', action='store_true')
     parser.add_argument('--scenario', choices=('navigation', 'launch-hello'), default='navigation')
+    parser.add_argument('--demo-evidence', type=Path, help='bounded visible live demo output directory')
     args = parser.parse_args()
-    shell = Shell()
+    if args.demo_evidence and args.headless:
+        parser.error('visible demo requires curses')
+    if args.demo_evidence:
+        args.demo_evidence.mkdir(parents=True, exist_ok=True)
+    shell = Shell(Runtime(runner=lambda command, cwd: run(command, cwd, timeout=20))
+                  if args.demo_evidence else None)
     try:
         if args.headless:
             return headless(shell, args.scenario)
-        curses.wrapper(visible, shell)
+        curses.wrapper(visible, shell,
+                       VisibleDemo(args.demo_evidence) if args.demo_evidence else None)
         return 0
     finally:
         shell.close()
