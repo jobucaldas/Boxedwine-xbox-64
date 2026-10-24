@@ -242,3 +242,87 @@ exit=0
 Notes: the first run creates the prefix (~7.5 s). stderr only contained `XDG_RUNTIME_DIR` warnings
 and `failed to open C:\windows\syswow64\rundll32.exe` (no 32-bit Wine installed; harmless here).
 A prefix directly under `/tmp` is refused by Wine ("'/tmp' is not owned by you").
+
+## Native path via Wine loader (step R2)
+
+Goal of R2: run our owned guest PE through **Wine's own, unmodified PE loader** — the
+mature, auditable, open-source load path — instead of any hand-rolled in-process mapper.
+Two things are shown here: (a) a tiny launcher that invokes Wine's public loader binary,
+and (b) proof the guest image is mapped by Wine's loader (not by us), on this modern
+PE-split / new-WoW64 Wine.
+
+### This Wine is the modern PE/Unix-split (new WoW64) build
+`wine-10.0 (Debian 10.0~repack-6)`. The loader is split into a PE side and a Unix side:
+```
+/usr/lib/x86_64-linux-gnu/wine/x86_64-windows/ntdll.dll  -> PE32+ executable for WINE (DLL), x86-64   (Wine's PE-side loader)
+/usr/lib/x86_64-linux-gnu/wine/x86_64-unix/ntdll.so      -> ELF 64-bit LSB shared object, x86-64        (Unix host side)
+x86_64-windows also ships: kernel32.dll, wow64.dll, wow64cpu.dll, wow64win.dll
+```
+ntdll.dll is a genuine PE that performs the Windows-side image loading (map sections,
+relocations, import resolution, TEB/PEB, entry call); ntdll.so is the ELF bridge to the
+host OS. This is exactly the architecture R2 targets: the guest .exe is *input data* to
+ntdll.dll's loader; our code never maps an image.
+
+### (a) Tiny launcher that uses Wine's public invocation mechanism
+`x64/pe/launcher/run_via_wine.c` (built native: `cc -O2 -o run_via_wine run_via_wine.c`).
+It does one thing: `execv()` Wine's own loader binary (`/usr/lib/wine/wine64`, overridable
+via `WINE_LOADER`) with the guest `.exe` as an argument. No mapping / relocation / import
+work is done by the launcher — all of that is Wine's. This is the piece that would live
+inside the Dev Mode UWP app, calling the Wine loader bundled in the app's own storage.
+
+Command (from repo root):
+```
+export WINEPREFIX=$HOME/.wine64-step1 WINEDLLOVERRIDES="mscoree,mshtml="
+WINEDEBUG=-all x64/pe/launcher/run_via_wine x64/pe/tests/hello_k32.exe
+WINEDEBUG=-all x64/pe/launcher/run_via_wine x64/pe/tests/hello.exe a b
+```
+Real output:
+```
+[launcher] exec /usr/lib/wine/wine64 -> x64/pe/tests/hello_k32.exe (handing guest to Wine's loader)
+hello from a native x86-64 PE (kernel32 only)
+exit=0
+[launcher] exec /usr/lib/wine/wine64 -> x64/pe/tests/hello.exe (handing guest to Wine's loader)
+hello.exe: native x86-64 Windows PE, argc=3 argv[0]=Z:\workspace\Boxedwine-xbox-64\x64\pe\tests\hello.exe
+TEB self-check: ok, sizeof(void*)=8
+malloc: heap, 64-bit math 123456789000, double 6.283
+threads: shared=200000 exit codes=6,7 main tls=5
+exit=0
+```
+
+### (b) Proof the guest is loaded by Wine's own loader
+Run the launcher with `WINEDEBUG=+loaddll` so Wine's loader logs every module it maps:
+```
+export WINEPREFIX=$HOME/.wine64-step1 WINEDLLOVERRIDES="mscoree,mshtml="
+WINEDEBUG=+loaddll x64/pe/launcher/run_via_wine x64/pe/tests/hello_k32.exe
+```
+Real trace (stderr):
+```
+[launcher] exec /usr/lib/wine/wine64 -> x64/pe/tests/hello_k32.exe (handing guest to Wine's loader)
+0124:trace:loaddll:build_module Loaded L"Z:\\workspace\\Boxedwine-xbox-64\\x64\\pe\\tests\\hello_k32.exe" at 0000000140000000: native
+0124:trace:loaddll:build_module Loaded L"C:\\windows\\system32\\kernelbase.dll" at 00006FFFFF3F0000: builtin
+0124:trace:loaddll:build_module Loaded L"C:\\windows\\system32\\kernel32.dll" at 00006FFFFFA40000: builtin
+hello from a native x86-64 PE (kernel32 only)
+exit=0
+```
+Reading: `build_module` is Wine's PE loader (in ntdll.dll). It maps our guest
+`hello_k32.exe` at its preferred base `0x140000000` (`native` = the real guest image),
+then resolves its import `kernel32.dll` (+ `kernelbase.dll`) as Wine `builtin` PE DLLs.
+The guest's x86-64 code then runs natively on the host CPU. Our launcher contributed no
+loader code; the entire map/relocate/import/entry sequence is Wine's.
+
+### How this packages inside a Dev Mode UWP app (design, no code)
+- The UWP app's install directory (its own app storage) ships: Wine's loader + the PE-side
+  DLLs (ntdll.dll/kernel32.dll/...) + the Unix side, and the guest `.exe` the user owns.
+- On Xbox (ARM64) there is no host Linux, so Wine's Unix side is provided by an emulated
+  Linux — the BoxedWine model (Approach 1). On ARM64, the x86-64 guest code that Wine's
+  loader maps is executed by a CPU backend (box64/FEX-style `wowbox64.dll`, as in Hangover),
+  reached through the same WoW64 CPU-backend seam shown by `wow64cpu.dll` above. The
+  `codeGeneration` capability covers the JIT'd native code.
+- The launcher role (this file) is unchanged on Xbox: hand the owned guest `.exe` to Wine's
+  own loader as input data. No image is mapped by our code, nothing is hidden from the OS
+  loader, nothing is injected into other processes, and only files from the app's own
+  storage are loaded. Guest DLL resolution stays inside the app's bundled Wine prefix.
+
+Skipped sub-part: none. R2 asked specifically for Wine's own loader path (not a hand-rolled
+in-process mapper — that was declined earlier, see REFUSED-STEP2), and that is exactly what
+is demonstrated above.
