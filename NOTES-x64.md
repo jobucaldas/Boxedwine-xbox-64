@@ -651,3 +651,58 @@ O1 validation is HOST-ONLY model/documentation testing plus the parent
 uwp-host build/surface check. No uwp-host runtime, launcher or stock Wine
 execution is exercised; UI routing evidence and Linux-box video are deferred
 to their respective later orders. See x64/ui/README.md for the exact checks.
+
+## R4W O1 wineboot trigger
+
+Source inspection (2026-10-24): installed Debian wine/wine64/libwine is
+10.0~repack-6; `/tmp/wine-src/VERSION` identifies Wine 10.0. The existing
+source tree lacked programs/wineboot, so that directory was extracted from
+Debian's matching `wine_10.0~repack.orig.tar.xz`. Its SHA256 is
+e87ff2971c9b2e79fc63341f044d7513e66f3c3782b49609746428caa87c6ee6;
+the matching -6 Debian patch archive has SHA256
+2a8343e7da627528a348e591fcf4531a9935512d771f896226b5f375d4898679.
+Neither inspected source file is targeted by that archive's Debian patches.
+Archives and .dsc came from https://deb.debian.org/debian/pool/main/w/wine/.
+
+**Why a copied prefix still starts wineboot:**
+`/tmp/wine-src/dlls/ntdll/unix/env.c:2042` tests `!startup_info_size` in
+`init_startup_info()`, then calls `build_initial_params()` at line 2044.
+That function unconditionally calls `run_wineboot()` at line 1948.
+In `run_wineboot()` (line 1594), the decisive existing-session check is
+`NtCreateEvent()` at line 1615 and `status == STATUS_OBJECT_NAME_EXISTS`
+at line 1616, which jumps to waiting instead of creating a process.
+The named event is `\KernelObjects\__wineboot_event` (lines 1596–1597).
+Without that existing wineserver event, it attempts `wineboot.exe --init`
+via `NtCreateUserProcess()` (lines 1644–1652). Copying prefix files cannot
+copy this live wineserver object. No on-disk prefix stamp is checked before
+this launch attempt; a completed prefix alone does not satisfy zero wineboot
+attempts in a fresh session.
+
+**Separate decision: whether wineboot updates the prefix.**
+`/tmp/wine-src/programs/wineboot/wineboot.c:1921` calls
+`update_wineprefix(update)` for init or explicit update. The function at
+line 1656 gets the prefix directory from `WINECONFIGDIR` (line 1658), opens
+`wine.inf`, and obtains its `st_mtime` (lines 1668–1675). At line 1677,
+`update_timestamp(config_dir, st.st_mtime) || force` decides whether to run
+the INF update. `get_wine_inf_path()` (lines 93–114) selects
+`WINEBUILDDIR/loader/wine.inf` or `WINEDATADIR/wine.inf`.
+
+`update_timestamp()` (lines 118–158) opens
+`<WINECONFIGDIR>/.update-timestamp` read/write (lines 123–129). The stamp is
+a decimal Unix modification time of the selected wine.inf, followed by a
+newline, not a Wine version string. An equal parsed timestamp returns false
+(line 135); the source also recognizes a leading `disable` (line 134).
+Otherwise a successfully written replacement stamp returns true (lines
+138–152); a missing stamp is created on ENOENT (lines 141–144). Allocation,
+open, or write failures can return false, so a skipped update does not itself
+prove a valid prefix. Explicit update forces the update branch. These are
+observations only; no stamp or runtime behavior was changed. Copying a stamp
+with a different wine.inf mtime can cause an INF update, whereas a matching
+stamp only skips that work after wineboot already starts. `system.reg` is
+prefix registry data, not the launch-suppression check described above.
+
+O1 verification: the exact requested grep/ls command exits 0. Its grep scans
+ntdll/*.c, not ntdll/unix/*.c, so the launch decision additionally required
+inspection of unix/env.c. This is source-only diagnosis: no THROUGH-uwph,
+launcher, stock Wine execution, or build was performed. No child Wine
+process was spawned, code/verifiers changed, or runtime proof claimed.
