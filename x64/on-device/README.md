@@ -6,7 +6,7 @@ This order is build-only: no stock Wine, uwph, Wine loader, or on-console
 execution is claimed. The program does not load game code.
 
 `AppxManifest.xml` is an XML skeleton targeting Windows.Xbox and x64. It declares
-`codeGeneration` (restricted capability), `internetClient`, and
+`codeGeneration` (base foundation capability), `internetClient`, and
 `privateNetworkClientServer`. Capability declarations alone do not prove
 availability or authorization on a particular console OS.
 
