@@ -651,3 +651,21 @@ O1 validation is HOST-ONLY model/documentation testing plus the parent
 uwp-host build/surface check. No uwp-host runtime, launcher or stock Wine
 execution is exercised; UI routing evidence and Linux-box video are deferred
 to their respective later orders. See x64/ui/README.md for the exact checks.
+
+## R4G O1
+
+Documented the exact dzn and isolated DComp commands and cited retained stock
+Wine logs in `x64/graphics/RESULT-dzn.md` (raw copies under
+`x64/graphics/evidence/R4G-O1/`). O1 evidence check PASS; runtime BLOCKED:
+DCompositionCreateDevice returns E_NOTIMPL (0x80004001), NULL device; dzn
+instance succeeds but physical-device enumeration returns -3 (process exit 10).
+Mesa 25.1.9 source root `/workspace/xbox-readiness/dzn/src/mesa-25.1.9`:
+`src/vulkan/wsi/wsi_common_win32.cpp:954` is the DComp call; NULL maps to
+initialization failure at :992. `src/microsoft/vulkan/dzn_device.c:1164`
+initializes WSI during device creation, before any requested surface.
+Next missing integration piece: composition swapchain (:795), then HWND target
+(:802), visual/SetRoot/SetContent/Commit (:806–809), all in that WSI file.
+These later dependencies are source-inspected and untested, not measured
+failures. A UWP CoreWindow path remains unimplemented. Evidence classification:
+cited STOCK WINE only; THROUGH-uwph/launcher not exercised, no new build.
+Lavapipe is not Xbox D3D12; no GPU/presentation or console proof. O1 only.
