@@ -690,15 +690,65 @@ The dispatcher itself is compiled assembly at `signal_x86_64.c:2712`.
 `dlls/ntdll/unix/loader.c:1584` assigns its exported pointer. None of these
 three operations independently requests RWX.
 
-Top three hello startup sites to address, in source-path order:
-`virtual.c:3019` initial image view, `virtual.c:2445` header mmap, and
-`virtual.c:2948–2951` final image section protection (RWX only for W+X sections).
-The first two are expected for an ordinary file-backed hello image; the third
-is a conditional checkpoint, not a claim that hello contains a W+X section.
-O1's exact test is static: no dynamic site-hit trace was collected, so three
-observed RWX hits are not asserted. THROUGH-uwph: not run; stock Wine: not
-run; classification: source-only inventory (no build or runtime acceptance).
-No video was generated for this textual search.
+### Hello artifact and applicable sites (review correction)
+
+The actual harness target is `x64/pe/tests/hello.exe`: the loop in
+`x64/uwp-host/harness/run-wine.sh:59–69` passes that path to
+`out/run_via_wine` (alongside the separate hello_k32 target). It is built by
+`x64/pe/tests/build.sh:6` from `hello.c`. The inspected existing binary has SHA256
+`85e2309af898c58117925c070705715f01b8186bbf8f9b8129fd5ab8161eb8d9`.
+It was inspected without rebuilding or executing it.
+
+`file x64/pe/tests/hello.exe` reports PE32+ x86-64, 18 sections.
+`objdump -h x64/pe/tests/hello.exe` shows only `.text` as CODE, READONLY;
+`.data`, `.bss`, and `.tls` are writable data. A direct little-endian PE-header
+inspection (e_lfanew at 0x3c, COFF section count at PE+6, optional-header size
+at PE+20, 40-byte section records with Characteristics at record+36) gives:
+
+```text
+Machine=0x8664 sections=18 SectionAlignment=0x1000 FileAlignment=0x200
+.text    characteristics=0x60000020 W=0 X=1
+.data    characteristics=0xc0000040 W=1 X=0
+.rdata   characteristics=0x40000040 W=0 X=0
+.pdata   characteristics=0x40000040 W=0 X=0
+.xdata   characteristics=0x40000040 W=0 X=0
+.bss     characteristics=0xc0000080 W=1 X=0
+.idata   characteristics=0x40000040 W=0 X=0
+.tls     characteristics=0xc0000040 W=1 X=0
+.reloc   characteristics=0x42000040 W=0 X=0
+remaining nine debug sections: characteristics=0x42000040 W=0 X=0 each
+W+X sections=0/18
+```
+
+Thus **only two distinct RWX request sites are established for mapping this
+hello image**, on the successful ordinary file-backed mapping path:
+
+1. `dlls/ntdll/unix/virtual.c:3019`: initial RWX image-view protection,
+   passed to `map_view` at 3045 (or address-selection alternatives 3067/3073).
+   `virtual_map_image:3112` calls this before mapping the image contents.
+2. `dlls/ntdll/unix/virtual.c:2445`: RWX header mmap.
+   `virtual_map_image:3115` calls `map_image_into_view`, whose line 2759 calls
+   `map_pe_header`; line 2443 guards this mmap with `!removable`.
+   This establishes applicability for the ordinary mmap-capable, non-removable
+   local-file path, not a guarantee for fallback/read-only filesystems or an
+   execution that fails before image loading.
+
+There is no third RWX request from the final section-protection site
+`virtual.c:2948–2951` for this hello: no section has both
+IMAGE_SCN_MEM_WRITE (0x80000000) and IMAGE_SCN_MEM_EXECUTE (0x20000000).
+The flat-image RWX site at 2796 is also excluded: SectionAlignment is 0x1000,
+so `server/mapping.c:892–893` does not set ImageMappedFlat for a 4 KiB page.
+Relocations, IAT, TLS and the x64 dispatcher paths are described above and
+supply no unconditional third site. Multiple invocations for dependencies
+would not make a third distinct source site. This finding is restricted to
+the image-mapping path; it does not assert that every dependency or later CRT
+behavior has only two RWX sites. A third startup-wide hit cannot be supplied
+from this static evidence and is not invented.
+
+These are statically applicable requests, not dynamically observed hits.
+THROUGH-uwph: not run; launcher: inspected only; stock Wine: not run;
+classification: source/artifact inspection only (neither build-only validation
+nor runtime/Xbox acceptance). No video was generated for this textual search.
 
 ### Exact test and complete search output
 
