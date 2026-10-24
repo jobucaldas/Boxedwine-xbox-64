@@ -208,3 +208,37 @@ Built jart/blink `f006a4fc` (`./configure && make`, 3 s) in `/workspace/x64-appr
   i.e. WoW64 is a consumer of approach 1, not an alternative to it.
 - Wine-on-Windows-host precedent: none found (Hangover targets ARM64 Linux). On Xbox, Wine's Unix
   side has to be provided by an emulated Linux (BoxedWine) — that is the BoxedWine model.
+
+## Native step 1 — 64-bit PE test programs under distro wine64 (Linux host)
+
+Stock Debian Wine (`sudo apt-get install wine64`, wine-10.0 Debian 10.0~repack-6), no BoxedWine
+involved: the test programs' x86-64 code runs natively on the host CPU, with Wine's PE-side DLLs
+(ntdll/kernel32/msvcrt from `/usr/lib/x86_64-linux-gnu/wine/x86_64-windows`) and Wine's Unix side
+providing the OS layer. This is the native-execution baseline to compare BoxedWine against.
+
+Test programs (`x64/pe/tests/`, built with mingw-w64 gcc 14 via `x64/pe/tests/build.sh`):
+- `hello_k32.c` — no CRT, kernel32 only (GetStdHandle/WriteFile/ExitProcess).
+- `hello.c` — standard mingw CRT: printf, argv, `NtCurrentTeb()` self-pointer check, malloc,
+  64-bit math, doubles, 2 threads with InterlockedIncrement, `__thread` TLS.
+
+Commands (from the repo root):
+```
+sudo apt-get install -y wine64 gcc-mingw-w64-x86-64
+x64/pe/tests/build.sh
+export WINEPREFIX=$HOME/.wine64-step1 WINEDEBUG=-all WINEDLLOVERRIDES="mscoree,mshtml="
+/usr/lib/wine/wine64 x64/pe/tests/hello_k32.exe
+/usr/lib/wine/wine64 x64/pe/tests/hello.exe a b
+```
+Real output (stderr dropped; exit codes appended):
+```
+hello from a native x86-64 PE (kernel32 only)
+exit=0
+hello.exe: native x86-64 Windows PE, argc=3 argv[0]=Z:\workspace\Boxedwine-xbox-64\x64\pe\tests\hello.exe
+TEB self-check: ok, sizeof(void*)=8
+malloc: heap, 64-bit math 123456789000, double 6.283
+threads: shared=200000 exit codes=6,7 main tls=5
+exit=0
+```
+Notes: the first run creates the prefix (~7.5 s). stderr only contained `XDG_RUNTIME_DIR` warnings
+and `failed to open C:\windows\syswow64\rundll32.exe` (no 32-bit Wine installed; harmless here).
+A prefix directly under `/tmp` is refused by Wine ("'/tmp' is not owned by you").
