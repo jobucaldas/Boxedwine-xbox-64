@@ -57,10 +57,10 @@ $(OUT)/win/smoke.exe: tests/smoke.c $(OUT)/win/unixside.o $(OUT)/win/libuwph.a
 	$(CC_WIN) $(CFLAGS_COMMON) $(WIN_DEFS) -Isrc -o $@ tests/smoke.c $(OUT)/win/unixside.o \
 	    $(OUT)/win/libuwph.a -lbcrypt -lsynchronization -lwindowsapp
 
-# every libc import of the installed wine64 Unix side must be classified in
-# tools/surface.tsv, and every "host" entry must exist as uwph_<name> in both builds
-check: $(OUT)/linux/libuwph.a $(OUT)/win/libuwph.a tools/surface.tsv
-	tools/check_surface.sh $(OUT)/linux/libuwph.a $(OUT)/win/libuwph.a
+# Bounded real Wine 10.0 inventory / binding diagnostic only. Unsupported imports
+# remain visible and block full-coverage claims; this does not run a PE.
+check: $(OUT)/linux/libuwph.a $(OUT)/win/libuwph.a
+	$(MAKE) -C harness wine-surface-check
 
 test: all
 	$(OUT)/linux/abi_check

@@ -31,3 +31,9 @@ shim-test: $(OUT)/libuwph_shim.so $(OUT)/elf_probe
 	timeout 15s env UWPH_REPORT=$(CURDIR)/$(OUT)/exit.report LD_PRELOAD=$(CURDIR)/$(OUT)/libuwph_shim.so $(OUT)/elf_probe $(OUT)/fixture --exit
 	python3 verify_counters.py $(OUT)/negative.report $(OUT)/positive.report $(OUT)/exit.report
 .PHONY: shim-test
+
+# Host-only inventory and relocation diagnostic; no Wine execution proof.
+wine-surface-check: out/libuwph_shim.so
+	./prepare-wine.sh
+	./check_surface.sh
+.PHONY: wine-surface-check

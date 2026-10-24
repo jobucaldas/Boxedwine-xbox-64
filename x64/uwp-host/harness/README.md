@@ -112,3 +112,59 @@ operations through stock Linux libc and must produce no uwph report.
 
 Capture the acceptance command with
 `x64/uwp-host/harness/record.sh O2 -- make -C x64/uwp-host/harness shim-test`.
+
+## Real Wine artifact inventory (O3)
+
+`./prepare-wine.sh` selects only the installed Debian Wine 10.0 artifacts at
+`/usr/lib/wine/wine64` and `/usr/lib/x86_64-linux-gnu/wine/`, verifies the local
+`/tmp/wine-src/VERSION`, records canonical paths/SHA-256/package identity in
+`out/wine/identity.json`, and hashes every supplied local source file into
+`out/wine/source.sha256`. Installed build configure arguments are unavailable;
+that fact is recorded rather than inventing a configuration. No local source
+build, host patch, network fetch, loader change, or prefix preparation occurs.
+Matching installed symbols bind successfully, so a source build is unnecessary.
+The installed binary checksums, not an assumed correspondence to the supplied
+source tree, identify the tested Wine build.
+
+`make wine-surface-check` regenerates `out/wine/imports.tsv`, raw ELF symbols,
+relocations, dependencies and disassembly, plus `direct-syscalls.tsv`. The
+committed `surface.tsv` explicitly classifies every undefined dynamic symbol,
+including weak/runtime and non-libc dependencies. A changed import list fails
+closed until reviewed; absent shim wrappers are unsupported, never inferred
+from the existence of an unrelated uwph API. `check_surface.sh [policy.tsv]`
+checks exact inventory membership, selected shim exports and actual dynamic
+linker binding diagnostics. Parent `make all` now invokes this bounded check
+instead of the missing `tools/check_surface.sh`/`tools/surface.tsv`. This changes
+the documented gate: success means complete classification, not full support.
+
+The generated owned ELF diagnostic dlopens the **real** ntdll.so with RTLD_NOW
+and records glibc LD_DEBUG=bindings. It checks that all six selected versioned
+imports actually resolve to the canonical shim path, rather than merely seeing
+LD_PRELOAD. No Wine entry point or PE is invoked. Five imports are classified
+`routed` for the selected shim surface (with O2 native-fd bypass limitations);
+`_exit` is an explicit host fallback that flushes instrumentation and performs
+raw Linux exit_group. The diagnostic is host-only and is **not execution proof**
+THROUGH uwph. O4 must provide caller-attributed backend counters from PE runs.
+
+Current inventory: 199 imports, comprising 5 routed, 33 libc internal, 1 explicit
+host fallback and 160 unsupported. Two decoded inline syscall instruction sites
+are saved by address; both remain unsupported direct sites. This is a static
+instruction inventory, not dynamic syscall-number recovery or a reachability
+claim. The libc `syscall` import is independently unsupported. Hidden/local
+libc calls, calls inside retained libc helpers, later dlopen/dlsym additions,
+version differences on other installations and inline syscalls evade the shim.
+Versioned relocation binding works for this exact installed artifact only.
+Unsupported entries and direct sites block any full Unix-side coverage claim.
+Libc-internal classification is a retained Linux dependency, not UWP support.
+
+| O3 evidence | Routing and limit |
+| --- | --- |
+| Inventory, SHA manifests, builds and ABI checks | Static/host-only; no PE execution |
+| Real ntdll relocation diagnostic | Host dynamic linker binds six imports to shim; no Wine entry point execution or uwph backend proof |
+| O1/O2 regression tests | THROUGH selected public uwph/backend; O2 negative control uses stock Linux libc |
+| Default Linux smoke | Portable uwph logic and ENOSYS stub; not Linux passthrough or Windows backend |
+| Stock Wine / our launcher | Only stock Wine `--version`; no PE run and no launcher run in O3 |
+| O3 video | Linux-box Xvfb terminal capture; not Xbox device proof |
+
+Record with `./record.sh O3 -- make -C x64/uwp-host/harness wine-surface-check`
+from the repository root (use the full harness path for record.sh).
