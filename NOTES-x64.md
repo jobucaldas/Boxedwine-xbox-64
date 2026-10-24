@@ -651,3 +651,301 @@ O1 validation is HOST-ONLY model/documentation testing plus the parent
 uwp-host build/surface check. No uwp-host runtime, launcher or stock Wine
 execution is exercised; UI routing evidence and Linux-box video are deferred
 to their respective later orders. See x64/ui/README.md for the exact checks.
+
+## R4X O1 RWX sites
+
+Source inventory only, Wine version 10.0 (`/tmp/wine-src/VERSION`). The initial
+source directory had only ntdll under dlls; expanded the available
+`/tmp/R4W-wine.orig.tar.xz` (wine-10.0) into it before the full search.
+All locations below are relative to `/tmp/wine-src`; line numbers refer to this
+source, not the host's installed binary. No loader, host, verifier or policy changes.
+
+### Loader and host protection requests
+
+| Site | Request and condition |
+| --- | --- |
+| dlls/ntdll/unix/virtual.c:3019 (map_image_view; map_view calls at 3045, 3067, 3073) | Initial image view is READ + EXEC + WRITECOPY, hence writable executable Unix protection. |
+| dlls/ntdll/unix/virtual.c:2445 (map_pe_header) | Explicit `mmap(PROT_READ|PROT_WRITE|PROT_EXEC)` for a non-removable image header; later protections narrow it. The supplied regex misses this operand order. |
+| dlls/ntdll/unix/virtual.c:2796 (map_image_into_view) | Flat/non-page-aligned image gets READ + WRITECOPY + EXEC across the image. |
+| dlls/ntdll/unix/virtual.c:2948–2951 | Final section protections combine WRITECOPY and EXEC if section characteristics request both; conditional on the PE. |
+| dlls/ntdll/unix/virtual.c:3539,3552–3555 | Builtin view initially records executable/writable-copy metadata; section flags may combine WRITE and EXEC. `create_view`/`set_page_vprot` here record metadata, not themselves an unconditional RWX mmap. |
+| dlls/ntdll/unix/virtual.c:1140–1142,1683–1690 | Conversion plumbing: WRITE/WRITECOPY becomes Unix WRITE, EXEC becomes Unix EXEC; PAGE_EXECUTE_READWRITE and PAGE_EXECUTE_WRITECOPY can both yield RWX. |
+| dlls/ntdll/unix/virtual.c:1636,1713,2111–2117 | Legacy `force_exec_prot` adds EXEC to readable mappings/protections, yielding RWX when writable. Conditional compatibility path, not assumed enabled for x64 hello. |
+| dlls/ntdll/loader.c:455 (allocate_stub) | RWX allocation for generated missing-import stubs; only when an unresolved import needs one. |
+| dlls/ntdll/relay.c:1064,1221 | RWX snoop entry and return thunk allocations; i386 snooping path, not ordinary x64 hello. |
+| dlls/ntdll/heap.c:566 | Executable-heap protection selection returns PAGE_EXECUTE_READWRITE when HEAP_CREATE_ENABLE_EXECUTE is set. Normal TLS heap allocation does not set this flag. |
+
+Relocations: `dlls/ntdll/loader.c:2163–2164` requests PAGE_READWRITE,
+then `2191–2192` restores `protect_old[i]`; restoration can reinstate RWX only
+if the original section already had that protection. The image mapper also
+performs relocations while its initial writable image mapping exists.
+IAT thunks: `loader.c:1140–1141` similarly uses PAGE_READWRITE and
+`1212` restores the old protection; do not mistake IAT data for executable stubs.
+TLS: `loader.c:1351,1574–1575,1586` allocates ordinary process-heap storage;
+`1363` writes the TLS index and `1609` begins callback handling. There is no
+standalone TLS RWX allocation here; callback code inherits image protections.
+Syscall dispatcher: `dlls/ntdll/unix/signal_x86_64.c:2495` maps the pointer
+page at 0x7ffe1000 READ + WRITE only; `2496` stores the dispatcher pointer.
+The dispatcher itself is compiled assembly at `signal_x86_64.c:2712`.
+`dlls/ntdll/unix/loader.c:1584` assigns its exported pointer. None of these
+three operations independently requests RWX.
+
+Top three hello startup sites to address, in source-path order:
+`virtual.c:3019` initial image view, `virtual.c:2445` header mmap, and
+`virtual.c:2948–2951` final image section protection (RWX only for W+X sections).
+The first two are expected for an ordinary file-backed hello image; the third
+is a conditional checkpoint, not a claim that hello contains a W+X section.
+O1's exact test is static: no dynamic site-hit trace was collected, so three
+observed RWX hits are not asserted. THROUGH-uwph: not run; stock Wine: not
+run; classification: source-only inventory (no build or runtime acceptance).
+No video was generated for this textual search.
+
+### Exact test and complete search output
+
+Command: `rg -n 'PROT_EXEC.*PROT_WRITE|PAGE_EXECUTE_READWRITE|0x40.*map' /tmp/wine-src`
+
+Exit 0; 235 matching lines. Complete output retained below so test-only uses,
+constant definitions, protection checks, legacy 16-bit callers and unrelated
+0x40 matches are visible without presenting them as x64 loader allocations.
+Other production callers include kernelbase/memory.c:300 (executable mapping)
+and :637 (temporary write protection), plus the legacy *16 and vmm modules
+shown below. This is a lexical inventory, supplemented above for reversed
+PROT operand order and indirect image protections.
+
+```text
+server/file.h:303:#define FILE_MAPPING_WRITE  0x40000000  /* set for writable shared mappings */
+include/winnt.h:805:#define PAGE_EXECUTE_READWRITE          0x00000040
+programs/winedbg/info.c:900:            if (mbi.AllocationProtect & (PAGE_READONLY|PAGE_READWRITE|PAGE_EXECUTE_READ|PAGE_EXECUTE_READWRITE|PAGE_WRITECOPY|PAGE_EXECUTE_WRITECOPY))
+programs/winedbg/info.c:902:            if (mbi.AllocationProtect & (PAGE_READWRITE|PAGE_EXECUTE_READWRITE))
+programs/winedbg/info.c:906:            if (mbi.AllocationProtect & (PAGE_EXECUTE|PAGE_EXECUTE_READ|PAGE_EXECUTE_READWRITE|PAGE_EXECUTE_WRITECOPY))
+programs/winedbg/gdbproxy.c:1613:            if (mbi.AllocationProtect & (PAGE_READONLY|PAGE_READWRITE|PAGE_EXECUTE_READ|PAGE_EXECUTE_READWRITE|PAGE_WRITECOPY|PAGE_EXECUTE_WRITECOPY))
+programs/winedbg/gdbproxy.c:1615:            if (mbi.AllocationProtect & (PAGE_READWRITE|PAGE_EXECUTE_READWRITE))
+programs/winedbg/gdbproxy.c:1619:            if (mbi.AllocationProtect & (PAGE_EXECUTE|PAGE_EXECUTE_READ|PAGE_EXECUTE_READWRITE|PAGE_EXECUTE_WRITECOPY))
+dlls/winex11.drv/palette.c:55:#define PC_SYS_RESERVED        0x40 /* system palentry is not to be mapped to */
+dlls/gdi.exe16/gdi.c:107:                                        MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+dlls/ole32/tests/propvariant.c:481:                                  MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+dlls/user.exe16/message.c:365:                                          MEM_COMMIT, PAGE_EXECUTE_READWRITE );
+dlls/mmsystem.dll16/mmio16.c:180:                                   PAGE_EXECUTE_READWRITE);
+dlls/mmsystem.dll16/message16.c:866:                                        MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+dlls/mmsystem.dll16/mci16.c:563:                                   PAGE_EXECUTE_READWRITE);
+dlls/msvcp140_1/tests/msvcp140_1.c:63:            MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+dlls/ucrtbase/tests/misc.c:1613:    struct rewind_thunk *thunk = VirtualAlloc(NULL, sizeof(*thunk), MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+dlls/kernel32/tests/loader.c:1729:        case PAGE_EXECUTE_READWRITE:
+dlls/kernel32/tests/loader.c:1765:        { PAGE_EXECUTE_READWRITE, PAGE_EXECUTE_WRITECOPY }, /* 0x40 */
+dlls/kernel32/tests/loader.c:1766:        { PAGE_EXECUTE_READWRITE | PAGE_EXECUTE, 0 }, /* 0x50 */
+dlls/kernel32/tests/loader.c:1767:        { PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_READ, 0 }, /* 0x60 */
+dlls/kernel32/tests/loader.c:1768:        { PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_READ | PAGE_EXECUTE, 0 }, /* 0x70 */
+dlls/kernel32/tests/loader.c:1773:        { PAGE_EXECUTE_WRITECOPY | PAGE_EXECUTE_READWRITE, 0 }, /* 0xc0 */
+dlls/kernel32/tests/loader.c:1774:        { PAGE_EXECUTE_WRITECOPY | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE, 0 }, /* 0xd0 */
+dlls/kernel32/tests/loader.c:1775:        { PAGE_EXECUTE_WRITECOPY | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_READ, 0 }, /* 0xe0 */
+dlls/kernel32/tests/loader.c:1776:        { PAGE_EXECUTE_WRITECOPY | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_READ | PAGE_EXECUTE, 0 } /* 0xf0 */
+dlls/kernel32/tests/loader.c:1879:        { IMAGE_SCN_MEM_WRITE | IMAGE_SCN_MEM_EXECUTE, PAGE_EXECUTE_WRITECOPY, PAGE_EXECUTE_READWRITE },
+dlls/kernel32/tests/loader.c:1880:        { IMAGE_SCN_MEM_READ | IMAGE_SCN_MEM_WRITE | IMAGE_SCN_MEM_EXECUTE, PAGE_EXECUTE_WRITECOPY, PAGE_EXECUTE_READWRITE },
+dlls/kernel32/tests/loader.c:1888:        { IMAGE_SCN_CNT_INITIALIZED_DATA | IMAGE_SCN_MEM_WRITE | IMAGE_SCN_MEM_EXECUTE, PAGE_EXECUTE_WRITECOPY, PAGE_EXECUTE_READWRITE },
+dlls/kernel32/tests/loader.c:1889:        { IMAGE_SCN_CNT_INITIALIZED_DATA | IMAGE_SCN_MEM_READ | IMAGE_SCN_MEM_WRITE | IMAGE_SCN_MEM_EXECUTE, PAGE_EXECUTE_WRITECOPY, PAGE_EXECUTE_READWRITE },
+dlls/kernel32/tests/loader.c:1897:        { IMAGE_SCN_CNT_UNINITIALIZED_DATA | IMAGE_SCN_MEM_WRITE | IMAGE_SCN_MEM_EXECUTE, PAGE_EXECUTE_WRITECOPY, PAGE_EXECUTE_READWRITE },
+dlls/kernel32/tests/loader.c:1898:        { IMAGE_SCN_CNT_UNINITIALIZED_DATA | IMAGE_SCN_MEM_READ | IMAGE_SCN_MEM_WRITE | IMAGE_SCN_MEM_EXECUTE, PAGE_EXECUTE_WRITECOPY, PAGE_EXECUTE_READWRITE }
+dlls/kernel32/tests/file.c:2518:    if ((map_access == PAGE_READWRITE || map_access == PAGE_EXECUTE_READWRITE) &&
+dlls/kernel32/tests/debugger.c:1693:    mem = VirtualAllocEx(pi.hProcess, NULL, sizeof(buf), MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+dlls/kernel32/tests/sync.c:87:    struct fastcall_thunk *thunk = VirtualAlloc(NULL, sizeof(*thunk), MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+dlls/kernel32/tests/virtual.c:91:    addr1 = VirtualAllocEx(GetCurrentProcess(), NULL, alloc_size, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+dlls/kernel32/tests/virtual.c:95:    addr2 = VirtualAllocEx(NULL, NULL, alloc_size, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+dlls/kernel32/tests/virtual.c:105:                           PAGE_EXECUTE_READWRITE);
+dlls/kernel32/tests/virtual.c:233:    b = VirtualProtectEx( hProcess, addr1, 0x2000, PAGE_EXECUTE_READWRITE, &old_prot );
+dlls/kernel32/tests/virtual.c:546:    addr1 = VirtualAlloc(0, 0x2000, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+dlls/kernel32/tests/virtual.c:550:    addr2 = VirtualAlloc(addr1, 0x1000, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+dlls/kernel32/tests/virtual.c:555:    addr2 = VirtualAlloc(addr1, 0x1000, MEM_RESERVE | MEM_COMMIT | AT_ROUND_TO_PAGE, PAGE_EXECUTE_READWRITE);
+dlls/kernel32/tests/virtual.c:2303:    call_on_stack = VirtualAlloc( 0, 0x1000, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE );
+dlls/kernel32/tests/virtual.c:2615:        success = VirtualProtect( (void *)rec->ExceptionInformation[1], 16, PAGE_EXECUTE_READWRITE, &old_prot );
+dlls/kernel32/tests/virtual.c:2645:    success = VirtualProtect( (void *)rec->ExceptionInformation[1], 16, PAGE_EXECUTE_READWRITE, &old_prot );
+dlls/kernel32/tests/virtual.c:2768:        success = VirtualProtect( base, size, PAGE_EXECUTE_READWRITE, &old_prot );
+dlls/kernel32/tests/virtual.c:2794:    success = VirtualProtect( base, size, PAGE_EXECUTE_READWRITE, &old_prot );
+dlls/kernel32/tests/virtual.c:2862:    success = VirtualProtect( base, size, PAGE_EXECUTE_READWRITE, &old_prot );
+dlls/kernel32/tests/virtual.c:3000:    success = VirtualProtect( base, size, PAGE_EXECUTE_READWRITE, &old_prot );
+dlls/kernel32/tests/virtual.c:3036:    success = VirtualProtect( base, size, PAGE_EXECUTE_READWRITE, &old_prot );
+dlls/kernel32/tests/virtual.c:3121:    success = VirtualProtect( base, size, PAGE_EXECUTE_READWRITE, &old_prot );
+dlls/kernel32/tests/virtual.c:3186:    success = VirtualProtect( base, size, PAGE_EXECUTE_READWRITE, &old_prot );
+dlls/kernel32/tests/virtual.c:3233:        { PAGE_EXECUTE_READWRITE, PAGE_EXECUTE_READWRITE }, /* 0x40 */
+dlls/kernel32/tests/virtual.c:3234:        { PAGE_EXECUTE_READWRITE | PAGE_EXECUTE, 0 }, /* 0x50 */
+dlls/kernel32/tests/virtual.c:3235:        { PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_READ, 0 }, /* 0x60 */
+dlls/kernel32/tests/virtual.c:3236:        { PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_READ | PAGE_EXECUTE, 0 }, /* 0x70 */
+dlls/kernel32/tests/virtual.c:3241:        { PAGE_EXECUTE_WRITECOPY | PAGE_EXECUTE_READWRITE, 0 }, /* 0xc0 */
+dlls/kernel32/tests/virtual.c:3242:        { PAGE_EXECUTE_WRITECOPY | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE, 0 }, /* 0xd0 */
+dlls/kernel32/tests/virtual.c:3243:        { PAGE_EXECUTE_WRITECOPY | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_READ, 0 }, /* 0xe0 */
+dlls/kernel32/tests/virtual.c:3244:        { PAGE_EXECUTE_WRITECOPY | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_READ | PAGE_EXECUTE, 0 } /* 0xf0 */
+dlls/kernel32/tests/virtual.c:3389:        case PAGE_EXECUTE_READWRITE:
+dlls/kernel32/tests/virtual.c:3426:        { PAGE_EXECUTE_READWRITE, TRUE }, /* 0x40 */
+dlls/kernel32/tests/virtual.c:3427:        { PAGE_EXECUTE_READWRITE | PAGE_EXECUTE, FALSE }, /* 0x50 */
+dlls/kernel32/tests/virtual.c:3428:        { PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_READ, FALSE }, /* 0x60 */
+dlls/kernel32/tests/virtual.c:3429:        { PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_READ | PAGE_EXECUTE, FALSE }, /* 0x70 */
+dlls/kernel32/tests/virtual.c:3434:        { PAGE_EXECUTE_WRITECOPY | PAGE_EXECUTE_READWRITE, FALSE }, /* 0xc0 */
+dlls/kernel32/tests/virtual.c:3435:        { PAGE_EXECUTE_WRITECOPY | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE, FALSE }, /* 0xd0 */
+dlls/kernel32/tests/virtual.c:3436:        { PAGE_EXECUTE_WRITECOPY | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_READ, FALSE }, /* 0xe0 */
+dlls/kernel32/tests/virtual.c:3437:        { PAGE_EXECUTE_WRITECOPY | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_READ | PAGE_EXECUTE, FALSE } /* 0xf0 */
+dlls/kernel32/tests/virtual.c:3516:        { PAGE_EXECUTE_READWRITE, TRUE, PAGE_EXECUTE_READWRITE }, /* 0x40 */
+dlls/kernel32/tests/virtual.c:3517:        { PAGE_EXECUTE_READWRITE | PAGE_EXECUTE, FALSE, PAGE_NOACCESS }, /* 0x50 */
+dlls/kernel32/tests/virtual.c:3518:        { PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_READ, FALSE, PAGE_NOACCESS }, /* 0x60 */
+dlls/kernel32/tests/virtual.c:3519:        { PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_READ | PAGE_EXECUTE, FALSE, PAGE_NOACCESS }, /* 0x70 */
+dlls/kernel32/tests/virtual.c:3520:        { PAGE_EXECUTE_WRITECOPY, TRUE, PAGE_EXECUTE_READWRITE }, /* 0x80 */
+dlls/kernel32/tests/virtual.c:3524:        { PAGE_EXECUTE_WRITECOPY | PAGE_EXECUTE_READWRITE, FALSE, PAGE_NOACCESS }, /* 0xc0 */
+dlls/kernel32/tests/virtual.c:3525:        { PAGE_EXECUTE_WRITECOPY | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE, FALSE, PAGE_NOACCESS }, /* 0xd0 */
+dlls/kernel32/tests/virtual.c:3526:        { PAGE_EXECUTE_WRITECOPY | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_READ, FALSE, PAGE_NOACCESS }, /* 0xe0 */
+dlls/kernel32/tests/virtual.c:3527:        { PAGE_EXECUTE_WRITECOPY | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_READ | PAGE_EXECUTE, FALSE, PAGE_NOACCESS } /* 0xf0 */
+dlls/kernel32/tests/virtual.c:3557:                if (td[i].prot == PAGE_EXECUTE_READ || td[i].prot == PAGE_EXECUTE_READWRITE)
+dlls/kernel32/tests/virtual.c:3612:    if (page_exec_supported) alloc_prot = PAGE_EXECUTE_READWRITE;
+dlls/kernel32/tests/virtual.c:3655:                if (td[i].prot == PAGE_EXECUTE_READ || td[i].prot == PAGE_EXECUTE_READWRITE)
+dlls/kernel32/tests/virtual.c:3735:    case PAGE_EXECUTE_READWRITE:
+dlls/kernel32/tests/virtual.c:3758:    case PAGE_EXECUTE_READWRITE:
+dlls/kernel32/tests/virtual.c:3777:    case PAGE_EXECUTE_READWRITE: return PAGE_EXECUTE_WRITECOPY;
+dlls/kernel32/tests/virtual.c:3787:    case PAGE_EXECUTE_WRITECOPY: return PAGE_EXECUTE_READWRITE;
+dlls/kernel32/tests/virtual.c:3798:    if (access & FILE_MAP_WRITE) return exec ? PAGE_EXECUTE_READWRITE : PAGE_READWRITE;
+dlls/kernel32/tests/virtual.c:3838:        PAGE_EXECUTE, PAGE_EXECUTE_READ, PAGE_EXECUTE_READWRITE, PAGE_EXECUTE_WRITECOPY
+dlls/kernel32/tests/virtual.c:3863:        { FILE_MAP_EXECUTE | FILE_MAP_WRITE, PAGE_EXECUTE_READWRITE }, /* 0x22 */
+dlls/kernel32/tests/virtual.c:3864:        { FILE_MAP_EXECUTE | FILE_MAP_WRITE | FILE_MAP_COPY, PAGE_EXECUTE_READWRITE }, /* 0x23 */
+dlls/kernel32/tests/virtual.c:3867:        { FILE_MAP_EXECUTE | FILE_MAP_READ | FILE_MAP_WRITE, PAGE_EXECUTE_READWRITE }, /* 0x26 */
+dlls/kernel32/tests/virtual.c:3868:        { FILE_MAP_EXECUTE | FILE_MAP_READ | FILE_MAP_WRITE | FILE_MAP_COPY, PAGE_EXECUTE_READWRITE }, /* 0x27 */
+dlls/kernel32/tests/virtual.c:3871:        { FILE_MAP_EXECUTE | SECTION_MAP_EXECUTE | FILE_MAP_WRITE, PAGE_EXECUTE_READWRITE }, /* 0x2a */
+dlls/kernel32/tests/virtual.c:3872:        { FILE_MAP_EXECUTE | SECTION_MAP_EXECUTE | FILE_MAP_WRITE | FILE_MAP_COPY, PAGE_EXECUTE_READWRITE }, /* 0x2b */
+dlls/kernel32/tests/virtual.c:3875:        { FILE_MAP_EXECUTE | SECTION_MAP_EXECUTE | FILE_MAP_READ | FILE_MAP_WRITE, PAGE_EXECUTE_READWRITE }, /* 0x2e */
+dlls/kernel32/tests/virtual.c:3876:        { FILE_MAP_EXECUTE | SECTION_MAP_EXECUTE | FILE_MAP_READ | FILE_MAP_WRITE | FILE_MAP_COPY, PAGE_EXECUTE_READWRITE } /* 0x2f */
+dlls/kernel32/tests/virtual.c:3892:                    || page_prot[i] == PAGE_EXECUTE_READWRITE || page_prot[i] == PAGE_EXECUTE_WRITECOPY))
+dlls/kernel32/tests/virtual.c:3937:                (page_prot[i] == PAGE_READWRITE || page_prot[i] == PAGE_EXECUTE_READWRITE))
+dlls/kernel32/tests/virtual.c:3941:            if (page_prot[i] == PAGE_EXECUTE_READ || page_prot[i] == PAGE_EXECUTE_READWRITE)
+dlls/kernel32/tests/virtual.c:4014:                   broken(view[j].prot == PAGE_EXECUTE_READWRITE && info.Protect == PAGE_READWRITE) || /* win2k */
+dlls/kernel32/tests/virtual.c:4439:                               PAGE_EXECUTE_READWRITE);
+dlls/msvcirt/tests/msvcirt.c:520:                                                 MEM_COMMIT, PAGE_EXECUTE_READWRITE );
+dlls/psapi/tests/psapi_main.c:884:    ret = GetMappedFileNameA(GetCurrentProcess(), base + 0x4000, map_name, sizeof(map_name));
+dlls/advapi32/tests/security.c:5924:        { PAGE_EXECUTE_READWRITE, STANDARD_RIGHTS_REQUIRED | SECTION_QUERY | SECTION_MAP_READ | SECTION_MAP_WRITE | SECTION_MAP_EXECUTE },
+dlls/advapi32/tests/security.c:5961:    mapping = CreateFileMappingW(file, NULL, PAGE_EXECUTE_READWRITE, 0, 4096, NULL);
+dlls/msvcrt/tests/cpp.c:131:            MEM_COMMIT, PAGE_EXECUTE_READWRITE );
+dlls/ntdll/relay.c:1064:                            MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+dlls/ntdll/relay.c:1221:                                        PAGE_EXECUTE_READWRITE);
+dlls/ntdll/heap.c:566:    return (flags & HEAP_CREATE_ENABLE_EXECUTE) ? PAGE_EXECUTE_READWRITE : PAGE_READWRITE;
+dlls/ntdll/loader.c:455:                                     MEM_COMMIT, PAGE_EXECUTE_READWRITE ) != STATUS_SUCCESS)
+dlls/ntdll/tests/info.c:2979:    ok (mbi.AllocationProtect == PAGE_READWRITE || mbi.AllocationProtect == PAGE_EXECUTE_READWRITE,
+dlls/ntdll/tests/info.c:2982:    ok (mbi.Protect == PAGE_READWRITE || mbi.Protect == PAGE_EXECUTE_READWRITE,
+dlls/ntdll/tests/large_int.c:483:    code_mem = VirtualAlloc(NULL, 0x1000, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+dlls/ntdll/tests/virtual.c:110:                                     MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+dlls/ntdll/tests/virtual.c:117:                                     MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+dlls/ntdll/tests/virtual.c:124:                                     MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+dlls/ntdll/tests/virtual.c:172:                                     MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+dlls/ntdll/tests/virtual.c:186:                                     MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+dlls/ntdll/tests/virtual.c:222:                                     MEM_RESERVE | MEM_COMMIT | AT_ROUND_TO_PAGE, PAGE_EXECUTE_READWRITE);
+dlls/ntdll/tests/virtual.c:235:                                     MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+dlls/ntdll/tests/virtual.c:315:                                        PAGE_EXECUTE_READWRITE, NULL, 0);
+dlls/ntdll/tests/virtual.c:324:                                        PAGE_EXECUTE_READWRITE, NULL, 1);
+dlls/ntdll/tests/virtual.c:330:    status = pNtAllocateVirtualMemoryEx(NULL, &addr1, &size, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE, NULL, 0);
+dlls/ntdll/tests/virtual.c:630:                                         PAGE_EXECUTE_READWRITE, ext, 1 );
+dlls/ntdll/tests/virtual.c:634:                                         PAGE_EXECUTE_READWRITE, ext, 2 );
+dlls/ntdll/tests/virtual.c:643:                                         PAGE_EXECUTE_READWRITE, ext, 1 );
+dlls/ntdll/tests/virtual.c:660:                                                 PAGE_EXECUTE_READWRITE, NULL, 0 );
+dlls/ntdll/tests/virtual.c:665:                                                 PAGE_EXECUTE_READWRITE, ext, 1 );
+dlls/ntdll/tests/virtual.c:674:                                                 PAGE_EXECUTE_READWRITE, NULL, 0 );
+dlls/ntdll/tests/virtual.c:688:                                                 PAGE_EXECUTE_READWRITE, ext, 1 );
+dlls/ntdll/tests/virtual.c:728:                                        PAGE_EXECUTE_READWRITE, ext, 1);
+dlls/ntdll/tests/virtual.c:736:                                        PAGE_EXECUTE_READWRITE, ext, 1);
+dlls/ntdll/tests/virtual.c:745:                                        PAGE_EXECUTE_READWRITE, ext, 1);
+dlls/ntdll/tests/virtual.c:755:                                        PAGE_EXECUTE_READWRITE, ext, 2);
+dlls/ntdll/tests/virtual.c:765:                                        PAGE_EXECUTE_READWRITE, ext, 1);
+dlls/ntdll/tests/virtual.c:772:                                        PAGE_EXECUTE_READWRITE, ext, 1);
+dlls/ntdll/tests/virtual.c:779:                                        PAGE_EXECUTE_READWRITE, ext, 1);
+dlls/ntdll/tests/virtual.c:786:                                        PAGE_EXECUTE_READWRITE, ext, 1);
+dlls/ntdll/tests/virtual.c:793:                                        PAGE_EXECUTE_READWRITE, ext, 1);
+dlls/ntdll/tests/virtual.c:803:                                        PAGE_EXECUTE_READWRITE, ext, 1);
+dlls/ntdll/tests/virtual.c:809:                                        PAGE_EXECUTE_READWRITE, ext, 1);
+dlls/ntdll/tests/virtual.c:820:                                        PAGE_EXECUTE_READWRITE, ext, 1);
+dlls/ntdll/tests/virtual.c:824:                                        PAGE_EXECUTE_READWRITE);
+dlls/ntdll/tests/virtual.c:829:                                        PAGE_EXECUTE_READWRITE);
+dlls/ntdll/tests/virtual.c:845:                                        PAGE_EXECUTE_READWRITE, ext, 1);
+dlls/ntdll/tests/virtual.c:860:                                        PAGE_EXECUTE_READWRITE, ext, 1);
+dlls/ntdll/tests/virtual.c:873:                                        PAGE_EXECUTE_READWRITE, ext, 1);
+dlls/ntdll/tests/virtual.c:881:                                        PAGE_EXECUTE_READWRITE, ext, 1);
+dlls/ntdll/tests/virtual.c:888:                                        PAGE_EXECUTE_READWRITE, ext, 1);
+dlls/ntdll/tests/virtual.c:895:                                        PAGE_EXECUTE_READWRITE, ext, 1);
+dlls/ntdll/tests/virtual.c:899:                                        PAGE_EXECUTE_READWRITE, ext, 1);
+dlls/ntdll/tests/virtual.c:907:                                        PAGE_EXECUTE_READWRITE, ext, 1);
+dlls/ntdll/tests/virtual.c:915:                                        PAGE_EXECUTE_READWRITE, ext, 1);
+dlls/ntdll/tests/virtual.c:922:                                        PAGE_EXECUTE_READWRITE, ext, 1);
+dlls/ntdll/tests/virtual.c:929:                                        PAGE_EXECUTE_READWRITE, ext, 1);
+dlls/ntdll/tests/virtual.c:937:                                        PAGE_EXECUTE_READWRITE, ext, 1);
+dlls/ntdll/tests/virtual.c:945:                                        PAGE_EXECUTE_READWRITE, ext, 1);
+dlls/ntdll/tests/virtual.c:957:                                        PAGE_EXECUTE_READWRITE, ext, 1);
+dlls/ntdll/tests/virtual.c:969:                                        PAGE_EXECUTE_READWRITE, ext, 1);
+dlls/ntdll/tests/virtual.c:2102:    ptr = VirtualAlloc( NULL, 0x1000, MEM_COMMIT, PAGE_EXECUTE_READWRITE );
+dlls/ntdll/tests/virtual.c:2163:        exec_mem = VirtualAlloc( NULL, 4096, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE );
+dlls/ntdll/tests/virtual.c:2796:    VirtualProtect( ptr, page_size, PAGE_EXECUTE_READWRITE, &old_prot );
+dlls/ntdll/tests/virtual.c:2809:    VirtualProtect( ptr, page_size, PAGE_EXECUTE_READWRITE, &old_prot );
+dlls/ntdll/tests/virtual.c:2838:    if (0) VirtualProtect( ptr, page_size, PAGE_EXECUTE_READWRITE, &old_prot );
+dlls/ntdll/tests/virtual.c:2883:    VirtualProtect( ptr, page_size, PAGE_EXECUTE_READWRITE, &old_prot );
+dlls/ntdll/tests/unwind.c:2638:                                    PAGE_EXECUTE_READWRITE, &param, 1 ))
+dlls/ntdll/tests/unwind.c:3343:                                     MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE, &param, 1 ))
+dlls/ntdll/tests/unwind.c:3419:    code_mem = VirtualAlloc( NULL, 65536, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE );
+dlls/ntdll/unix/sync.c:2197:    case PAGE_EXECUTE_READWRITE:
+dlls/ntdll/tests/wow64.c:183:        code_mem = VirtualAlloc( NULL, 65536, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE );
+dlls/ntdll/tests/wow64.c:650:    status = NtAllocateVirtualMemory( process, &addr, 0, &size, MEM_RESERVE, PAGE_EXECUTE_READWRITE );
+dlls/ntdll/tests/wow64.c:656:                                         MEM_RESERVE, PAGE_EXECUTE_READWRITE, 0, 0xcccccccc );
+dlls/ntdll/tests/wow64.c:658:                                         MEM_RESERVE, PAGE_EXECUTE_READWRITE, 0, 0xcccccccc );
+dlls/ntdll/tests/wow64.c:677:    status = NtProtectVirtualMemory( process, &addr2, &size, PAGE_EXECUTE_READWRITE, &old_prot );
+dlls/ntdll/tests/wow64.c:683:                                         PAGE_EXECUTE_READWRITE, 0, 0xcccccccc, 0xcccccccc );
+dlls/ntdll/tests/wow64.c:685:                                         PAGE_EXECUTE_READWRITE, 0, 0xcccccccc, 0xcccccccc );
+dlls/ntdll/unix/virtual.c:140:    PAGE_EXECUTE_READWRITE,     /* WRITE | EXEC */
+dlls/ntdll/unix/virtual.c:141:    PAGE_EXECUTE_READWRITE,     /* READ | WRITE | EXEC */
+dlls/ntdll/unix/virtual.c:231:    return (vprot & VPROT_EXEC) && (vprot & (VPROT_WRITE | VPROT_WRITECOPY));
+dlls/ntdll/unix/virtual.c:1683:    case PAGE_EXECUTE_READWRITE:
+dlls/ntdll/unix/virtual.c:1685:            *vprot = VPROT_EXEC | VPROT_READ | VPROT_WRITECOPY;
+dlls/ntdll/unix/virtual.c:1687:            *vprot = VPROT_EXEC | VPROT_READ | VPROT_WRITE;
+dlls/ntdll/unix/virtual.c:1690:        *vprot = VPROT_EXEC | VPROT_READ | VPROT_WRITECOPY;
+dlls/ntdll/unix/virtual.c:3019:    unsigned int vprot = SEC_IMAGE | SEC_FILE | VPROT_COMMITTED | VPROT_READ | VPROT_EXEC | VPROT_WRITECOPY;
+dlls/ntdll/unix/virtual.c:3185:    case PAGE_EXECUTE_READWRITE:
+dlls/msvideo.dll16/msvideo16.c:746:                                      PAGE_EXECUTE_READWRITE);
+dlls/ddeml.dll16/ddeml.c:186:                                      PAGE_EXECUTE_READWRITE);
+dlls/ntdll/tests/exception.c:1601:    VirtualProtect(code_mem, 1, PAGE_EXECUTE_READWRITE, &old_prot);
+dlls/ntdll/tests/exception.c:2024:    ret = VirtualProtect(hook_trampoline, ARRAY_SIZE(hook_trampoline), PAGE_EXECUTE_READWRITE, &old_protect1);
+dlls/ntdll/tests/exception.c:2028:            PAGE_EXECUTE_READWRITE, &old_protect2);
+dlls/ntdll/tests/exception.c:2163:                          PAGE_EXECUTE_READWRITE, &old_protect );
+dlls/ntdll/tests/exception.c:2231:                          PAGE_EXECUTE_READWRITE, &old_protect );
+dlls/ntdll/tests/exception.c:3312:    VirtualProtect(code_mem, 1, PAGE_EXECUTE_READWRITE, &old_prot);
+dlls/ntdll/tests/exception.c:4872:            PAGE_EXECUTE_READWRITE, &old_protect);
+dlls/ntdll/tests/exception.c:5061:                          PAGE_EXECUTE_READWRITE, &old_protect );
+dlls/ntdll/tests/exception.c:5140:                          PAGE_EXECUTE_READWRITE, &old_protect );
+dlls/ntdll/tests/exception.c:6223:                          PAGE_EXECUTE_READWRITE, &old_protect );
+dlls/ntdll/tests/exception.c:6313:                          PAGE_EXECUTE_READWRITE, &old_protect );
+dlls/ntdll/tests/exception.c:6382:                          PAGE_EXECUTE_READWRITE, &old_protect );
+dlls/ntdll/tests/exception.c:7563:                          PAGE_EXECUTE_READWRITE, &old_protect );
+dlls/ntdll/tests/exception.c:7646:                          PAGE_EXECUTE_READWRITE, &old_protect );
+dlls/ntdll/tests/exception.c:7711:                          PAGE_EXECUTE_READWRITE, &old_protect );
+dlls/ntdll/tests/exception.c:11405:    target_ptr = VirtualAlloc( NULL, 65536, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE );
+dlls/ntdll/tests/exception.c:11810:    code_mem = VirtualAlloc(NULL, 65536, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+dlls/msvcp60/tests/ios.c:514:                                                 MEM_COMMIT, PAGE_EXECUTE_READWRITE );
+dlls/msvcp60/tests/string.c:154:                                                 MEM_COMMIT, PAGE_EXECUTE_READWRITE );
+dlls/msvcp100/tests/misc.c:82:            MEM_COMMIT, PAGE_EXECUTE_READWRITE );
+dlls/msvcp100/tests/string.c:59:            MEM_COMMIT, PAGE_EXECUTE_READWRITE );
+dlls/concrt140/tests/concrt140.c:40:            MEM_COMMIT, PAGE_EXECUTE_READWRITE );
+dlls/msvcp120/tests/msvcp120.c:130:            MEM_COMMIT, PAGE_EXECUTE_READWRITE );
+dlls/msvcr100/tests/msvcr100.c:92:            MEM_COMMIT, PAGE_EXECUTE_READWRITE );
+dlls/vmm.vxd/vmm.c:159:        ret = VirtualAlloc ( address, npages * page_size, MEM_RESERVE, PAGE_EXECUTE_READWRITE );
+dlls/vmm.vxd/vmm.c:184:            virt_perm = PAGE_EXECUTE_READWRITE;
+dlls/vmm.vxd/vmm.c:241:        case PAGE_EXECUTE_READWRITE:
+dlls/vmm.vxd/vmm.c:258:            virt_new_perm |= PAGE_EXECUTE_READWRITE;
+dlls/msvcp140/tests/msvcp140.c:96:            MEM_COMMIT, PAGE_EXECUTE_READWRITE );
+dlls/riched20/tests/txtsrv.c:569:                                  MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+dlls/commdlg.dll16/filedlg.c:518:    if (!hooks && !(hooks = VirtualAlloc( NULL, size, MEM_COMMIT, PAGE_EXECUTE_READWRITE )))
+dlls/krnl386.exe16/dosmem.c:684:        if (DOSMEM_dosmem || !VirtualProtect( NULL, DOSMEM_SIZE, PAGE_EXECUTE_READWRITE, &old_prot ))
+dlls/krnl386.exe16/vxd.c:1477:            case PAGE_EXECUTE_READWRITE:  access = FILE_MAP_WRITE; break;
+dlls/krnl386.exe16/int31.c:56:                                MEM_COMMIT|MEM_RESERVE, PAGE_EXECUTE_READWRITE );
+dlls/krnl386.exe16/int31.c:86:                            MEM_COMMIT|MEM_RESERVE, PAGE_EXECUTE_READWRITE );
+dlls/kernelbase/memory.c:300:        protect = exec ? PAGE_EXECUTE_READWRITE : PAGE_READWRITE;
+dlls/kernelbase/memory.c:451:    return protect == PAGE_EXECUTE || protect == PAGE_EXECUTE_READ || protect == PAGE_EXECUTE_READWRITE
+dlls/kernelbase/memory.c:623:    case PAGE_EXECUTE_READWRITE:
+dlls/kernelbase/memory.c:637:        prot |= (info.Type == MEM_PRIVATE) ? PAGE_EXECUTE_READWRITE : PAGE_EXECUTE_WRITECOPY;
+dlls/kernelbase/sync.c:1022:    case PAGE_EXECUTE_READWRITE:
+dlls/kernelbase/tests/process.c:247:    addr = pVirtualAlloc2(NULL, NULL, size, MEM_COMMIT, PAGE_EXECUTE_READWRITE, NULL, 0);
+dlls/kernelbase/tests/process.c:423:        PAGE_EXECUTE_READWRITE,
+dlls/kernelbase/tests/process.c:457:        PAGE_EXECUTE_READWRITE,
+dlls/kernelbase/tests/process.c:531:    file = pCreateFileMappingFromApp(INVALID_HANDLE_VALUE, NULL, PAGE_EXECUTE_READWRITE, 1024, L"foo");
+dlls/kernelbase/tests/process.c:566:    ptr = pMapViewOfFileFromApp( mapping, PAGE_EXECUTE_READWRITE, 0, 4096 );
+dlls/msvcr120/tests/msvcr120.c:61:            MEM_COMMIT, PAGE_EXECUTE_READWRITE );
+dlls/msvcp90/tests/misc.c:197:                                                 MEM_COMMIT, PAGE_EXECUTE_READWRITE );
+dlls/msvcp90/tests/ios.c:609:                                                 MEM_COMMIT, PAGE_EXECUTE_READWRITE );
+dlls/msvcp90/tests/string.c:137:                                                 MEM_COMMIT, PAGE_EXECUTE_READWRITE );
+```
