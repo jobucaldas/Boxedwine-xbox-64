@@ -18,6 +18,7 @@ class Shell:
         self.screen = 'login'
         self.games = ()
         self.focus = 0
+        self._selected = 0
         self.logs = ['LOGIN PLACEHOLDER — offline mock approval only']
         self.future = None
         self.result = None
@@ -31,6 +32,7 @@ class Shell:
                 self.screen = 'login'
                 self.backend.cancel_login()
                 self.focus = 0
+                self._selected = 0
             return
         if self.screen == 'login':
             if action == 'activate':
@@ -39,6 +41,7 @@ class Shell:
                 self.games = self.backend.library().games
                 self.screen = 'library'
                 self.focus = 0
+                self._selected = 0
                 self.logs.append(f'MOCK LIBRARY: {len(self.games)} games')
             return
         if action in ('left', 'right', 'up', 'down'):
@@ -51,6 +54,8 @@ class Shell:
                 self.focus = (self.focus + (1 if action == 'right' else -1)) % 3
             else:
                 self.focus = 4 if self.focus == 3 else 3
+            if self.focus < 3:
+                self._selected = self.focus
             self.logs.append(f'FOCUS: {self.focus_label()}')
         elif action == 'activate' and self.focus >= 3:
             if self.future is not None:
@@ -66,11 +71,10 @@ class Shell:
 
     @property
     def selected(self):
-        return getattr(self, '_selected', 0)
+        return self._selected
 
     def focus_label(self):
         if self.focus < 3:
-            self._selected = self.focus
             return self.games[self.focus].id
         return ('Install', 'Launch')[self.focus - 3]
 

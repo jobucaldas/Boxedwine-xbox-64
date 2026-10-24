@@ -65,6 +65,24 @@ class UIFlowTests(unittest.TestCase):
         self.assertEqual(shell.result.status, 'blocked')
         self.assertEqual(self.runtime.calls, [('install', 'hello-demo'), ('launch', 'hello-demo')])
 
+    def test_relogin_resets_details_and_both_button_targets(self):
+        shell = self.shell
+        for action in ('activate', 'right', 'back', 'activate'):
+            shell.dispatch(action)
+        self.assertEqual(shell.focus, 0)
+        self.assertEqual(shell.games[shell.selected].id, 'hello-demo')
+        # Rendering labels must not change the selected action target.
+        self.assertEqual(shell.focus_label(), 'hello-demo')
+        shell.dispatch('down')
+        shell.dispatch('activate')
+        wait_action(shell)
+        shell.dispatch('right')
+        shell.dispatch('activate')
+        self.runtime.release.set()
+        wait_action(shell)
+        self.assertEqual(self.runtime.calls,
+                         [('install', 'hello-demo'), ('launch', 'hello-demo')])
+
     def test_non_demo_passes_selected_id_to_adapter(self):
         shell = self.shell
         shell.dispatch('activate')
