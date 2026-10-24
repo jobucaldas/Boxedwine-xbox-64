@@ -44,6 +44,15 @@ int main(void)
     CHECK(uwph_fstat(fd,&st)==0 && st.st_size==17 && (st.st_mode&0777)==0600);
     CHECK(uwph_stat(path,&st)==0 && st.st_size==17);
     CHECK(uwph_lstat(path,&st)==0 && st.st_size==17);
+    /* Absolute paths ignore even invalid dirfds; relative paths must not
+     * adopt native descriptors or bypass the backend's owned fd table. */
+    int absolute=uwph_openat(-1,path,UWPH_O_RDONLY);
+    CHECK(absolute>=0x100000);
+    CHECK(uwph_read(absolute,buf,7)==7 && !memcmp(buf,"Fixture",7));
+    CHECK(uwph_close(absolute)==0);
+    CHECK(uwph_fstatat(-1,path,&st,0)==0 && st.st_size==17);
+    CHECK(uwph_openat(-1,"input",UWPH_O_RDONLY)==-1 && uwph_errno==UWPH_EBADF);
+    CHECK(uwph_fstatat(-1,"input",&st,0)==-1 && uwph_errno==UWPH_EBADF);
     CHECK(uwph_open(missing,UWPH_O_RDONLY)==-1 && uwph_errno==UWPH_ENOENT);
     CHECK(uwph_stat(missing,&st)==-1 && uwph_errno==UWPH_ENOENT);
     CHECK(uwph_read(0,buf,1)==-1 && uwph_errno==UWPH_EBADF);

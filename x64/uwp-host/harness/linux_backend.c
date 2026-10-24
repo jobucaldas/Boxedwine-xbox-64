@@ -46,7 +46,10 @@ static long fdcall(long nr, int fd, long b, long c, long d)
 int uwph_linux_openat(int dirfd, const char *path, int flags, unsigned mode)
 {
     pthread_rwlock_wrlock(&lock);
-    int dir = dirfd == UWPH_AT_FDCWD ? dirfd : native(dirfd);
+    /* Linux ignores dirfd for absolute paths; relative paths still require
+     * an owned descriptor (or AT_FDCWD), never an arbitrary native fd. */
+    int dir = path && path[0] == '/' ? UWPH_AT_FDCWD :
+              dirfd == UWPH_AT_FDCWD ? dirfd : native(dirfd);
     long r = dir == -1 ? -UWPH_EBADF : raw(SYS_openat,dir,PTR(path),flags,mode,0,0);
     if (r >= 0) {
         int i; for (i=0;i<SLOTS && slots[i];i++);
@@ -77,7 +80,8 @@ int uwph_linux_fstat(int fd, struct uwph_stat *st) { return fdcall(SYS_fstat,fd,
 int uwph_linux_fstatat(int dirfd, const char *path, struct uwph_stat *st, int flags)
 {
     pthread_rwlock_rdlock(&lock);
-    int dir=dirfd==UWPH_AT_FDCWD ? dirfd : native(dirfd);
+    int dir=path && path[0]=='/' ? UWPH_AT_FDCWD :
+            dirfd==UWPH_AT_FDCWD ? dirfd : native(dirfd);
     long r=dir==-1 ? -UWPH_EBADF : raw(SYS_newfstatat,dir,PTR(path),PTR(st),flags,0,0);
     pthread_rwlock_unlock(&lock); return result(r);
 }
