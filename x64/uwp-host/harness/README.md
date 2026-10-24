@@ -44,3 +44,71 @@ and cleans up only PIDs it started. Commands must not daemonize. A timed-out
 command returns 124; completed commands return their status. Logs and status
 are saved under `/workspace/x64-run/v2/R4H/`. Video checks are host-only proof
 of execution on this Linux box, not Xbox Dev Mode validation.
+
+## Bounded ELF shim (O2)
+
+Run `make -C x64/uwp-host/harness shim-test`. The target uses LD_PRELOAD only
+for its two owned, dynamically linked ELF probe processes. Its version script
+exports exactly open/read/close/mmap/munmap, _exit, and the explicit
+uwph_shim_report instrumentation function. There is no generic syscall wrapper,
+RTLD_NEXT resolver, constructor, process-wide trapping, or Wine loader change.
+The five SysV prototypes are explicitly adapted to the existing uwph APIs;
+compile-time checks cover the selected scalar/flag ABI. No struct-bearing libc
+symbols are exported. open consumes a mode only for O_CREAT or full O_TMPFILE.
+Unexported symbols (including open64/openat/fstat/write and libc hidden calls)
+remain outside this proof.
+
+Calls using private backend descriptors route through the real public uwph
+entry points. Anonymous mmap and munmap route too. Borrowed native descriptors
+in read/close/file mmap are explicit raw-Linux bypasses counted per operation;
+they are never adopted into uwph. Other APIs cannot use the private descriptors.
+This intentionally bounded shim is not a general replacement libc and must not
+yet be used as evidence of Wine integration. Linux raw memory semantics still
+do not demonstrate UWP memory policy.
+
+Instrumentation is separately linked into the shim; optional weak hooks in the
+five selected backend entries increment atomic totals independently of wrapper
+counts. A mutex protects immediate-caller module names and per-module wrapper
+and backend counts; TLS carries attribution only for the current wrapper call.
+dladdr identifies the immediate return-address module (not a complete causal
+stack). Module names are hex-encoded in reports, alongside process PID.
+Thirty-two module slots and 511-byte names are bounded; overflow and unknown
+origins cannot pass the probe verifier. Calls entering the backend directly
+without wrapper context are counted as unattributed. No caller is assumed to be
+Wine: future acceptance must match the real ntdll.so identity separately.
+Recursion fails closed with EDEADLK and increments its own counter, rather than
+calling a resolver or reentering the backend. Counters describe only this selected
+surface, not hidden libc calls, inline syscalls or all host operations.
+
+uwph_shim_report explicitly snapshots counters, preserves errno, and uses only
+raw openat/write/close for report I/O (snprintf formats memory; it is not an
+interposed export). That instrumentation I/O is separately classified and is
+not routing evidence. UWPH_REPORT is a trusted per-process harness output path;
+later multiprocess tests must choose unique paths. _exit snapshots before raw
+exit_group; a destructor is supplementary. Reports are coherent for the joined,
+quiescent probe; asynchronous snapshots during live operations can include
+in-flight wrapper calls. Fork, signal-handler instrumentation and arbitrary
+process teardown are not supported by this bounded harness.
+
+The test runs four threads, each performing 50 fixture open/read/file-map/close
+and anonymous-map cycles, checking real contents, writable memory, errno
+preservation and successful unmaps. It also checks O_CREAT mode normalization,
+ENOENT, EBADF and EINVAL, and deliberate native-fd bypasses. Expected backend
+entries per positive process: open=202, read=200, close=201, mmap=401,
+munmap=401; bypass read=2/close=2, all others zero. Verification matches exact
+wrapper/backend totals and module attribution, with zero recursion, unattributed
+entries and module overflow. One run explicitly snapshots and returns normally;
+the other calls _exit without any earlier explicit snapshot, proving that reports
+do not depend on destructors. A negative run without the shim exercises the same
+operations through stock Linux libc and must produce no uwph report.
+
+| O2 evidence | Routing and limit |
+| --- | --- |
+| Two positive ELF runs | THROUGH shim -> public uwph -> O1 Linux backend for the selected operations; declared bypasses remain native Linux |
+| Negative ELF control | Stock Linux libc; no uwph proof report |
+| Counters/report writer | Instrumentation only, not proof of every host operation |
+| Build/ABI/video checks | Host-only evidence on this Linux box |
+| Our launcher / stock Wine | Neither used; neither ELF run is Wine or Xbox-device proof |
+
+Capture the acceptance command with
+`x64/uwp-host/harness/record.sh O2 -- make -C x64/uwp-host/harness shim-test`.

@@ -3,6 +3,9 @@
 #include "../src/linux_backend.h"
 #include <sys/syscall.h>
 #include <pthread.h>
+#include "counters.h"
+extern void uwph_harness_backend_entry(int) __attribute__((weak));
+#define COUNT(op) do { if (uwph_harness_backend_entry) uwph_harness_backend_entry(op); } while (0)
 #if !defined(__linux__) || !defined(__x86_64__) || !defined(UWPH_BACKEND_LINUX_PASSTHROUGH)
 #error This backend is only for the selected Linux x86-64 harness
 #endif
@@ -61,17 +64,19 @@ int uwph_linux_openat(int dirfd, const char *path, int flags, unsigned mode)
 }
 int uwph_linux_open(const char *path, int flags, unsigned mode)
 {
+    COUNT(C_OPEN);
     return uwph_linux_openat(UWPH_AT_FDCWD,path,flags,mode);
 }
 int uwph_linux_close(int fd)
 {
+    COUNT(C_CLOSE);
     pthread_rwlock_wrlock(&lock);
     int n=native(fd);
     long r=n<0 ? -UWPH_EBADF : raw(SYS_close,n,0,0,0,0,0);
     if(n>=0) slots[fd-BASE]=0; /* Linux close releases fd even on EINTR. */
     pthread_rwlock_unlock(&lock); return result(r);
 }
-uwph_ssize_t uwph_linux_read(int fd, void *buf, size_t len) { return fdcall(SYS_read,fd,PTR(buf),len,0); }
+uwph_ssize_t uwph_linux_read(int fd, void *buf, size_t len) { COUNT(C_READ); return fdcall(SYS_read,fd,PTR(buf),len,0); }
 uwph_ssize_t uwph_linux_write(int fd, const void *buf, size_t len) { return fdcall(SYS_write,fd,PTR(buf),len,0); }
 uwph_ssize_t uwph_linux_pread(int fd, void *buf, size_t len, uwph_off_t off) { return fdcall(SYS_pread64,fd,PTR(buf),len,off); }
 uwph_ssize_t uwph_linux_pwrite(int fd, const void *buf, size_t len, uwph_off_t off) { return fdcall(SYS_pwrite64,fd,PTR(buf),len,off); }
@@ -89,12 +94,13 @@ int uwph_linux_stat(const char *path, struct uwph_stat *st) { return uwph_linux_
 int uwph_linux_lstat(const char *path, struct uwph_stat *st) { return uwph_linux_fstatat(UWPH_AT_FDCWD,path,st,0x100); }
 void *uwph_linux_mmap(void *addr, size_t len, int prot, int flags, int fd, uwph_off_t off)
 {
+    COUNT(C_MMAP);
     pthread_rwlock_rdlock(&lock);
     int n=(flags & UWPH_MAP_ANONYMOUS) ? -1 : native(fd);
     long r=(!(flags & UWPH_MAP_ANONYMOUS) && n<0) ? -UWPH_EBADF : raw(SYS_mmap,PTR(addr),len,prot,flags,n,off);
     pthread_rwlock_unlock(&lock); return (void *)result(r);
 }
-int uwph_linux_munmap(void *addr, size_t len) { return result(raw(SYS_munmap,PTR(addr),len,0,0,0,0)); }
+int uwph_linux_munmap(void *addr, size_t len) { COUNT(C_MUNMAP); return result(raw(SYS_munmap,PTR(addr),len,0,0,0,0)); }
 int uwph_linux_mprotect(void *addr, size_t len, int prot) { return result(raw(SYS_mprotect,PTR(addr),len,prot,0,0,0)); }
 int uwph_linux_clock_gettime(uwph_clockid_t id, struct uwph_timespec *ts) { return result(raw(SYS_clock_gettime,id,PTR(ts),0,0,0,0)); }
 int uwph_linux_clock_getres(uwph_clockid_t id, struct uwph_timespec *ts) { return result(raw(SYS_clock_getres,id,PTR(ts),0,0,0,0)); }

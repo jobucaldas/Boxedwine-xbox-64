@@ -5,7 +5,7 @@ SOURCES := $(wildcard ../src/*.c) linux_backend.c
 HEADERS := $(wildcard ../include/uwph/*.h ../src/*.h)
 OBJECTS := $(patsubst %.c,$(OUT)/%.o,$(notdir $(SOURCES)))
 vpath %.c ../src .
-$(OUT)/%.o: %.c $(HEADERS)
+$(OUT)/%.o: %.c $(HEADERS) counters.h
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) -c $< -o $@
 $(OUT)/libuwph.a: $(OBJECTS)
@@ -15,3 +15,19 @@ $(OUT)/backend_test: backend_test.c $(OUT)/libuwph.a
 backend-test: $(OUT)/backend_test
 	timeout 15s $(OUT)/backend_test
 .PHONY: backend-test
+
+$(OUT)/shim.map:
+	@mkdir -p $(OUT)
+	printf '{ global: open; read; close; mmap; munmap; _exit; uwph_shim_report; local: *; };\n' > $@
+$(OUT)/libuwph_shim.so: shim.c counters.c counters.h $(OUT)/libuwph.a $(OUT)/shim.map
+	$(CC) $(CFLAGS) -shared shim.c counters.c $(OUT)/libuwph.a -ldl -Wl,--version-script=$(OUT)/shim.map -Wl,-z,defs -o $@
+$(OUT)/elf_probe: elf_probe.c
+	$(CC) $(CFLAGS) -fno-builtin $< -ldl -o $@
+shim-test: $(OUT)/libuwph_shim.so $(OUT)/elf_probe
+	@rm -f $(OUT)/negative.report $(OUT)/positive.report $(OUT)/exit.report $(OUT)/fixture.created
+	@printf 'hello from O2 fixture\n' > $(OUT)/fixture
+	UWPH_REPORT=$(CURDIR)/$(OUT)/negative.report timeout 15s $(OUT)/elf_probe $(OUT)/fixture
+	timeout 15s env UWPH_REPORT=$(CURDIR)/$(OUT)/positive.report LD_PRELOAD=$(CURDIR)/$(OUT)/libuwph_shim.so $(OUT)/elf_probe $(OUT)/fixture
+	timeout 15s env UWPH_REPORT=$(CURDIR)/$(OUT)/exit.report LD_PRELOAD=$(CURDIR)/$(OUT)/libuwph_shim.so $(OUT)/elf_probe $(OUT)/fixture --exit
+	python3 verify_counters.py $(OUT)/negative.report $(OUT)/positive.report $(OUT)/exit.report
+.PHONY: shim-test
