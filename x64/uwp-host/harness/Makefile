@@ -65,3 +65,8 @@ windows-file-test:
 evidence-replay: $(OUT)/backend_test
 	./evidence-replay.sh
 .PHONY: evidence-replay
+
+# Explicit packaging-time initialization only; never a runtime prerequisite.
+prebuilt-prefix:
+	./prepare-wine.sh --prebuilt-prefix
+.PHONY: prebuilt-prefix

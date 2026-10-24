@@ -706,3 +706,40 @@ ntdll/*.c, not ntdll/unix/*.c, so the launch decision additionally required
 inspection of unix/env.c. This is source-only diagnosis: no THROUGH-uwph,
 launcher, stock Wine execution, or build was performed. No child Wine
 process was spawned, code/verifiers changed, or runtime proof claimed.
+
+## R4W O2 build-time prebuilt prefix
+
+`make -C x64/uwp-host/harness prebuilt-prefix` calls the opt-in
+`prepare-wine.sh --prebuilt-prefix` packaging path. On this Linux build box it
+runs installed Wine 10.0's `wineboot.exe --init` once for a fresh, isolated
+win64 prefix, waits for its matching stock wineserver to finish flushing the
+registry, checks all three registry files and the Wine-generated stamp, and
+publishes `x64/uwp-host/harness/prebuilt-prefix/`. All real files and directories
+have write bits removed; chmod never follows Wine's host drive symlinks. The
+large generated tree is gitignored. `packaging.json` records the Wine version,
+loader/server hashes, wine.inf hash and mtime. The actual `.update-timestamp`
+contains `1750921248\n`, matching this installation's wine.inf mtime, as O1
+requires; it is not synthesized or replaced with a version string. A lock
+prevents concurrent packagers. Existing packages are checked and reused with
+zero wineboot invocations; changed identities or stamps fail explicitly.
+For a new Wine installation, remove the generated package (restore owner write
+permissions on directories first) and rerun this packaging target.
+
+Runtime integration must explicitly set an absolute `WINEPREFIX`, e.g.
+`WINEPREFIX=/workspace/wt/R4W/x64/uwp-host/harness/prebuilt-prefix` for this
+box. A deployment should bundle the prepared tree and point WINEPREFIX to its
+corresponding deployed location (or an authorized LocalState copy if registry
+writes are needed). This packaging target is never a runtime dependency and
+no runtime script was changed. Linux Wine's host drive symlinks need platform
+path mapping before a UWP deployment. Read-only here means filesystem mode
+bits, not a security boundary. As O1 explains, these disk files do not suppress
+the fresh-session wineboot launch or supply an in-process wineserver: O2 does
+not establish runtime zero-child acceptance.
+
+Validation: the exact O2 make/test command exited 0, creating the read-only
+prefix and matching stamp. Repeating it exited 0 and printed
+`Reused read-only prebuilt-prefix; wineboot invocations this run: 0`.
+`bash -n` and `git diff --check` passed. Evidence classification: **build-only,
+stock Wine packaging**, not THROUGH-uwph or launcher execution. The Xvfb :99
+recording `/workspace/x64-run/videos/R4W-O2.mp4` shows the repeat exact test,
+identity and stamp; it is not runtime proof.
