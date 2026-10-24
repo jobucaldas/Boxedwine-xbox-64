@@ -464,6 +464,29 @@ static U64 x64Sigsuspend(X64CPU* cpu, U64 maskAddress, U64 size) {
     return (U64)-K_CONTINUE;
 }
 
+// utimbuf / timeval[2] with 64-bit longs -> i386 32-bit layout
+static U64 x64Utimes(X64CPU* cpu, U32 nr32, U64 path, U64 times, bool timeval) {
+    U32 t = 0;
+    if (times) {
+        t = scratch(cpu) + 4064;
+        int count = timeval ? 4 : 2;
+        for (int i = 0; i < count; i++) {
+            cpu->memory->writed(t + i * 4, (U32)cpu->read64(times + i * 8));
+        }
+    }
+    return bridge(cpu, nr32, path, t);
+}
+
+static U64 x64Truncate(X64CPU* cpu, U64 path, U64 len) {
+    U32 fd = (U32)bridge(cpu, 5, path, 1 /* O_WRONLY */);
+    if (isError(fd)) {
+        return fd;
+    }
+    U32 result = (U32)bridge(cpu, 194, fd, (U32)len, (U32)(len >> 32));
+    bridge(cpu, 6, fd);
+    return result;
+}
+
 static U64 x64Exit(X64CPU* cpu, U64 code, bool group) {
     U32 nr32 = group ? 252 : 1;
     return bridge(cpu, nr32, code);
@@ -510,6 +533,9 @@ static U64 doSyscall64(X64CPU* cpu, U64 nr, U64 a1, U64 a2, U64 a3, U64 a4, U64 
     case 26: return bridge(cpu, 144, a1, a2, a3);       // msync
     case 27: return bridge(cpu, 218, a1, a2, a3);       // mincore
     case 28: return bridge(cpu, 219, a1, a2, a3);       // madvise
+    case 29: return bridge(cpu, 395, a1, a2, a3);       // shmget
+    case 30: return bridge(cpu, 397, a1, a2, a3);       // shmat
+    case 31: return bridge(cpu, 396, a1, a2, a3);       // shmctl
     case 32: return bridge(cpu, 41, a1);                // dup
     case 33: return bridge(cpu, 63, a1, a2);            // dup2
     case 35: return bridge(cpu, 407, 0, 0, a1, a2);     // nanosleep -> clock_nanosleep_time64
@@ -557,10 +583,12 @@ static U64 doSyscall64(X64CPU* cpu, U64 nr, U64 a1, U64 a2, U64 a3, U64 a4, U64 
         }
         return result;
     }
+    case 67: return bridge(cpu, 117, 22, 0, 0, 0, a1);  // shmdt -> ipc(SHMDT)
     case 72: return x64Fcntl(cpu, a1, a2, a3);          // fcntl
     case 73: return bridge(cpu, 143, a1, a2);           // flock
     case 74: return bridge(cpu, 118, a1);               // fsync
     case 75: return bridge(cpu, 148, a1);               // fdatasync
+    case 76: return x64Truncate(cpu, a1, a2);           // truncate
     case 77: return bridge(cpu, 194, a1, (U32)a2, (U32)(a2 >> 32)); // ftruncate -> ftruncate64
     case 79: return bridge(cpu, 183, a1, a2);           // getcwd
     case 80: return bridge(cpu, 12, a1);                // chdir
@@ -568,6 +596,7 @@ static U64 doSyscall64(X64CPU* cpu, U64 nr, U64 a1, U64 a2, U64 a3, U64 a4, U64 
     case 82: return bridge(cpu, 38, a1, a2);            // rename
     case 83: return bridge(cpu, 39, a1, a2);            // mkdir
     case 84: return bridge(cpu, 40, a1);                // rmdir
+    case 85: return bridge(cpu, 5, a1, 0x241, a2);      // creat -> open(O_CREAT|O_WRONLY|O_TRUNC)
     case 86: return bridge(cpu, 9, a1, a2);             // link
     case 87: return bridge(cpu, 10, a1);                // unlink
     case 88: return bridge(cpu, 83, a1, a2);            // symlink
@@ -631,6 +660,16 @@ static U64 doSyscall64(X64CPU* cpu, U64 nr, U64 a1, U64 a2, U64 a3, U64 a4, U64 
     case 127: return x64Sigpending(cpu, a1, a2);        // rt_sigpending
     case 128: return bridge(cpu, 421, a1, a2, a3, a4);  // rt_sigtimedwait -> time64
     case 130: return x64Sigsuspend(cpu, a1, a2);        // rt_sigsuspend
+    case 132: return x64Utimes(cpu, 30, a1, a2, false); // utime
+    case 140: return 20;                                // getpriority (nice 0)
+    case 141: return bridge(cpu, 97, a1, a2, a3);       // setpriority
+    case 143: return bridge(cpu, 155, a1, a2);          // sched_getparam
+    case 145: return bridge(cpu, 157, a1);              // sched_getscheduler
+    case 146: return bridge(cpu, 159, a1);              // sched_get_priority_max
+    case 147: return bridge(cpu, 160, a1);              // sched_get_priority_min
+    case 149: return bridge(cpu, 150, a1, a2);          // mlock
+    case 150: return bridge(cpu, 151, a1, a2);          // munlock
+    case 162: return bridge(cpu, 36);                   // sync
     case 131: return sigaltstack64(cpu, a1, a2);        // sigaltstack
     case 137: case 138: {                               // statfs, fstatfs
         U32 s = scratch(cpu);
@@ -671,6 +710,10 @@ static U64 doSyscall64(X64CPU* cpu, U64 nr, U64 a1, U64 a2, U64 a3, U64 a4, U64 
         return result;
     }
     case 221: return 0;                                 // fadvise64 (advisory)
+    case 235: return x64Utimes(cpu, 271, a1, a2, true);  // utimes
+    case 253: return bridge(cpu, 291);                  // inotify_init
+    case 254: return bridge(cpu, 292, a1, a2, a3);      // inotify_add_watch
+    case 255: return bridge(cpu, 293, a1, a2);          // inotify_rm_watch
     case 263: return bridge(cpu, 301, a1, a2, a3);      // unlinkat
     case 264: return bridge(cpu, 302, a1, a2, a3, a4);  // renameat
     case 266: return bridge(cpu, 304, a1, a2, a3);      // symlinkat
@@ -680,6 +723,8 @@ static U64 doSyscall64(X64CPU* cpu, U64 nr, U64 a1, U64 a2, U64 a3, U64 a4, U64 
     case 270: return x64Pselect6(cpu, a1, a2, a3, a4, a5, a6); // pselect6
     case 271: return x64Ppoll(cpu, a1, a2, a3);         // ppoll (sigmask ignored)
     case 281: return bridge(cpu, 256, a1, a2, a3, a4);  // epoll_pwait (sigmask ignored)
+    case 277: return 0;                                 // sync_file_range
+    case 285: return bridge(cpu, 324, a1, a2, (U32)a3, (U32)(a3 >> 32), (U32)a4, (U32)(a4 >> 32)); // fallocate
     case 288: return bridge(cpu, 364, a1, a2, a3, a4);  // accept4
     case 273: return 0;                                 // set_robust_list (robust futexes not emulated)
     case 280: return bridge(cpu, 412, a1, a2, a3, a4);  // utimensat -> time64
@@ -689,8 +734,14 @@ static U64 doSyscall64(X64CPU* cpu, U64 nr, U64 a1, U64 a2, U64 a3, U64 a4, U64 
     case 291: return bridge(cpu, 329, a1);              // epoll_create1
     case 292: return bridge(cpu, 330, a1, a2, a3);      // dup3
     case 293: return bridge(cpu, 331, a1, a2);          // pipe2
+    case 294: return bridge(cpu, 291);                  // inotify_init1 (flags ignored)
     case 302: return bridge(cpu, 340, a1, a2, a3, a4);  // prlimit64
     case 316: return bridge(cpu, 353, a1, a2, a3, a4, a5); // renameat2
+    case 309: {                                         // getcpu
+        if (a1) cpu->write32(a1, 0);
+        if (a2) cpu->write32(a2, 0);
+        return 0;
+    }
     case 318: return bridge(cpu, 355, a1, a2, a3);      // getrandom
     case 319: return bridge(cpu, 356, a1, a2);          // memfd_create
     case 332: return bridge(cpu, 383, a1, a2, a3, a4, a5); // statx
