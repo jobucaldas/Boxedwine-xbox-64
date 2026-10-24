@@ -55,6 +55,7 @@ UWPH_API int uwph_pthread_sigmask(int how, const uwph_sigset_t *set, uwph_sigset
         default: return UWPH_EINVAL;   /* pthread_* returns the error */
         }
     }
+    uwph_deliver_pending_signals(NULL);
     return 0;
 }
 
@@ -246,6 +247,8 @@ int uwph_dispatch_exception(const struct uwph_exception *e, void *ctx)
     int64_t trapno, err;
     int sig, handled, was_guest = t->teb_swap.in_guest;
 
+    /* No supported UWP path for live TEB mutation. */
+    if (was_guest) return 0;
     if (e->code == UWPH_EXC_ACCESS_VIOLATION && e->nparams >= 2 &&
         uwph_wx_handle_fault((const void *)(uintptr_t)e->info[1], (int)e->info[0]))
         return 1;
@@ -298,6 +301,7 @@ _Static_assert(offsetof(uwph_win_context, Rip) == offsetof(CONTEXT, Rip), "CONTE
 _Static_assert(offsetof(uwph_win_context, FltSave) == offsetof(CONTEXT, FltSave), "CONTEXT.FltSave");
 _Static_assert(offsetof(uwph_win_context, EFlags) == offsetof(CONTEXT, EFlags), "CONTEXT.EFlags");
 
+#ifdef UWPH_DESKTOP_SIGNAL_TEST
 static LONG CALLBACK veh(EXCEPTION_POINTERS *ep)
 {
     const EXCEPTION_RECORD *r = ep->ExceptionRecord;
@@ -322,6 +326,13 @@ int uwph_signal_init(void)
     }
     return 0;
 }
+#else
+int uwph_signal_init(void)
+{
+    uwph_log("uwph: UWP cooperative signals only; exception registration disabled\n");
+    return 0;
+}
+#endif
 #else
 int uwph_signal_init(void) { return 0; }   /* stub: nothing raises exceptions */
 #endif

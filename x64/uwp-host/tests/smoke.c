@@ -343,17 +343,81 @@ static void *stack_probe(void *arg)
 }
 
 static int usr1_count;
-static void on_usr1(int sig) { if (sig == UWPH_SIGUSR1) usr1_count++; }
+static void on_usr1(int sig) {
+    if (sig == UWPH_SIGUSR1) usr1_count++;
+    uwph_errno = UWPH_EBADF; /* handler must not clobber futex errno */
+}
 
+struct signal_case { int mode, ready, go, done, result, error, count, after; };
 static void *sig_waiter(void *arg)
 {
-    int *tid = arg;
-    long r;
-    *tid = uwph_gettid();
-    r = uwph_futex((int *)&futex_word, UWPH_FUTEX_WAIT, 7, NULL, NULL, 0);
-    if (r == -1 && uwph_errno == UWPH_EINTR) uwph_deliver_pending_signals(NULL);
-    return (void *)(intptr_t)(r == -1 ? uwph_errno : 0);
+    struct signal_case *c = arg;
+    uwph_sigset_t mask;
+    struct uwph_timespec timeout = { 2, 0 };
+    uwph_sigemptyset(&mask);
+    uwph_sigaddset(&mask, UWPH_SIGUSR1);
+    if (c->mode >= 2) uwph_pthread_sigmask(UWPH_SIG_BLOCK, &mask, NULL);
+    __atomic_store_n(&c->ready, 1, __ATOMIC_RELEASE);
+    while (!__atomic_load_n(&c->go, __ATOMIC_ACQUIRE)) SwitchToThread();
+    uwph_errno = 123;
+    c->result = (int)uwph_futex((int *)&futex_word, UWPH_FUTEX_WAIT, 7, &timeout, NULL, 0);
+    c->error = uwph_errno; /* save before any other handler activity */
+    c->count = usr1_count;
+    if (c->mode >= 2) uwph_pthread_sigmask(UWPH_SIG_UNBLOCK, &mask, NULL);
+    c->after = usr1_count;
+    __atomic_store_n(&c->done, 1, __ATOMIC_RELEASE);
+    return NULL;
 }
+
+static int await_atomic(volatile int *p, int nonzero)
+{
+    uint64_t end = GetTickCount64() + 3000;
+    while (!!__atomic_load_n(p, __ATOMIC_ACQUIRE) != nonzero) {
+        if (GetTickCount64() >= end) return 0;
+        SwitchToThread();
+    }
+    return 1;
+}
+
+static void test_futex_signals(void)
+{
+    uwph_signal(UWPH_SIGUSR1, (void *)on_usr1);
+    for (int repeat = 0; repeat < 20; repeat++) for (int mode = 0; mode < 5; mode++) {
+        struct signal_case c = { .mode = mode };
+        uwph_pthread_t t;
+        int kick = 0;
+        usr1_count = 0;
+        __atomic_store_n(&futex_word, 7, __ATOMIC_RELEASE);
+        CHECK(uwph_pthread_create(&t, NULL, sig_waiter, &c) == 0, "futex case create %d/%d", repeat, mode);
+        if (!await_atomic(&c.ready, 1)) { CHECK(0, "ready deadline"); return; }
+        if (mode == 0 || mode == 2) kick = uwph_tgkill(uwph_getpid(), t->tid, UWPH_SIGUSR1);
+        __atomic_store_n(&c.go, 1, __ATOMIC_RELEASE);
+        if (mode != 0) {
+            uint64_t end = GetTickCount64() + 3000;
+            while (!__atomic_load_n(&t->wait_addr, __ATOMIC_ACQUIRE) &&
+                   !__atomic_load_n(&c.done, __ATOMIC_ACQUIRE) && GetTickCount64() < end) SwitchToThread();
+            CHECK(__atomic_load_n(&t->wait_addr, __ATOMIC_ACQUIRE) != NULL, "waiter published %d/%d", repeat, mode);
+            if (mode == 1 || mode == 3) kick = uwph_tgkill(uwph_getpid(), t->tid, UWPH_SIGUSR1);
+            if (mode >= 2) {
+                CHECK(uwph_futex((int *)&futex_word, UWPH_FUTEX_WAKE, 0, NULL, NULL, 0) == 0,
+                      "wake zero leaves waiter queued");
+                CHECK(uwph_futex((int *)&futex_word, UWPH_FUTEX_WAKE, 1, NULL, NULL, 0) == 1,
+                      "ordinary wake claims equal-word waiter");
+            }
+        }
+        WaitForSingleObjectEx(t->handle, INFINITE, FALSE);
+        CHECK(uwph_tgkill(uwph_getpid(), t->tid, UWPH_SIGUSR1) == -1 && uwph_errno == UWPH_ESRCH,
+              "exited waiter no longer signal eligible");
+        uwph_pthread_join(t, NULL);
+        CHECK(kick == 0 && (mode < 2 ? c.result == -1 && c.error == UWPH_EINTR && c.count == 1 && c.after == 1 :
+              c.result == 0 && c.error == 123 && c.count == 0 && c.after == (mode == 4 ? 0 : 1)),
+              "futex SIGUSR1: %s repeat=%d mode=%d r=%d errno=%d handlers=%d unmask=%d",
+              (mode < 2 ? c.result == -1 && c.error == UWPH_EINTR && c.count == 1 && c.after == 1 :
+               c.result == 0 && c.error == 123 && c.count == 0 && c.after == (mode == 4 ? 0 : 1)) ? "PASS" : "FAIL",
+              repeat, mode, c.result, c.error, c.count, c.after);
+    }
+}
+
 #endif
 
 static void test_host(void)
@@ -372,22 +436,23 @@ static void test_host(void)
     }
 #ifdef UWPH_BACKEND_WIN32
     {
+#ifdef UWPH_DESKTOP_SIGNAL_TEST
         static const unsigned char ret42[] = { 0xb8, 0x2a, 0x00, 0x00, 0x00, 0xc3 };   /* mov eax,42; ret */
         static const unsigned char ret7[]  = { 0xb8, 0x07, 0x00, 0x00, 0x00, 0xc3 };
         unsigned char *rwx;
+#endif
         char buf[64];
         struct uwph_stat st;
         uwph_pthread_t t;
         uwph_pthread_attr_t attr;
-        void *stk, *where;
-        int tid = 0;
-        uwph_sigset_t none;
+        void *stk;
 
         CHECK(p != UWPH_MAP_FAILED, "mmap anon RW -> %p", p);
         CHECK(clock_rc == 0 && ts.tv_sec >= 0, "clock_gettime(MONOTONIC) -> %lld.%09lld", (long long)ts.tv_sec, (long long)ts.tv_nsec);
         CHECK(uwph_munmap(p, 3 * 4096) == 0, "munmap");
 
-        /* the guest asks for RWX: emulated as RW <-> RX flips */
+#ifdef UWPH_DESKTOP_SIGNAL_TEST
+        /* Explicit desktop-only exception execution test. */
         rwx = uwph_mmap(NULL, 4096, UWPH_PROT_READ | UWPH_PROT_WRITE | UWPH_PROT_EXEC,
                         UWPH_MAP_PRIVATE | UWPH_MAP_ANONYMOUS, -1, 0);
         CHECK(rwx != UWPH_MAP_FAILED, "mmap RWX (tracked as W^X-emulated) -> %p", (void *)rwx);
@@ -396,6 +461,9 @@ static void test_host(void)
         memcpy(rwx, ret7, sizeof(ret7));
         CHECK(((int (*)(void))rwx)() == 7, "write fault -> RW, patched, exec fault -> RX again -> 7");
         uwph_munmap(rwx, 4096);
+#else
+        printf("SKIP live exception execution: unsupported UWP exception hook disabled\n");
+#endif
 
         /* futex across threads */
         futex_word = 0;
@@ -416,16 +484,7 @@ static void test_host(void)
         CHECK(stack_addr > (uintptr_t)stk && stack_addr < (uintptr_t)stk + 256 * 1024,
               "pthread_attr_setstack honoured: thread ran at %p inside [%p, +256K)", (void *)stack_addr, stk);
 
-        /* tgkill(SIGUSR1) interrupts a futex wait; handler runs at the next host entry */
-        uwph_sigemptyset(&none);
-        uwph_signal(UWPH_SIGUSR1, (void *)on_usr1);
-        futex_word = 7;
-        uwph_pthread_create(&t, NULL, sig_waiter, &tid);
-        while (!tid) uwph_usleep(1000);
-        uwph_usleep(20000);
-        CHECK(uwph_tgkill(uwph_getpid(), tid, UWPH_SIGUSR1) == 0, "tgkill(SIGUSR1) -> tid %d", tid);
-        uwph_pthread_join(t, &where);
-        CHECK((intptr_t)where == UWPH_EINTR && usr1_count == 1, "waiter: futex -> EINTR, SIGUSR1 handler ran (%d)", usr1_count);
+        test_futex_signals();
 
         CHECK(fd >= 0, "open(\"/smoke-input.txt\") via CreateFile2 -> fd %d", fd);
         if (fd >= 0) {
@@ -453,7 +512,18 @@ int main(int argc, char **argv)
     /* "/" -> the directory holding the test binary's input (LocalFolder on the Xbox) */
     snprintf(root, sizeof(root), "%s", argc > 1 ? argv[1] : (WIN ? "x64\\uwp-host\\tests" : "x64/uwp-host/tests"));
     setvbuf(stdout, NULL, _IONBF, 0);
-    uwph_init(root, WIN ? "C:\\uwph-install" : "/opt/uwph-install");
+#ifdef UWPH_BACKEND_WIN32
+    if (argc > 1 && !strcmp(argv[1], "--futex-only")) {
+        printf("Desktop cooperative test-only mode: Windows PE -> uwph wait/signal -> stock Wine Win32; no exception hook or live TEB mutation\n");
+        test_futex_signals();
+        printf("%d passed, %d failed\n", passes, fails);
+        return fails ? 1 : 0;
+    }
+#endif
+#ifdef UWPH_DESKTOP_SIGNAL_TEST
+    printf("Desktop exception test-only mode; no live TEB mutation; not UWP acceptance\n");
+#endif
+    CHECK(uwph_init(root, WIN ? "C:\\uwph-install" : "/opt/uwph-install") == 0, "uwph_init");
     printf("uwph smoke test, backend: %s\n", uwph_backend_name());
     printf("API probe:\n");
     uwph_probe_print(print_line);

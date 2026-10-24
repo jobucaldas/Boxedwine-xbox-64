@@ -48,3 +48,11 @@ $(OUT)/run_via_wine: ../../pe/launcher/run_via_wine.c
 wine-test: $(OUT)/libuwph_wine_shim.so $(OUT)/run_via_wine
 	./run-wine.sh
 .PHONY: wine-test
+
+# Desktop PE -> uwph Windows waits/signals -> stock Wine Win32 implementation.
+# Distinct from wine-test, which routes real Unix ntdll.so calls via Linux uwph.
+windows-futex-test:
+	./run-windows-smoke.sh --futex-only
+windows-smoke-test:
+	./run-windows-smoke.sh --full
+.PHONY: windows-futex-test windows-smoke-test

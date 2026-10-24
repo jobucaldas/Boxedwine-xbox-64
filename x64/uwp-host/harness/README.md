@@ -244,3 +244,39 @@ native Linux TLS/signals and memory behavior are not UWP equivalents.
 Capture with `x64/uwp-host/harness/record.sh O4 -- make -C
 x64/uwp-host/harness wine-test` (on one shell line). Its nonzero status records
 the rejected acceptance run honestly; the resulting MP4 is still valid footage.
+
+## O5: cooperative Windows futex/signal regression
+
+`make -C x64/uwp-host/harness windows-futex-test` builds a separate desktop
+artifact under `out/windows-desktop/` and runs the owned PE with stock Wine.
+It exercises **THROUGH uwph Windows thread/futex/signal code**; stock Wine
+loads the PE and provides Win32 waits/threads. It does not route Wine's Unix
+ntdll.so through the Windows backend. `wine-test` remains the independent O4
+Linux routing check, including its existing wineboot-free acceptance blocker.
+The initialized owned O4 fixture is reused under its lock; no normal prefix,
+Wine loader changes, or initialization commands are used.
+
+Twenty repetitions cover signals queued before wait and during a published
+wait, masked signals at both points with delivery on unmask, and ordinary wake
+while the word remains equal. The per-waiter sequence/registry lock handshake
+closes publication-to-sleep races. Signal kicks increment the sequence without
+claiming a normal wake; FUTEX_WAKE claims at most its requested waiter count.
+Zero wake is checked. Tests save return/errno immediately, use a handler that
+clobbers errno, check exactly one delivery, and check ESRCH after thread exit.
+Waiters have a two-second bound and publication handshakes have deadlines.
+
+The futex-only run skips initialization, exception registration and live TEB
+mutation. Default UWP signal initialization enables cooperative delivery only;
+exception registration is compiled solely with `UWPH_DESKTOP_SIGNAL_TEST`.
+Live guest-TEB exception dispatch is disabled. Synthetic context/fake-array
+checks remain synthetic. Full desktop smoke is explicitly test-only and uses
+that macro for its existing desktop exception tests. The default smoke skips
+live exception execution with an explicit message.
+
+`make -C x64/uwp-host/harness windows-smoke-test` runs the entire desktop suite
+and preserves its exit status. The CreateFile2 `/smoke-input.txt` failure and
+three dependent file assertions remain pending O6; the futex-only target is
+not a full-suite pass. Linux backend/stub tests do not validate this Windows
+fix. Record O5 locally with `record.sh O5 -- make -C
+x64/uwp-host/harness windows-futex-test`; the video shows this Linux box, not an
+Xbox device. No Encom is used.

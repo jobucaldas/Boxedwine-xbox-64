@@ -24,6 +24,18 @@ static struct uwph_thread *registry[MAX_THREADS];
 static uwph_lock_t reg_lock = UWPH_LOCK_INIT;
 static __thread struct uwph_thread *self;
 
+#ifdef UWPH_BACKEND_WIN32
+/* Stack-owned waiters are published and removed under reg_lock. All users
+ * finish touching them before removal; sequence closes the check/sleep race. */
+struct futex_waiter {
+    struct futex_waiter *next;
+    struct uwph_thread *thread;
+    int *addr;
+    int sequence, woken;
+};
+static struct futex_waiter *waiters;
+#endif
+
 static int new_tid(void)
 {
 #ifdef UWPH_BACKEND_WIN32
@@ -81,17 +93,24 @@ UWPH_API int uwph_tgkill(uwph_pid_t tgid, int tid, int sig)
     struct uwph_thread *t;
     if (tgid != uwph_getpid()) return UWPH_FAIL(UWPH_ESRCH);
     if (sig < 0 || sig >= 64) return UWPH_FAIL(UWPH_EINVAL);
-    if (!(t = uwph_thread_find(tid))) return UWPH_FAIL(UWPH_ESRCH);
-    if (!sig) return 0;
-    __atomic_or_fetch(&t->pending, (uint64_t)1 << (sig - 1), __ATOMIC_ACQ_REL);
+    /* Keep registry lifetime protection through pending publication and kick. */
+    uwph_lock(&reg_lock);
+    t = NULL;
+    for (int i = 0; i < MAX_THREADS; i++)
+        if (registry[i] && registry[i]->tid == tid) { t = registry[i]; break; }
+    if (!t) { uwph_unlock(&reg_lock); return UWPH_FAIL(UWPH_ESRCH); }
+    if (sig) {
+        __atomic_or_fetch(&t->pending, (uint64_t)1 << (sig - 1), __ATOMIC_ACQ_REL);
 #ifdef UWPH_BACKEND_WIN32
-    {   /* kick it out of a futex/nanosleep wait; it delivers at its next host entry */
-        volatile int *w = t->wait_addr;
-        if (w) WakeByAddressAll((PVOID)w);
+        for (struct futex_waiter *w = waiters; w; w = w->next) if (w->thread == t) {
+            __atomic_add_fetch(&w->sequence, 1, __ATOMIC_RELEASE);
+            WakeByAddressAll(&w->sequence);
+        }
         WakeByAddressAll((PVOID)&t->pending);
-    }
 #endif
-    if (t == self) uwph_deliver_pending_signals(NULL);
+    }
+    uwph_unlock(&reg_lock);
+    if (sig && t == self) uwph_deliver_pending_signals(NULL);
     return 0;
 }
 
@@ -225,6 +244,7 @@ static DWORD WINAPI thread_entry(LPVOID p)
     else
         thread_body(t);
     run_key_dtors(t);
+    unregister_thread(t);
     return 0;
 }
 
@@ -263,6 +283,7 @@ UWPH_API void uwph_pthread_exit(void *ret)
     struct uwph_thread *t = uwph_thread_current();
     t->ret = ret;
     run_key_dtors(t);
+    unregister_thread(t);
     ExitThread(0);
 }
 
@@ -289,26 +310,50 @@ UWPH_API int uwph_sched_setaffinity(uwph_pid_t pid, size_t size, const void *mas
     return SetThreadAffinityMask(t == self ? GetCurrentThread() : t->handle, m) ? 0 : UWPH_FAIL(UWPH_EINVAL);
 }
 
-/* futex on WaitOnAddress. Waits are sliced so a queued signal (tgkill)
- * can interrupt them even if its wake-up raced with the wait. */
+/* Only the target reads its signal mask; senders publish pending atomically. */
+static int deliverable(struct uwph_thread *t)
+{
+    return (__atomic_load_n(&t->pending, __ATOMIC_ACQUIRE) & ~t->sigmask.val[0]) != 0;
+}
+
 static int futex_wait(int *uaddr, int val, int64_t timeout_ms)
 {
     struct uwph_thread *t = uwph_thread_current();
+    struct futex_waiter w = { NULL, t, uaddr, 0, 0 }, **link;
     uint64_t start = GetTickCount64();
-    t->wait_addr = uaddr;
+    int error = 0, saved_errno = uwph_errno;
+    uwph_lock(&reg_lock);
+    if (__atomic_load_n(uaddr, __ATOMIC_ACQUIRE) != val) {
+        uwph_unlock(&reg_lock);
+        return UWPH_FAIL(UWPH_EAGAIN);
+    }
+    w.next = waiters;
+    waiters = &w;
+    __atomic_store_n(&t->wait_addr, uaddr, __ATOMIC_RELEASE);
+    uwph_unlock(&reg_lock);
     for (;;) {
+        int seq = __atomic_load_n(&w.sequence, __ATOMIC_ACQUIRE);
         DWORD slice = 100;
-        if (__atomic_load_n(uaddr, __ATOMIC_ACQUIRE) != val) break;
-        if (t->pending) { t->wait_addr = NULL; return UWPH_FAIL(UWPH_EINTR); }
+        /* Check after every wake, including a successful host wake. */
+        if (deliverable(t)) { error = UWPH_EINTR; break; }
+        if (__atomic_load_n(&w.woken, __ATOMIC_ACQUIRE)) break;
         if (timeout_ms >= 0) {
             uint64_t el = GetTickCount64() - start;
-            if (el >= (uint64_t)timeout_ms) { t->wait_addr = NULL; return UWPH_FAIL(UWPH_ETIMEDOUT); }
+            if (el >= (uint64_t)timeout_ms) { error = UWPH_ETIMEDOUT; break; }
             if ((uint64_t)timeout_ms - el < slice) slice = (DWORD)(timeout_ms - el);
         }
-        if (WaitOnAddress(uaddr, &val, sizeof(val), slice)) break;
+        WaitOnAddress(&w.sequence, &seq, sizeof(seq), slice);
     }
-    t->wait_addr = NULL;
-    return 0;
+    uwph_lock(&reg_lock);
+    for (link = &waiters; *link != &w; link = &(*link)->next) {}
+    *link = w.next;
+    __atomic_store_n(&t->wait_addr, NULL, __ATOMIC_RELEASE);
+    uwph_unlock(&reg_lock);
+    /* Delivery may call wrappers that change errno. Preserve this operation. */
+    if (deliverable(t)) error = UWPH_EINTR;
+    uwph_deliver_pending_signals(NULL);
+    uwph_errno = error ? error : saved_errno;
+    return error ? -1 : 0;
 }
 
 UWPH_API long uwph_futex(int *uaddr, int op, int val, const struct uwph_timespec *timeout,
@@ -336,9 +381,19 @@ UWPH_API long uwph_futex(int *uaddr, int op, int val, const struct uwph_timespec
         return futex_wait(uaddr, val, ms);
     case UWPH_FUTEX_WAKE:
     case UWPH_FUTEX_WAKE_BITSET:
-        if (val == 1) WakeByAddressSingle(uaddr);
-        else WakeByAddressAll(uaddr);
-        return 0;   /* number woken is not reported by WakeByAddress*; Wine ignores it */
+        {
+            int count = 0;
+            uwph_lock(&reg_lock);
+            for (struct futex_waiter *w = waiters; w && count < val; w = w->next)
+                if (w->addr == uaddr && !w->woken) {
+                    __atomic_store_n(&w->woken, 1, __ATOMIC_RELEASE);
+                    __atomic_add_fetch(&w->sequence, 1, __ATOMIC_RELEASE);
+                    WakeByAddressAll(&w->sequence);
+                    count++;
+                }
+            uwph_unlock(&reg_lock);
+            return count;
+        }
     default:
         return UWPH_FAIL(UWPH_ENOSYS);
     }
