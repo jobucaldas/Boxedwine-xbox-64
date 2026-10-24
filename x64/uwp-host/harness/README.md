@@ -274,9 +274,38 @@ that macro for its existing desktop exception tests. The default smoke skips
 live exception execution with an explicit message.
 
 `make -C x64/uwp-host/harness windows-smoke-test` runs the entire desktop suite
-and preserves its exit status. The CreateFile2 `/smoke-input.txt` failure and
-three dependent file assertions remain pending O6; the futex-only target is
-not a full-suite pass. Linux backend/stub tests do not validate this Windows
+and preserves its exit status. O6 resolves the fixture path for the CreateFile2
+checks (see below); the futex-only target is not a full-suite pass. Linux backend/stub tests do not validate this Windows
 fix. Record O5 locally with `record.sh O5 -- make -C
 x64/uwp-host/harness windows-futex-test`; the video shows this Linux box, not an
 Xbox device. No Encom is used.
+
+
+## O6: absolute Windows file fixture
+
+`make -C x64/uwp-host/harness windows-file-test` runs the focused file checks;
+`windows-smoke-test` runs the full desktop suite including O5 signals. Both
+use the owned O4 prefix under its lock. The runner resolves the repository's
+`tests` directory with `realpath`, converts it with `winepath -w` using that
+prefix, validates an absolute drive path, and passes the quoted Windows root
+to the PE. This conversion is fixture setup only. The previous relative root
+was interpreted from the harness CWD and pointed to a nonexistent nested tree.
+No fs.c change, API fallback, writable filesystem expansion or Wine loader
+change is needed.
+
+The PE checks initialization and stops if it fails. It logs process CWD,
+virtual CWD, translated path and mount result, then performs a separately
+labelled stock Win32 GetFileAttributesA path control. Immediately after
+uwph_open it saves GetLastError and uwph_errno before printing. Read/content,
+regular-file size, lseek/read and close assertions exercise Windows uwph's
+CreateFile2 backend. A failed open remains a failing assertion and explicitly
+lists the dependent assertions skipped. Successful runs skip none of these.
+
+Coverage: file/signal tests go THROUGH Windows uwph hosted by stock Wine's
+Win32 implementation. GetFileAttributesA and winepath are stock Wine controls
+or setup, not routing evidence. These runs do not use run_via_wine and do not
+route Wine's Unix ntdll.so through uwph. The separate `wine-test` exercises our
+launcher and selected real ntdll.so -> shim -> Linux uwph calls; its existing
+wineboot-attempt acceptance blocker remains. Local `record.sh O6 -- make -C
+x64/uwp-host/harness windows-smoke-test` captures Linux Xvfb/xterm via ffmpeg,
+not Xbox device validation. No Encom is used.

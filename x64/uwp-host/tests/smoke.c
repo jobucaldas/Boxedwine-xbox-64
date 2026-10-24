@@ -420,12 +420,54 @@ static void test_futex_signals(void)
 
 #endif
 
+#ifdef UWPH_BACKEND_WIN32
+static void test_file(void)
+{
+    char host[1024] = "", cwd_buf[512] = "", buf[64];
+    struct uwph_stat st = {0};
+    int translated = uwph_fs_translate("/smoke-input.txt", host, sizeof(host));
+    DWORD path_error;
+    DWORD attrs;
+    int fd, open_error;
+    DWORD last_error;
+    uwph_getcwd(cwd_buf, sizeof(cwd_buf));
+    printf("File fixture: uwph CWD=%s translated=%s mount=%d\n", cwd_buf, host, translated);
+    CHECK(translated >= 0, "fixture path translation");
+    /* Controlled stock Win32 path check only; never substitute for uwph_open. */
+    SetLastError(0);
+    attrs = GetFileAttributesA(host);
+    path_error = GetLastError();
+    CHECK(attrs != INVALID_FILE_ATTRIBUTES && !(attrs & FILE_ATTRIBUTE_DIRECTORY),
+          "stock Wine path control: GetFileAttributesA path=%s error=%lu", host, (unsigned long)path_error);
+    uwph_errno = 0;
+    SetLastError(0);
+    fd = uwph_open("/smoke-input.txt", UWPH_O_RDONLY);
+    last_error = GetLastError();
+    open_error = uwph_errno;
+    printf("CreateFile2 immediate: path=%s fd=%d GetLastError=%lu uwph_errno=%d\n",
+           host, fd, (unsigned long)last_error, open_error);
+    CHECK(fd >= 0, "open(\"/smoke-input.txt\") via CreateFile2 -> fd %d", fd);
+    if (fd >= 0) {
+        uwph_ssize_t n = uwph_read(fd, buf, sizeof(buf) - 1);
+        buf[n > 0 ? n : 0] = 0;
+        CHECK(n > 0 && !strncmp(buf, "uwph smoke input", 16), "read: \"%.16s\"", buf);
+        CHECK(uwph_fstat(fd, &st) == 0 && (st.st_mode & UWPH_S_IFMT) == UWPH_S_IFREG && st.st_size == n,
+              "fstat: regular, %lld bytes", (long long)st.st_size);
+        CHECK(uwph_lseek(fd, 5, UWPH_SEEK_SET) == 5 && uwph_read(fd, buf, 5) == 5 && !memcmp(buf, "smoke", 5),
+              "lseek + read");
+        CHECK(uwph_close(fd) == 0, "file close");
+    } else {
+        printf("SKIP dependent file assertions: read/content, fstat, lseek/read, close (open failed)\n");
+    }
+}
+#endif
+
 static void test_host(void)
 {
     struct uwph_timespec ts;
     void *p = uwph_mmap(NULL, 3 * 4096, UWPH_PROT_READ | UWPH_PROT_WRITE, UWPH_MAP_PRIVATE | UWPH_MAP_ANONYMOUS, -1, 0);
     int clock_rc = uwph_clock_gettime(UWPH_CLOCK_MONOTONIC, &ts);
-    int fd = uwph_open("/smoke-input.txt", UWPH_O_RDONLY);
+    int fd = WIN ? -1 : uwph_open("/smoke-input.txt", UWPH_O_RDONLY);
 
     if (!WIN) {
         CHECK(p == UWPH_MAP_FAILED && uwph_errno == UWPH_ENOSYS, "stub: mmap -> ENOSYS");
@@ -442,7 +484,6 @@ static void test_host(void)
         unsigned char *rwx;
 #endif
         char buf[64];
-        struct uwph_stat st;
         uwph_pthread_t t;
         uwph_pthread_attr_t attr;
         void *stk;
@@ -486,17 +527,7 @@ static void test_host(void)
 
         test_futex_signals();
 
-        CHECK(fd >= 0, "open(\"/smoke-input.txt\") via CreateFile2 -> fd %d", fd);
-        if (fd >= 0) {
-            uwph_ssize_t n = uwph_read(fd, buf, sizeof(buf) - 1);
-            buf[n > 0 ? n : 0] = 0;
-            CHECK(n > 0 && !strncmp(buf, "uwph smoke input", 16), "read: \"%.16s\"", buf);
-            CHECK(uwph_fstat(fd, &st) == 0 && (st.st_mode & UWPH_S_IFMT) == UWPH_S_IFREG && st.st_size == n,
-                  "fstat: regular, %lld bytes", (long long)st.st_size);
-            CHECK(uwph_lseek(fd, 5, UWPH_SEEK_SET) == 5 && uwph_read(fd, buf, 5) == 5 && !memcmp(buf, "smoke", 5),
-                  "lseek + read");
-            uwph_close(fd);
-        }
+        test_file();
         CHECK(uwph_sysconf(UWPH_SC_NPROCESSORS_ONLN) > 0, "sysconf(NPROCESSORS_ONLN) = %ld", uwph_sysconf(UWPH_SC_NPROCESSORS_ONLN));
         CHECK(uwph_getrandom(buf, 16, 0) == 16, "getrandom (BCryptGenRandom)");
     }
@@ -523,7 +554,24 @@ int main(int argc, char **argv)
 #ifdef UWPH_DESKTOP_SIGNAL_TEST
     printf("Desktop exception test-only mode; no live TEB mutation; not UWP acceptance\n");
 #endif
-    CHECK(uwph_init(root, WIN ? "C:\\uwph-install" : "/opt/uwph-install") == 0, "uwph_init");
+    {
+        int rc = uwph_init(root, WIN ? "C:\\uwph-install" : "/opt/uwph-install");
+        int error = uwph_errno;
+        CHECK(rc == 0, "uwph_init root=%s rc=%d uwph_errno=%d", root, rc, error);
+        if (rc != 0) return 1;
+    }
+#ifdef UWPH_BACKEND_WIN32
+    {
+        char host_cwd[1024] = "";
+        GetCurrentDirectoryA(sizeof(host_cwd), host_cwd);
+        printf("Windows process CWD=%s fixture root=%s\n", host_cwd, root);
+        if (argc > 2 && !strcmp(argv[2], "--file-only")) {
+            test_file();
+            printf("%d passed, %d failed\n", passes, fails);
+            return fails ? 1 : 0;
+        }
+    }
+#endif
     printf("uwph smoke test, backend: %s\n", uwph_backend_name());
     printf("API probe:\n");
     uwph_probe_print(print_line);

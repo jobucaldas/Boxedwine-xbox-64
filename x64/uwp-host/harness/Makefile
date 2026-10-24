@@ -56,3 +56,7 @@ windows-futex-test:
 windows-smoke-test:
 	./run-windows-smoke.sh --full
 .PHONY: windows-futex-test windows-smoke-test
+
+windows-file-test:
+	./run-windows-smoke.sh --file-only
+.PHONY: windows-file-test
