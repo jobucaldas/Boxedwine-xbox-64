@@ -89,6 +89,9 @@ int uwph_fd_count(void)
 
 UWPH_API int uwph_close(int fd)
 {
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    return uwph_linux_close(fd);
+#else
     struct fd_entry old;
     if (fd < 0 || fd >= UWPH_MAX_FDS) return UWPH_FAIL(UWPH_EBADF);
     uwph_lock(&fd_lock);
@@ -98,6 +101,7 @@ UWPH_API int uwph_close(int fd)
     if (old.kind == UWPH_FD_FREE) return UWPH_FAIL(UWPH_EBADF);
     release_entry(old, fd);
     return 0;
+#endif
 }
 
 static int dup_from(int fd, int start, int cloexec)
@@ -174,6 +178,9 @@ UWPH_API int uwph_isatty(int fd)
 
 UWPH_API uwph_ssize_t uwph_read(int fd, void *buf, size_t len)
 {
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    return uwph_linux_read(fd, buf, len);
+#else
     enum uwph_fd_kind kind;
     int flags;
     uwph_ssize_t ret;
@@ -191,10 +198,14 @@ UWPH_API uwph_ssize_t uwph_read(int fd, void *buf, size_t len)
     }
     uwph_obj_unref(o);
     return ret;
+#endif
 }
 
 UWPH_API uwph_ssize_t uwph_write(int fd, const void *buf, size_t len)
 {
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    return uwph_linux_write(fd, buf, len);
+#else
     enum uwph_fd_kind kind;
     int flags;
     uwph_ssize_t ret;
@@ -213,6 +224,7 @@ UWPH_API uwph_ssize_t uwph_write(int fd, const void *buf, size_t len)
     }
     uwph_obj_unref(o);
     return ret;
+#endif
 }
 
 UWPH_API uwph_ssize_t uwph_writev(int fd, const struct uwph_iovec *iov, int cnt)
@@ -229,6 +241,9 @@ UWPH_API uwph_ssize_t uwph_writev(int fd, const struct uwph_iovec *iov, int cnt)
 
 UWPH_API uwph_ssize_t uwph_pread(int fd, void *buf, size_t len, uwph_off_t off)
 {
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    return uwph_linux_pread(fd, buf, len, off);
+#else
     enum uwph_fd_kind kind;
     uwph_ssize_t ret;
     struct uwph_object *o = uwph_fd_get(fd, &kind, NULL);
@@ -236,16 +251,24 @@ UWPH_API uwph_ssize_t uwph_pread(int fd, void *buf, size_t len, uwph_off_t off)
     ret = kind == UWPH_FD_FILE ? uwph_file_read(o, buf, len, off < 0 ? 0 : off) : UWPH_FAIL(UWPH_ESPIPE);
     uwph_obj_unref(o);
     return ret;
+#endif
 }
 
 UWPH_API uwph_ssize_t uwph_pwrite(int fd, const void *buf, size_t len, uwph_off_t off)
 {
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    return uwph_linux_pwrite(fd, buf, len, off);
+#else
     (void)fd; (void)buf; (void)len; (void)off;
     return UWPH_ENOSYS_INT();
+#endif
 }
 
 UWPH_API uwph_off_t uwph_lseek(int fd, uwph_off_t off, int whence)
 {
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    return uwph_linux_lseek(fd, off, whence);
+#else
     enum uwph_fd_kind kind;
     uwph_off_t ret;
     struct uwph_object *o = uwph_fd_get(fd, &kind, NULL);
@@ -253,4 +276,5 @@ UWPH_API uwph_off_t uwph_lseek(int fd, uwph_off_t off, int whence)
     ret = kind == UWPH_FD_FILE ? uwph_file_seek(o, off, whence) : UWPH_FAIL(UWPH_ESPIPE);
     uwph_obj_unref(o);
     return ret;
+#endif
 }

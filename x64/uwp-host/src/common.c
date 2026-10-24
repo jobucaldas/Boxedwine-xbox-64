@@ -12,6 +12,8 @@ UWPH_API const char *uwph_backend_name(void)
 {
 #ifdef UWPH_BACKEND_WIN32
     return "win32 (UWP APP partition)";
+#elif defined(UWPH_BACKEND_LINUX_PASSTHROUGH)
+    return "linux-passthrough";
 #else
     return "stub (Linux, host calls -> ENOSYS)";
 #endif

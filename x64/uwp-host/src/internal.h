@@ -5,6 +5,9 @@
 #include "uwph/uwph.h"
 #include <string.h>
 #include <stdlib.h>
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+#include "linux_backend.h"
+#endif
 
 #ifdef UWPH_BACKEND_WIN32
 # ifndef WIN32_LEAN_AND_MEAN

@@ -10,7 +10,7 @@
 
 OUT      ?= out
 SRCS     := $(wildcard src/*.c)
-HDRS     := $(wildcard include/uwph/*.h) src/internal.h
+HDRS     := $(wildcard include/uwph/*.h) $(wildcard src/*.h)
 CFLAGS_COMMON := -O2 -g -std=gnu11 -Wall -Wextra -Werror -Wno-unused-parameter -Iinclude
 
 CC_LINUX ?= gcc

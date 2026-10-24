@@ -253,13 +253,25 @@ int uwph_file_fstat(struct uwph_object *o, struct uwph_stat *st)
 
 UWPH_API int uwph_open(const char *path, int flags, ...)
 {
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    va_list ap; unsigned mode = 0;
+    if (flags & (UWPH_O_CREAT | 020000000)) { va_start(ap, flags); mode = va_arg(ap, unsigned); va_end(ap); }
+    return uwph_linux_open(path, flags, mode);
+#else
     return host_open(path, flags);
+#endif
 }
 
 UWPH_API int uwph_openat(int dirfd, const char *path, int flags, ...)
 {
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    va_list ap; unsigned mode = 0;
+    if (flags & (UWPH_O_CREAT | 020000000)) { va_start(ap, flags); mode = va_arg(ap, unsigned); va_end(ap); }
+    return uwph_linux_openat(dirfd, path, flags, mode);
+#else
     if (dirfd != UWPH_AT_FDCWD && path[0] != '/') return UWPH_ENOSYS_INT();   /* needs dir fds */
     return host_open(path, flags);
+#endif
 }
 
 UWPH_API int uwph_creat(const char *path, uwph_mode_t mode)
@@ -269,6 +281,9 @@ UWPH_API int uwph_creat(const char *path, uwph_mode_t mode)
 
 UWPH_API int uwph_fstat(int fd, struct uwph_stat *st)
 {
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    return uwph_linux_fstat(fd, st);
+#else
     enum uwph_fd_kind kind;
     int ret;
     struct uwph_object *o = uwph_fd_get(fd, &kind, NULL);
@@ -284,6 +299,7 @@ UWPH_API int uwph_fstat(int fd, struct uwph_stat *st)
     }
     uwph_obj_unref(o);
     return ret;
+#endif
 }
 
 static int stat_path(const char *path, struct uwph_stat *st)
@@ -297,14 +313,30 @@ static int stat_path(const char *path, struct uwph_stat *st)
     return ret;
 }
 
-UWPH_API int uwph_stat(const char *path, struct uwph_stat *st)  { return stat_path(path, st); }
-UWPH_API int uwph_lstat(const char *path, struct uwph_stat *st) { return stat_path(path, st); }
+UWPH_API int uwph_stat(const char *path, struct uwph_stat *st)  {
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    return uwph_linux_stat(path, st);
+#else
+    return stat_path(path, st);
+#endif
+}
+UWPH_API int uwph_lstat(const char *path, struct uwph_stat *st) {
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    return uwph_linux_lstat(path, st);
+#else
+    return stat_path(path, st);
+#endif
+}
 
 UWPH_API int uwph_fstatat(int dirfd, const char *path, struct uwph_stat *st, int flags)
 {
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    return uwph_linux_fstatat(dirfd, path, st, flags);
+#else
     if ((flags & UWPH_AT_EMPTY_PATH) && !path[0]) return uwph_fstat(dirfd, st);
     if (dirfd != UWPH_AT_FDCWD && path[0] != '/') return UWPH_ENOSYS_INT();
     return stat_path(path, st);
+#endif
 }
 
 UWPH_API int uwph_access(const char *path, int mode)

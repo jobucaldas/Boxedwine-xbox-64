@@ -140,6 +140,9 @@ static int apply_prot(void *addr, size_t len, int prot)
 
 UWPH_API void *uwph_mmap(void *addr, size_t len, int prot, int flags, int fd, uwph_off_t off)
 {
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    return uwph_linux_mmap(addr, len, prot, flags, fd, off);
+#else
     int fixed = flags & (UWPH_MAP_FIXED | UWPH_MAP_FIXED_NOREPLACE);
     int reserve_only = prot == UWPH_PROT_NONE && (flags & UWPH_MAP_NORESERVE);
     ULONG type = reserve_only ? MEM_RESERVE : MEM_RESERVE | MEM_COMMIT;
@@ -174,10 +177,14 @@ UWPH_API void *uwph_mmap(void *addr, size_t len, int prot, int flags, int fd, uw
         return uwph_errno = e, UWPH_MAP_FAILED;
     }
     return p;
+#endif
 }
 
 UWPH_API int uwph_munmap(void *addr, size_t len)
 {
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    return uwph_linux_munmap(addr, len);
+#else
     MEMORY_BASIC_INFORMATION mbi;
     uwph_wx_untrack(addr, len);
     if (!VirtualQuery(addr, &mbi, sizeof(mbi))) return UWPH_FAIL(UWPH_EINVAL);
@@ -185,10 +192,14 @@ UWPH_API int uwph_munmap(void *addr, size_t len)
     /* partial unmap of a reservation: Windows cannot release part of it, so
        the range goes back to reserved (Wine treats it as free again) */
     return VirtualFree(addr, len, MEM_DECOMMIT) ? 0 : UWPH_FAIL(UWPH_EINVAL);
+#endif
 }
 
 UWPH_API int uwph_mprotect(void *addr, size_t len, int prot)
 {
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    return uwph_linux_mprotect(addr, len, prot);
+#else
     if (prot != UWPH_PROT_NONE) {
         MEMORY_BASIC_INFORMATION mbi;
         /* Wine commits by mprotect()ing reserved PROT_NONE ranges */
@@ -197,6 +208,7 @@ UWPH_API int uwph_mprotect(void *addr, size_t len, int prot)
             return UWPH_FAIL(UWPH_ENOMEM);
     }
     return apply_prot(addr, len, prot);
+#endif
 }
 
 UWPH_API int uwph_madvise(void *addr, size_t len, int advice)
@@ -232,11 +244,27 @@ int uwph_wx_handle_fault(const void *fault_addr, int fault_kind)
 }
 UWPH_API void *uwph_mmap(void *addr, size_t len, int prot, int flags, int fd, uwph_off_t off)
 {
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    return uwph_linux_mmap(addr, len, prot, flags, fd, off);
+#else
     (void)addr; (void)len; (void)prot; (void)flags; (void)fd; (void)off;
     return uwph_errno = UWPH_ENOSYS, UWPH_MAP_FAILED;
+#endif
 }
-UWPH_API int uwph_munmap(void *addr, size_t len) { (void)addr; (void)len; return UWPH_ENOSYS_INT(); }
-UWPH_API int uwph_mprotect(void *addr, size_t len, int prot) { (void)addr; (void)len; (void)prot; return UWPH_ENOSYS_INT(); }
+UWPH_API int uwph_munmap(void *addr, size_t len) {
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    return uwph_linux_munmap(addr, len);
+#else
+    (void)addr; (void)len; return UWPH_ENOSYS_INT();
+#endif
+}
+UWPH_API int uwph_mprotect(void *addr, size_t len, int prot) {
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    return uwph_linux_mprotect(addr, len, prot);
+#else
+    (void)addr; (void)len; (void)prot; return UWPH_ENOSYS_INT();
+#endif
+}
 UWPH_API int uwph_madvise(void *addr, size_t len, int advice) { (void)addr; (void)len; (void)advice; return UWPH_ENOSYS_INT(); }
 UWPH_API int uwph_msync(void *addr, size_t len, int flags) { (void)addr; (void)len; (void)flags; return UWPH_ENOSYS_INT(); }
 #endif

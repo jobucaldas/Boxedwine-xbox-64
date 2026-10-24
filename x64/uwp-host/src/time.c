@@ -6,6 +6,9 @@ static int64_t qpc_freq;
 
 UWPH_API int uwph_clock_gettime(uwph_clockid_t id, struct uwph_timespec *ts)
 {
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    return uwph_linux_clock_gettime(id, ts);
+#else
     switch (id) {
     case UWPH_CLOCK_REALTIME:
     case UWPH_CLOCK_REALTIME_COARSE: {
@@ -33,20 +36,28 @@ UWPH_API int uwph_clock_gettime(uwph_clockid_t id, struct uwph_timespec *ts)
     default:
         return UWPH_FAIL(UWPH_EINVAL);   /* CPU-time clocks: GetThreadTimes, next step */
     }
+#endif
 }
 
 UWPH_API int uwph_clock_getres(uwph_clockid_t id, struct uwph_timespec *ts)
 {
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    return uwph_linux_clock_getres(id, ts);
+#else
     if (id != UWPH_CLOCK_REALTIME && id != UWPH_CLOCK_MONOTONIC && id != UWPH_CLOCK_MONOTONIC_RAW &&
         id != UWPH_CLOCK_BOOTTIME && id != UWPH_CLOCK_REALTIME_COARSE && id != UWPH_CLOCK_MONOTONIC_COARSE)
         return UWPH_FAIL(UWPH_EINVAL);
     ts->tv_sec = 0;
     ts->tv_nsec = 100;
     return 0;
+#endif
 }
 
 UWPH_API int uwph_nanosleep(const struct uwph_timespec *req, struct uwph_timespec *rem)
 {
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    return uwph_linux_nanosleep(req, rem);
+#else
     struct uwph_thread *t = uwph_thread_current();
     uint64_t pend = 0, total = (uint64_t)req->tv_sec * 1000 + (uint64_t)req->tv_nsec / 1000000;
     uint64_t start = GetTickCount64(), el;
@@ -60,11 +71,30 @@ UWPH_API int uwph_nanosleep(const struct uwph_timespec *req, struct uwph_timespe
         WaitOnAddress((volatile void *)&t->pending, &pend, sizeof(pend), (DWORD)(total - el));
     }
     return 0;
+#endif
 }
 #else
-UWPH_API int uwph_clock_gettime(uwph_clockid_t id, struct uwph_timespec *ts) { (void)id; (void)ts; return UWPH_ENOSYS_INT(); }
-UWPH_API int uwph_clock_getres(uwph_clockid_t id, struct uwph_timespec *ts) { (void)id; (void)ts; return UWPH_ENOSYS_INT(); }
-UWPH_API int uwph_nanosleep(const struct uwph_timespec *req, struct uwph_timespec *rem) { (void)req; (void)rem; return UWPH_ENOSYS_INT(); }
+UWPH_API int uwph_clock_gettime(uwph_clockid_t id, struct uwph_timespec *ts) {
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    return uwph_linux_clock_gettime(id, ts);
+#else
+    (void)id; (void)ts; return UWPH_ENOSYS_INT();
+#endif
+}
+UWPH_API int uwph_clock_getres(uwph_clockid_t id, struct uwph_timespec *ts) {
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    return uwph_linux_clock_getres(id, ts);
+#else
+    (void)id; (void)ts; return UWPH_ENOSYS_INT();
+#endif
+}
+UWPH_API int uwph_nanosleep(const struct uwph_timespec *req, struct uwph_timespec *rem) {
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    return uwph_linux_nanosleep(req, rem);
+#else
+    (void)req; (void)rem; return UWPH_ENOSYS_INT();
+#endif
+}
 #endif
 
 UWPH_API int uwph_gettimeofday(struct uwph_timeval *tv, void *tz)

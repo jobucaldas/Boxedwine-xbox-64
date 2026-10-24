@@ -14,6 +14,8 @@
  *                       ENOSYS; portable logic (fd table, in-process sockets and
  *                       pipes, poll/epoll, dl registry, exception->signal mapping,
  *                       W^X policy, sysconf/uname) is real.
+ *   UWPH_BACKEND_LINUX_PASSTHROUGH (explicit harness-only selection): bounded
+ *                       real Linux syscall adapters, not Xbox validation.
  *   UWPH_BACKEND_WIN32  (mingw-w64 build, APP partition headers): the parts that
  *                       are implemented on documented UWP APIs (memory via
  *                       *FromApp + codeGeneration, futex via WaitOnAddress, clocks,
@@ -27,7 +29,7 @@
 
 #if defined(_WIN32)
 # define UWPH_BACKEND_WIN32 1
-#else
+#elif !defined(UWPH_BACKEND_LINUX_PASSTHROUGH)
 # define UWPH_BACKEND_STUB 1
 #endif
 

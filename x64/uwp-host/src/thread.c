@@ -68,7 +68,13 @@ struct uwph_thread *uwph_thread_find(int tid)
     return t;
 }
 
-UWPH_API int uwph_gettid(void) { return uwph_thread_current()->tid; }
+UWPH_API int uwph_gettid(void) {
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    return uwph_linux_gettid();
+#else
+    return uwph_thread_current()->tid;
+#endif
+}
 
 UWPH_API int uwph_tgkill(uwph_pid_t tgid, int tid, int sig)
 {
@@ -308,6 +314,9 @@ static int futex_wait(int *uaddr, int val, int64_t timeout_ms)
 UWPH_API long uwph_futex(int *uaddr, int op, int val, const struct uwph_timespec *timeout,
                          int *uaddr2, int val3)
 {
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    return uwph_linux_futex(uaddr, op, val, timeout, uaddr2, val3);
+#else
     int cmd = op & ~(UWPH_FUTEX_PRIVATE_FLAG | UWPH_FUTEX_CLOCK_REALTIME);
     int64_t ms = -1;
     (void)uaddr2; (void)val3;
@@ -333,6 +342,7 @@ UWPH_API long uwph_futex(int *uaddr, int op, int val, const struct uwph_timespec
     default:
         return UWPH_FAIL(UWPH_ENOSYS);
     }
+#endif
 }
 #else
 UWPH_API int uwph_pthread_create(uwph_pthread_t *out, const uwph_pthread_attr_t *a,
@@ -348,7 +358,13 @@ UWPH_API int uwph_sched_setaffinity(uwph_pid_t pid, size_t size, const void *mas
 { (void)pid; (void)size; (void)mask; return UWPH_ENOSYS_INT(); }
 UWPH_API long uwph_futex(int *uaddr, int op, int val, const struct uwph_timespec *timeout,
                          int *uaddr2, int val3)
-{ (void)uaddr; (void)op; (void)val; (void)timeout; (void)uaddr2; (void)val3; return UWPH_ENOSYS_INT(); }
+{
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    return uwph_linux_futex(uaddr, op, val, timeout, uaddr2, val3);
+#else
+    (void)uaddr; (void)op; (void)val; (void)timeout; (void)uaddr2; (void)val3; return UWPH_ENOSYS_INT();
+#endif
+}
 #endif
 
 UWPH_API uwph_pthread_t uwph_pthread_self(void) { return uwph_thread_current(); }
