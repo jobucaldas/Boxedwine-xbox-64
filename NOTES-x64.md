@@ -669,3 +669,21 @@ These later dependencies are source-inspected and untested, not measured
 failures. A UWP CoreWindow path remains unimplemented. Evidence classification:
 cited STOCK WINE only; THROUGH-uwph/launcher not exercised, no new build.
 Lavapipe is not Xbox D3D12; no GPU/presentation or console proof. O1 only.
+
+## R4G O2
+
+Added an opt-in, enumeration-only `x64/graphics/dcomp_stub.cpp`: exported
+DCompositionCreateDevice returns S_OK and a real reference-counted
+IDCompositionDevice for Mesa's NULL-DXGI request. COM identity, unsupported
+IIDs, output clearing, lifetime and E_NOTIMPL presentation behavior are unit
+tested. All composition operations remain unimplemented; input arrays are
+preserved. Build `make -C x64/graphics` exit 0; test
+`x64/graphics/tests/run.sh` exit 0 with
+`PASS DCompositionCreateDevice HRESULT=0x00000000; COM identity/lifetime/errors; compositor E_NOTIMPL`.
+Evidence: `x64/graphics/evidence/R4G-O2/`. Proof is THROUGH our launcher,
+Wine's own PE loader and selected ntdll Unix calls routed via uwp-host shim;
+stock separate wineserver remains, no full uwph acceptance claim. This is a
+Linux stand-in unit proof only: actual dzn enumeration, swapchain/presentation,
+UWP deployment/API authorization and Xbox GPU execution remain untested.
+No platform DComp API is invoked by the compatibility DLL. Lavapipe is not
+Xbox D3D12. No visual output/video for this textual unit test. O2 only.

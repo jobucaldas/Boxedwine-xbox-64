@@ -1,0 +1,3 @@
+make: Entering directory '/workspace/wt/R4G/x64/graphics'
+x86_64-w64-mingw32-g++ -O2 -std=c++17 -Wall -Wextra -Werror -Wno-unused-parameter -static-libgcc -static-libstdc++ -shared dcomp_stub.cpp -o out/dcomp.dll -luuid
+make: Leaving directory '/workspace/wt/R4G/x64/graphics'

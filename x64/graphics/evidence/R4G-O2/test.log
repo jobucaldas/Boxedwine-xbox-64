@@ -1,0 +1,6 @@
+make: Entering directory '/workspace/wt/R4G/x64/uwp-host/harness'
+make: 'out/libuwph_wine_shim.so' is up to date.
+make: 'out/run_via_wine' is up to date.
+make: Leaving directory '/workspace/wt/R4G/x64/uwp-host/harness'
+[launcher] exec /usr/lib/wine/wine64 -> /workspace/wt/R4G/x64/graphics/out/test_dcomp.exe (handing guest to Wine's loader)
+PASS DCompositionCreateDevice HRESULT=0x00000000; COM identity/lifetime/errors; compositor E_NOTIMPL
