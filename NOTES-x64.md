@@ -543,3 +543,71 @@ Screenshots: `x64/pe/r3/out/d3d11-dxvk.png` (blue) and `d3d12-vkd3dp.png` (orang
 - **Still open for Xbox:** a POSIX host for Wine's Unix side inside UWP (BoxedWine layer),
   WoW64 for 32-bit bootstrappers, a Vulkan driver inside the UWP sandbox (Vulkan-on-D3D12),
   and window/input/audio glue (CoreWindow instead of X11).
+
+## POSIX host for Wine on Xbox UWP
+
+Wine's Unix-side ntdll.so and wineserver need a host C/OS surface: Linux-style
+syscall numbers and layouts, files and prefix paths, descriptor ownership,
+AF_UNIX request/reply sockets and SCM_RIGHTS, poll/epoll, threads/TLS/futexes,
+signals and exception contexts, clocks, and mmap/mprotect for data and executable
+pages. The intended Xbox execution path is in-process, through Wine's own PE
+loader, with executable memory authorized by the documented codeGeneration
+capability. No Linux kernel or separate wineserver process is assumed.
+
+BoxedWine already supplies analogous guest Linux services through its emulated
+kernel and Windows platform adapters (filesystem/CRT, host threads, memory and
+exception handling; see platform/windows/platform.cpp and platformThreads.cpp).
+Those adapters serve BoxedWine's emulated CPU/process model; they do not directly
+provide Wine64's native Unix ABI. x64/uwp-host is a separate, partial C host surface
+with explicit Linux layouts, SysV-facing exports and a Windows backend compiled
+with WINAPI_FAMILY=2. It is not yet a linked, booting Wine64 runtime. Existing
+Windows VirtualAlloc use is not evidence of Xbox UWP executable-page permission.
+
+Module layout (under x64/uwp-host):
+
+- include/uwph/abi.h: Linux x86-64 constants, types and layouts; uwph.h aggregates the public surface.
+- src/common.c: initialization, backend synchronization, logging and errno support.
+- src/fd.c: descriptor table and reference-counted object ownership.
+- src/fs.c: mount/path translation and Windows read-only regular files via CreateFile2.
+- src/socket.c: in-process pipes, AF_UNIX listeners and SCM_RIGHTS transport; network backend remains incomplete.
+- src/poll.c: readiness polling, select and epoll over host descriptors.
+- src/mem.c: anonymous mappings, protection and tracked RW/RX transitions for requested RWX ranges.
+- src/thread.c: host threads, pthread subset, caller stacks, futexes and cooperative tgkill delivery.
+- src/teb.c: TEB field save/restore, GS-based current TEB read and arch_prctl subset.
+- src/signal.c: signal masks/actions, Windows exception translation and context conversion.
+- src/syscall.c: supported raw syscall dispatch; variadic argument slots explicitly use int64_t on LLP64.
+- src/time.c: clocks and sleeps through Windows APIs; Linux backend stubs.
+- src/process.c: identity, environment, limits and randomness; process creation returns ENOSYS.
+- src/server.c: starts a supplied wineserver main callback on an in-process host thread.
+- src/dl.c: static Unix-library symbol registry, not an ELF dynamic loader.
+- src/stdio.c: minimal buffered streams over host descriptors.
+- src/probe.c: runtime API availability and RW-to-RX execution probes.
+- tests/: ABI assertions, Unix-side stand-in and smoke checks; tools/: import-surface classification/check script.
+
+Build and validate from x64/uwp-host:
+
+```sh
+make out/win/libuwph.a out/win/smoke.exe
+WINEDEBUG=-all timeout 60 wine out/win/smoke.exe
+make out/linux/abi_check out/linux/smoke
+out/linux/abi_check
+out/linux/smoke
+```
+
+R4-A results (2026-10-24): Windows archive and smoke executable build with
+-Werror and WINAPI_FAMILY=2, linking windowsapp for VirtualAllocFromApp. The
+MinGW NtCurrentTeb array-bounds warning is avoided with an explicit x64 GS:0x30
+read; the stack smoke probe records a numeric address while its local is alive.
+The syscall dispatcher reads only the supported call's argument count.
+Linux ABI assertions pass; smoke reports **54 passed, 0 failed, open fds at exit: 3**.
+The installed wine invocation terminates with **Bad system call (exit 159)**
+before producing smoke output; Windows pass/fail counts are unavailable. This
+is an execution-environment blocker, not a recorded host-backend test failure.
+
+Known gaps: writable filesystem and directory operations, real network sockets,
+full mapping semantics and process semantics, actual Wine64 Unix-side integration,
+and on-device validation of TLS/TEB, exceptions, caller stacks and executable
+pages. Runtime-resolved API presence and the existing desktop VirtualProtect test
+fallback do not establish UWP authorization. Xbox must use the documented app
+API/capability path; desktop Wine results cannot certify it. Linux smoke exercises
+portable logic and ENOSYS stubs rather than the Windows memory/thread/file backend.

@@ -337,8 +337,9 @@ static void *futex_waiter(void *arg)
 static void *stack_probe(void *arg)
 {
     char here;
-    return (void *)&here;    /* address on whatever stack we run on */
-    (void)arg;
+    /* Record the numeric address while the local is alive. */
+    *(uintptr_t *)arg = (uintptr_t)&here;
+    return NULL;
 }
 
 static int usr1_count;
@@ -409,10 +410,11 @@ static void test_host(void)
         stk = uwph_mmap(NULL, 256 * 1024, UWPH_PROT_READ | UWPH_PROT_WRITE, UWPH_MAP_PRIVATE | UWPH_MAP_ANONYMOUS, -1, 0);
         uwph_pthread_attr_init(&attr);
         uwph_pthread_attr_setstack(&attr, stk, 256 * 1024);
-        uwph_pthread_create(&t, &attr, stack_probe, NULL);
-        uwph_pthread_join(t, &where);
-        CHECK((char *)where > (char *)stk && (char *)where < (char *)stk + 256 * 1024,
-              "pthread_attr_setstack honoured: thread ran at %p inside [%p, +256K)", where, stk);
+        uintptr_t stack_addr = 0;
+        uwph_pthread_create(&t, &attr, stack_probe, &stack_addr);
+        uwph_pthread_join(t, NULL);
+        CHECK(stack_addr > (uintptr_t)stk && stack_addr < (uintptr_t)stk + 256 * 1024,
+              "pthread_attr_setstack honoured: thread ran at %p inside [%p, +256K)", (void *)stack_addr, stk);
 
         /* tgkill(SIGUSR1) interrupts a futex wait; handler runs at the next host entry */
         uwph_sigemptyset(&none);

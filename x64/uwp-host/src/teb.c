@@ -37,7 +37,11 @@ void uwph_teb_leave_guest(void *teb, struct uwph_teb_swap *s)
 void *uwph_teb_current(void)
 {
 #ifdef UWPH_BACKEND_WIN32
-    return NtCurrentTeb();
+    /* x64 NT_TIB.Self. MinGW's NtCurrentTeb intrinsic models this as a
+     * dereference near NULL, triggering GCC's array-bounds diagnostic. */
+    void *teb;
+    __asm__ volatile ("movq %%gs:0x30, %0" : "=r" (teb) : : "memory");
+    return teb;
 #else
     return NULL;
 #endif

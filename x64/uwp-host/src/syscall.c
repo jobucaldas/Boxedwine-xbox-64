@@ -6,8 +6,17 @@ UWPH_API long uwph_syscall(long nr, ...)
 {
     va_list ap;
     int64_t a[6];   /* not long: long is 32-bit on the Windows build (LLP64) */
+    int nargs;
+    switch (nr) {
+    case UWPH_NR_gettid: return uwph_gettid();
+    case UWPH_NR_futex: nargs = 6; break;
+    case UWPH_NR_tgkill: nargs = 3; break;
+    case UWPH_NR_tkill: case UWPH_NR_arch_prctl: nargs = 2; break;
+    case UWPH_NR_utimensat: nargs = 4; break;
+    default: return UWPH_FAIL(UWPH_ENOSYS);
+    }
     va_start(ap, nr);
-    for (int i = 0; i < 6; i++) a[i] = va_arg(ap, int64_t);
+    for (int i = 0; i < nargs; i++) a[i] = va_arg(ap, int64_t);
     va_end(ap);
 
     switch (nr) {

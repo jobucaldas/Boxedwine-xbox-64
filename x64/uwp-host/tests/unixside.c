@@ -19,8 +19,8 @@ long unixside_roundtrip(const char *msg)
     return n == (long)strlen(msg) && !memcmp(buf, msg, (size_t)n) ? n : -3;
 }
 
-/* raw syscall() path with all six argument slots */
+/* A zero-argument raw syscall must not read absent variadic slots. */
 long unixside_syscall_gettid(void)
 {
-    return uwph_syscall(UWPH_NR_gettid, 1L, 2L, 3L, 4L, 5L, 6L);
+    return uwph_syscall(UWPH_NR_gettid);
 }

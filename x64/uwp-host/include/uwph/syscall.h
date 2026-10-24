@@ -9,6 +9,8 @@
 extern "C" {
 #endif
 
+/* Supply each variadic slot as int64_t, including pointer values cast through
+ * intptr_t. Windows long is only 32 bits; this is not libc's variadic ABI. */
 UWPH_API long uwph_syscall(long nr, ...);
 
 #ifdef __cplusplus
