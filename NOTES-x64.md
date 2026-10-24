@@ -326,3 +326,220 @@ loader code; the entire map/relocate/import/entry sequence is Wine's.
 Skipped sub-part: none. R2 asked specifically for Wine's own loader path (not a hand-rolled
 in-process mapper — that was declined earlier, see REFUSED-STEP2), and that is exactly what
 is demonstrated above.
+
+> **Correction (R3):** the R2 packaging note above says "On Xbox (ARM64)". That is wrong.
+> Xbox Series X|S have an 8-core **x86-64** AMD Zen 2 CPU. x86-64 guest code can run
+> directly on the CPU, so no box64/FEX/`wowbox64` translator is needed. What's missing on
+> Xbox is not an ISA translator but a **POSIX host for Wine's Unix side**: there's no Linux
+> kernel inside a UWP app. That gap is still the BoxedWine-style Linux-syscall layer
+> (Approach 1), or something that replaces Wine's `ntdll.so` Unix side.
+
+## How GameNative boots Steam games (step R3, research)
+
+Sources read: `github.com/utkarshdalal/GameNative` at `dc245441` (2026-10-24, GPL-3.0) and
+`github.com/oxters168/Pluvia` at `467a631f` (2026-02-23, GPL-3.0; development has stopped and
+the README points to GameNative, which started as a Pluvia fork). File references below are
+to GameNative unless noted.
+
+### Overall stack (Android)
+- **App layer (Kotlin):** a Steam client written on **JavaSteam** (a Java port of SteamKit2,
+  using a GameNative fork `io.github.joshuatam:javasteam`). It handles login (the user's own
+  account, with a refresh token stored in prefs), licence/PICS/app-info, cloud saves, friends,
+  and downloads through `javasteam-depotdownloader` (a port of SteamRE's DepotDownloader). Games are
+  fetched depot-by-depot with the user's licences and decryption keys into
+  `<app files>/Steam/steamapps/common/<installdir>`.
+- **Runtime layer (Winlator, inherited from Pluvia):** `com.winlator.*`. An "imagefs" Linux
+  rootfs (glibc, or a bionic variant), a Wine/Proton build (`proton-9.0`, `proton-10.0`,
+  `proton-11.0` in x86_64 and arm64ec variants), and **box64 / FEX / wowbox64** to run
+  x86-64 code on ARM phones. There's a **Java X11 server** (`com/winlator/xserver`) that
+  Wine's winex11 draws into, PulseAudio/ALSA bridges, and Vulkan drivers (Turnip+Zink for Adreno,
+  VirGL, "vortek"). A game is a Winlator *container* (a Wine prefix plus settings).
+  The game directory is exposed as a Wine drive (`A:`/`D:`) or as
+  `C:\Program Files (x86)\Steam\steamapps\common\<game>`.
+- **Choosing which exe to launch:** `SteamService.getInstalledExe()` reads the app's PICS
+  `config/launch` entries (Windows targets), checks them against the depot manifests, and
+  picks the flagged launch exe (falling back to the largest exe). Users can override it
+  per container. The final Wine command line is always `winhandler.exe "<target>"`
+  (`XServerScreen.kt` ~L5150-5290). `winhandler` is Winlator's in-prefix helper process.
+
+### How the Steam client / Steamworks API is handled — five launch modes
+A Steamworks game calls `steam_api64.dll`, which wants a running, logged-in Steam client
+(`steamclient64.dll` loaded by `steam.exe`) for the same account that owns the game.
+GameNative provides that in one of these ways (per container, `Container.steamType` /
+`launchRealSteam` / `useLegacyDRM`):
+
+1. **Real Valve Steam client (`launchRealSteam`, GUI):** the Windows `steam.exe` runs inside
+   Wine: `steam.exe -silent -vgui -tcp -nobigpicture -nofriendsui -nochatui -nointro
+   -applaunch <appid>`. `SteamTokenLogin` writes the user's own refresh token into Steam's
+   config so the client auto-logs in. Steam then launches the game the normal way. This
+   is the same model Proton uses on Linux, except Proton's `lsteamclient.dll` bridges to the
+   *native Linux* Steam client instead of a Windows one.
+2. **Headless real client ("steamhost", default `steamType=headless`, used when
+   `launchRealSteam` is on):** a downloaded archive (`steamhost-20261021.tzst`, "Valve client
+   tree build 1788652215 + headless host as steam.exe"). It takes `STEAMHOST_ACCOUNT`,
+   `STEAMHOST_TOKEN` (sealed refresh token), `STEAMHOST_APPID`, `STEAMHOST_GAME_CMD`, and so on, logs
+   in with Valve's client binaries without the CEF UI, and starts the game. Progress is
+   reported through a `steamhost_status` file. The steamhost source isn't in the repo; only
+   the binary archive is downloaded.
+3. **"Bionic Steam":** Valve's Android-arm64 `libsteamclient.so` runs in the Android process.
+   Proton's `lsteamclient.dll` (PE) plus its unixlib bridge the game's Windows `steam_api`
+   calls to that native client, the same way Proton does on desktop Linux. The lsteamclient
+   unixlib ABI is locked to the Wine version, so they ship one archive per Proton build
+   (`BionicSteamAssetsDependency.kt`).
+4. **Open reimplementation — gbe_fork "steampipe" (`useLegacyDRM`, or `.bat` targets):** the
+   game's own `steam_api(64).dll` is backed up as `.orig` and **replaced** with a build of
+   **gbe_fork** (Goldberg Steam Emulator fork, LGPL-3.0; the strings in
+   `assets/steampipe/steam_api64.dll` show `D:\a\gbe_fork\...`). `ensureSteamSettings()`
+   writes `steam_settings/` (appid, installed depots, DLC list, account name and SteamID,
+   language, save path, and **an encrypted app ticket the app requests from Steam for the
+   logged-in user**, `SteamService.getEncryptedAppTicket`). The game runs with no Steam
+   client at all.
+5. **gbe_fork ColdClient (the default when the real client is off):** `replaceSteamclientDll()`
+   extracts `experimental-drm-20260116.tzst` (gbe_fork's experimental `steamclient(64).dll` plus
+   `steamclient_loader_x64.exe`) into the Steam directory. It restores the game's original
+   `steam_api` and writes `ColdClientLoader.ini` (exe, args, working dir, SteamClient DLL
+   paths). It launches `steamclient_loader_x64.exe`, which starts the game with the
+   emulated steamclient in place of Valve's.
+
+Pluvia (the predecessor) only had a much smaller version of mode 4: a ~200 KB mingw-built
+`steam_api(64).dll` stub that forwards a few `SteamAPI_*` calls (Init, IsSteamRunning,
+RunCallbacks, ...) over TCP `127.0.0.1:34865` to `SteamPipeServer.java` in the Android app.
+It's documented as supporting **DRM-free games only**.
+
+**DRM note.** GameNative also has an optional **Steamless** step (`unpackExecutableFile`,
+`Container.unpackFiles`, default `false`). It runs `Steamless.CLI.exe` on the game exe to
+strip SteamStub DRM and swaps in `<exe>.unpacked.exe`. That is DRM removal, so it is **out
+of scope for this project and must not be reused.** Modes 4/5 (swapping Valve's steam_api /
+steamclient for an emulator) are also a legal and ToS grey area even with a real ownership
+ticket: they replace the vendor's licence-checking component. For João's runtime, the
+clearly legitimate choices are modes 1–3: Valve's own client binaries, logged in with his
+own account, on the device.
+
+### Graphics: DXVK / VKD3D(-Proton)
+- `extractDXWrapperFiles()` (`XServerScreen.kt` ~L6059): on first boot it clones Wine's
+  original `d3d8/9/10/10_1/10core/11/12/12core/dxgi/ddraw` DLLs. It then extracts the chosen
+  wrapper into `C:\windows\system32` (+`syswow64`) and sets `WINEDLLOVERRIDES=...=n`.
+  Choices are `wined3d` (restores the originals), `dxvk-<ver>` (1.9.2, 1.10.x/1.11.1 "sarek"
+  for old drivers, 2.4.1, 2.6.1-gplasync, 2.7.1, ...), `vkd3d-<ver>` (VKD3D-Proton 2.6–3.0b,
+  always paired with a DXVK ≥ 2.1 for d3d11/dxgi), and `cnc-ddraw` for old DirectDraw.
+  Env knobs: `DXVK_ASYNC`, `DXVK_FRAME_RATE`, `VKD3D_FRAME_RATE`, `DXVK_LOG_LEVEL`,
+  `VKD3D_DEBUG`.
+- The Vulkan driver is separate (`extractGraphicsDriverFiles`): Turnip (Mesa Freedreno
+  Vulkan) for Adreno, with Zink for GL; or VirGL; or the vendor driver through "vortek".
+  On Xbox the matching piece would be a Vulkan implementation reachable from inside the
+  UWP sandbox. There's no official one, so a Vulkan-on-D3D12 layer (e.g. Mesa "dozen"/dzn)
+  is what DXVK/VKD3D-Proton would sit on.
+
+### What a Dev Mode UWP app could reuse
+| Piece | Reusable? | Notes |
+|---|---|---|
+| JavaSteam / SteamKit2 / DepotDownloader logic (login, licences, PICS, depot download, cloud saves) | **Yes, as a design and as libraries** | SteamKit2 (C#, LGPL-2.1) fits a UWP/.NET app directly. Uses only WebSocket CMs and HTTPS CDN (verified below: anonymous steamcmd works through a 443-only proxy). Needs João's login at runtime. |
+| Launch-target selection from PICS `config/launch` | Yes | Pure logic. |
+| Container model (prefix + DLL overrides + per-game env / fixes, `gamefixes/STEAM_*.kt`) | Yes | Data and logic only. |
+| DXVK / VKD3D-Proton install-by-override | **Yes** | Exactly what was verified below on Linux. Licences: zlib / LGPL-2.1. |
+| Real Valve client (modes 1–3) | Yes, in principle | Needs João's login. Mode 3's idea (Proton `lsteamclient` bridging to a *native* client) has no Xbox equivalent, since Valve has no Xbox steamclient. So on Xbox it's mode 1/2: Windows `steam.exe`/steamclient inside the same Wine, which needs 32-bit (WoW64) support for the bootstrapper. |
+| gbe_fork steampipe / ColdClient (modes 4–5), Steamless | **No** | Replaces or strips licence and DRM components; excluded by project rules. |
+| Winlator X server, box64/FEX/wowbox64, Turnip, Android imagefs | **No** | Android/ARM-specific. On Xbox: x86-64 runs natively; display is a CoreWindow/SwapChainPanel; the "Linux" is BoxedWine's syscall layer. |
+
+## Step R3 prototype — Steam content + DXVK/VKD3D under wine64, no account
+
+Everything ran on this Linux box under Debian `wine 10.0~repack-6` (`wine64` plus `wine32:i386`
+for WoW64) on Xvfb, with **no Steam account**: steamcmd `+login anonymous` only, plus
+open-source DXVK/VKD3D-Proton. Runner: `x64/pe/r3/run_r3.sh`. Probes: `x64/pe/r3/*.c`.
+
+### Network note (this sandbox)
+Egress is a proxy that allows **HTTPS on 443 to some hosts only**. Plain HTTP (port 80) and
+Steam's 27015-27050 ports are blocked. steamcmd's first-run self-update uses plain HTTP, so
+it was bootstrapped by hand: the three zips listed in
+`https://media.steampowered.com/client/steam_cmd_linux` were downloaded over HTTPS and
+unpacked into the steamcmd dir. After that, steamcmd updated itself and logged in anonymously
+over WebSocket CMs on 443.
+
+### 1. steamcmd anonymous download (Windows depots)
+```
+./steamcmd.sh +@sSteamCmdForcePlatformType windows \
+  +force_install_dir /workspace/r3-games/sdkredist  +login anonymous +app_update 1007 validate \
+  +force_install_dir /workspace/r3-games/valheim-ds +app_update 896660 validate +quit
+...
+Connecting anonymously to Steam Public...OK
+Waiting for client config...OK
+Waiting for user info...OK
+Success! App '1007' fully installed.          # Steamworks SDK Redist (Valve steamclient64.dll etc.), 65 MB
+Success! App '896660' fully installed.        # Valheim Dedicated Server, 2.0 GB
+```
+
+### 2. A real Steamworks x64 game binary runs under wine64: Valheim Dedicated Server
+`valheim_server.exe` (PE32+ x86-64, Unity 6000.0.75f1 + Mono) with Valve's own
+`steam_api64.dll` / `steamclient64.dll`, headless (`-nographics -batchmode`):
+```
+Initialize engine version: 6000.0.75f1 (26349cd2a5c8)
+Using steam APPID:892970
+Steam game server initialized
+Load world: R3world (R3world)
+Opened Steam server
+Loading: Done. Total seconds sinze ZNet start: 31.9 ...   (world generated: 183 locations)
+Game server connected            # run 1: anonymous gameserver logon to Steam succeeded after 44 s
+Loaded L"Z:\...\valheim_server.exe" at 0000000140000000: native
+Loaded L"Z:\...\UnityPlayer.dll" ...: native
+Loaded L"Z:\...\Plugins\x86_64\steam_api64.dll" ...: native
+Loaded L"Z:\...\steamclient64.dll" ...: native
+```
+Two later re-runs (`run_r3.sh all`, then `run_r3.sh valheim`, in a fresh WoW64 prefix)
+matched everything up to "Opened Steam server", but the logon ended
+`Game server connected failed` after about 3 minutes. So the logon succeeded in 1 of 3 runs. The log
+also shows `CalcUnIPThisBox - GetAdaptersAddresses returned 13` from Wine's iphlpapi inside
+the sandbox. The game server's CM logon through this 443-only proxy is therefore
+intermittent here. Both outcomes are recorded in `DONE-R3`.
+
+### 3. Steamworks *client* API without a client (what a normal game needs)
+`steamapi_probe.exe` loads Valve's `steam_api64.dll` and calls the public flat API:
+```
+SteamAPI_GetSteamInstallPath = (none)
+SteamAPI_IsSteamRunning      = 0
+SteamAPI_Init                = 0 (no logged-in Steam client to talk to)
+```
+This is the piece that **needs João's login**: a client game's `SteamAPI_Init` only succeeds
+against a running Steam client logged into an account that owns the app (GameNative modes
+1–3). Not attempted, by design.
+
+### 4. Valve's Windows Steam client under Wine: bootstrap only
+`SteamSetup.exe /S` (32-bit NSIS) installs fine once `wine32:i386` is present. Without it:
+`failed to load ...\syswow64\ntdll.dll c0000135`. So the Xbox runtime needs a
+WoW64-capable Wine for Steam's bootstrapper. Running `Steam.exe` shows the "Updating
+Steam…" window. It then fails in this sandbox: the bootstrapper's TLS revocation checks go to
+`http://yr1.c.lencr.org` on port 80 (blocked, `STATUS_IO_TIMEOUT`), and the manifest fetch ends with
+`Download failed: http error 0 (cdn.steamstatic.com/client/steam_client_win32)` /
+`Steam needs to be online to update`. On a normal network the next stop is the login
+screen, which needs João's account anyway.
+
+### 5. Graphics: DXVK 3.1.1 and VKD3D-Proton 3.0.1 on lavapipe (software Vulkan)
+`d3d11_probe.exe` / `d3d12_probe.exe` create a window plus a flip-model swapchain, clear,
+present 30 frames, and report which DLL was used (the Wine-builtin check looks for the
+`"Wine builtin DLL"` marker at DOS-header +0x40).
+```
+# Wine builtins
+d3d11.dll kind: Wine builtin (wined3d)    adapter: NVIDIA GeForce GTX 470   readback 0,128,255,255
+d3d12.dll kind: Wine builtin (vkd3d)      presented 30 frames, fence=30
+# DXVK/VKD3D-Proton copied to system32 + WINEDLLOVERRIDES=d3d11,dxgi,d3d10core,d3d9,d3d8,d3d12,d3d12core=n
+info:  DXVK: v3.1.1
+info:  Found device: llvmpipe (LLVM 19.1.7, 256 bits)
+d3d11.dll kind: native (e.g. DXVK)        adapter: llvmpipe ...  readback pixel(0,0) RGBA = 0,128,255,255
+vkd3d-proton - applicationVersion: 3.0.1.
+d3d12.dll kind: native (e.g. VKD3D-Proton) adapter: llvmpipe ...  presented 30 frames, fence=30
+```
+Screenshots: `x64/pe/r3/out/d3d11-dxvk.png` (blue) and `d3d12-vkd3dp.png` (orange).
+
+### What ran / what's missing
+- **Ran:** anonymous steamcmd download of Windows depots. A real x64 Steamworks game binary
+  (Valheim DS: Unity + Mono + Valve steam_api64/steamclient64) under wine64, including an
+  anonymous Steam gameserver logon (1 of 3 runs through this proxy). D3D11 through DXVK and
+  D3D12 through VKD3D-Proton on Vulkan, installed the same way GameNative/Proton do it.
+  Steam's Windows installer.
+- **Needs João's login (not done):** downloading owned client games, `SteamAPI_Init` for
+  client games, and logging the Steam client in.
+- **Blocked by this sandbox's network:** completing the Steam client bootstrap (port-80
+  CRL checks).
+- **Not reusable / excluded:** gbe_fork steam_api/steamclient replacement and Steamless.
+- **Still open for Xbox:** a POSIX host for Wine's Unix side inside UWP (BoxedWine layer),
+  WoW64 for 32-bit bootstrappers, a Vulkan driver inside the UWP sandbox (Vulkan-on-D3D12),
+  and window/input/audio glue (CoreWindow instead of X11).
