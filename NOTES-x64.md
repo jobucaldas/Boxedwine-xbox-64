@@ -621,3 +621,33 @@ libc/internal imports, libc syscall() and two inline syscall sites remain gaps.
 O7 Linux-box recording is 17.6 seconds; seven videos validated with ffprobe.
 O5 was explicitly replayed to recover damaged command-log provenance, retaining
 the original. See /workspace/x64-run/RESULT-R4H-O7.md and O7-verify.log.
+
+## Steam connection and UI
+
+R5 O1 implements offline Python contracts under x64/ui only: explicit mock
+login/approval/cancel, a fixed three-entry mock library with stable local IDs,
+and install states. Live authentication and all downloads return unavailable.
+There are no credentials, token input fields, network requests, persistence,
+actual installs, UI screens or launches in this order. Mock metadata does not
+establish ownership, entitlement or device/API authorization.
+
+Proposed integration (not implemented): a real Steam connector would support
+QR approval and refresh-token authentication in a GameNative/JavaSteam-style
+flow for João's own account, retrieve the owned library, and download only
+entitled depots through a DepotDownloader-style adapter. Future refresh tokens
+must use a platform credential store with token redaction in UI/logs/errors;
+no secret storage is implemented here. No accounts are created or used.
+
+The planned controller-friendly shell exposes login, library grid, Install and
+Launch. Launch must use Wine's own PE loader through our run_via_wine launcher
+and the existing x64/uwp-host harness, retaining its verification and current
+wineboot-attempt blocker. Later Xbox integration requires the documented,
+in-process UWP host path; Linux subprocess behavior is not that proof.
+WinUI 3 targets desktop Windows: a UWP version requires a distinct compatible
+XAML/project/API adaptation, not a drop-in port. No UWP package, Xbox execution
+or device/API authorization is established here.
+
+O1 validation is HOST-ONLY model/documentation testing plus the parent
+uwp-host build/surface check. No uwp-host runtime, launcher or stock Wine
+execution is exercised; UI routing evidence and Linux-box video are deferred
+to their respective later orders. See x64/ui/README.md for the exact checks.
