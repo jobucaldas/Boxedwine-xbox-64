@@ -4,9 +4,11 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import shutil
+import signal
 import subprocess
 import tempfile
 
@@ -27,15 +29,47 @@ def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def run(command, cwd):
-    try:
-        return subprocess.run(command, cwd=cwd, stdout=subprocess.PIPE,
-                              stderr=subprocess.STDOUT, text=True, timeout=180)
-    except subprocess.TimeoutExpired as error:
-        output = error.stdout or b''
-        if isinstance(output, bytes):
-            output = output.decode(errors='replace')
-        return subprocess.CompletedProcess(command, 124, output + '\nRUNTIME ERROR: worker timed out\n')
+def run(command, cwd, timeout=180, terminate_grace=2):
+    """Own the Linux worker session, including cleanup after a timeout.
+
+    Keep the pipe open until group cleanup finishes so late cleanup diagnostics
+    are retained. Kill the group even if make exits during the TERM grace:
+    a descendant can ignore TERM or close its inherited output descriptors.
+    """
+    with subprocess.Popen(command, cwd=cwd, stdout=subprocess.PIPE,
+                          stderr=subprocess.STDOUT, text=True,
+                          start_new_session=True) as child:
+        try:
+            output, _ = child.communicate(timeout=timeout)
+            return subprocess.CompletedProcess(command, child.returncode, output)
+        except subprocess.TimeoutExpired:
+            def signal_group(sig):
+                try:
+                    os.killpg(child.pid, sig)
+                except ProcessLookupError:
+                    pass
+
+            signal_group(signal.SIGTERM)
+            try:
+                output, _ = child.communicate(timeout=terminate_grace)
+            except subprocess.TimeoutExpired:
+                output = None
+            finally:
+                signal_group(signal.SIGKILL)
+            # Reap the direct child and drain late output after escalation.
+            # Bound pipe draining too: a detached process must not keep this
+            # worker blocked indefinitely by retaining an inherited pipe.
+            if output is None:
+                try:
+                    output, _ = child.communicate(timeout=terminate_grace)
+                except subprocess.TimeoutExpired as error:
+                    output = error.output or b''
+                    if isinstance(output, bytes):
+                        output = output.decode(errors='replace')
+                    child.stdout.close()
+                    child.wait(timeout=terminate_grace)
+            return subprocess.CompletedProcess(
+                command, 124, output + '\nRUNTIME ERROR: worker timed out\n')
 
 
 class Runtime:

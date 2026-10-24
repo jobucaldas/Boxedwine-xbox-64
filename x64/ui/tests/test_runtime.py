@@ -1,12 +1,16 @@
 """Injected process results are behavior checks, never live routing proof."""
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+import os
 import subprocess
 import sys
 import tempfile
+import threading
+import time
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from runtime import Runtime
+from runtime import Runtime, run
 
 
 class RuntimeTests(unittest.TestCase):
@@ -70,6 +74,72 @@ class RuntimeTests(unittest.TestCase):
             raise FileNotFoundError('make unavailable')
         self.runtime.runner = missing
         self.assertEqual(self.runtime.launch('hello-demo').status, 'error')
+
+    def test_timeout_cleans_real_descendant_and_preserves_evidence(self):
+        self.runtime.install('hello-demo')
+        marker = self.root / 'escaped-marker'
+        pidfile = self.root / 'descendant.pid'
+        # The parent reaps its descendant on TERM, just as a cooperating
+        # harness shell can run its EXIT cleanup during the grace interval.
+        script = """
+import pathlib, signal, subprocess, sys, time
+child = subprocess.Popen([sys.executable, '-c',
+    'import pathlib,time,sys; time.sleep(1); pathlib.Path(sys.argv[1]).touch()',
+    str(sys.argv[1])])
+def cleanup(sig, frame):
+    child.wait()
+    print('parent cleanup complete', flush=True)
+    sys.exit(0)
+signal.signal(signal.SIGTERM, cleanup)
+pathlib.Path(sys.argv[2]).write_text(str(child.pid))
+print('worker output before timeout', flush=True)
+while True: time.sleep(1)
+"""
+        def real_runner(command, cwd):
+            return run([sys.executable, '-c', script, str(marker), str(pidfile)],
+                       cwd, timeout=0.4, terminate_grace=0.5)
+        self.runtime.runner = real_runner
+        started = time.monotonic()
+        result = self.runtime.launch('hello-demo')
+        self.assertLess(time.monotonic() - started, 3)
+        self.assertEqual((result.status, result.exit_code, result.child_exit_code),
+                         ('error', 1, 124))
+        raw = Path(result.log_path).read_text()
+        self.assertIn('worker output before timeout', raw)
+        self.assertIn('parent cleanup complete', raw)
+        self.assertIn('worker timed out', raw)
+        self.assertEqual(Path(result.log_path).with_name('child.exit').read_text(), '124\n')
+        with self.assertRaises(ProcessLookupError):
+            os.kill(int(pidfile.read_text()), 0)
+        time.sleep(1.1)
+        self.assertFalse(marker.exists())
+        # An uncooperative direct worker must also be killed within the bound.
+        killed = run([sys.executable, '-c',
+                      "import signal,time; signal.signal(signal.SIGTERM, signal.SIG_IGN); print('stubborn', flush=True); time.sleep(30)"],
+                     self.root, timeout=0.3, terminate_grace=0.1)
+        self.assertEqual(killed.returncode, 124)
+        self.assertIn('stubborn', killed.stdout)
+
+    def test_async_submission_returns_pending_future_and_propagates_result(self):
+        self.runtime.install('hello-demo')
+        entered, release = threading.Event(), threading.Event()
+        def waiting_runner(command, cwd):
+            entered.set()
+            if not release.wait(3):
+                raise RuntimeError('test worker was not released')
+            return self.response
+        self.runtime.runner = waiting_runner
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = self.runtime.launch_async('hello-demo', executor)
+            try:
+                self.assertTrue(entered.wait(1))
+                self.assertFalse(future.done())
+            finally:
+                release.set()
+            result = future.result(timeout=2)
+        self.assertEqual((result.status, result.exit_code, result.child_exit_code),
+                         ('blocked', 2, 2))
+        self.assertEqual(Path(result.log_path).read_text(), self.response.stdout)
 
 
 if __name__ == '__main__':

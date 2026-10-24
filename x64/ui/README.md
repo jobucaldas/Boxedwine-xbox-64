@@ -67,7 +67,11 @@ its own fixture isolation and nonblocking lock. Concurrent launches can therefor
 return a distinct harness error. Each completed batch retains raw merged child
 output, child exit status and classified result in a unique `out/launch-*`
 directory; its output links the harness's full raw traces and reports. A worker
-timeout is an error (124), never the known blocker.
+timeout retains child status 124 and returns adapter error/exit 1, never the
+known blocker. The Linux worker starts a new session; on timeout the adapter
+sends TERM to its process group, allows two seconds for harness cleanup, then
+sends KILL to remaining group members and reaps the worker while retaining
+merged output. This leaves the upstream verifier and acceptance gate unchanged.
 
 Live routed runs go THROUGH our compiled run_via_wine -> real Wine PE
 loader/ntdll -> shim -> public uwph Linux backend for open/read/close/mmap/munmap.
@@ -80,8 +84,9 @@ with the original child status retained separately. Only upstream verifier PASS
 and child exit zero yield `LAUNCH VERIFIED: selected Linux surface only`.
 Python subprocesses establish no UWP process model or Xbox execution proof.
 
-O2 unit tests inject process results: they are HOST-ONLY behavior tests and are
-not live routing evidence. The CLI launch is the live THROUGH-layer test with
+O2 unit tests include injected process results, asynchronous future submission,
+and a real subprocess timeout/descendant cleanup regression with retained logs
+and status. These are HOST-ONLY behavior tests, not live routing evidence. The CLI launch is the live THROUGH-layer test with
 stock controls. Visible shell and Xvfb video are O3/O4 deliverables; O2 provides
 no visible UI to record. No real authentication, depot download, account,
 credential, or network behavior is implemented.
