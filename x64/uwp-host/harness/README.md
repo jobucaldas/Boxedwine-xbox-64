@@ -309,3 +309,30 @@ launcher and selected real ntdll.so -> shim -> Linux uwph calls; its existing
 wineboot-attempt acceptance blocker remains. Local `record.sh O6 -- make -C
 x64/uwp-host/harness windows-smoke-test` captures Linux Xvfb/xterm via ffmpeg,
 not Xbox device validation. No Encom is used.
+
+## O7 final evidence ledger (acceptance BLOCKED)
+
+From the repository root run the four O7 commands in ORDERS-R4H.md.
+`make evidence-replay` runs a bounded live backend positive test, then displays
+labelled saved O7 real-Wine regression and O6 Windows smoke results with paths.
+It pauses for readability within the recorder's limit. Replay exit 0 means the
+display completed, not that Wine acceptance passed. All seven recordings exist. O5 was recovered with an explicitly labelled O7
+replay because its original terminal command header was damaged; original
+video/log/status are retained in v2/R4H/O7-original-O5/. O4's recording correctly has exit 2.
+
+`verify-evidence.sh` is host-only and fails closed: ffprobe checks every video
+stream/duration, recorded command and exit sidecars must match the terminal log,
+each result needs a coverage table, and SHA-256 manifests seal the recordings.
+It reruns the real Wine identity/binding/caller/counter/negative-control verifier
+on the saved O7 run, including rejection of wineboot attempts. Saved ELF reports
+are independently verified too. It currently returns 1, printing
+`evidence verification: BLOCKED`; it must not print PASS while O4 or the O7
+regression fails. The original recordings show Linux-box execution only.
+
+Final ledger: `/workspace/x64-run/RESULT-R4H-O7.md`; per-order results O1–O6
+retain their original scope and failures. The five routed real ntdll operations
+are open/read/close/mmap/munmap. Windows uwph file and futex smoke hosted by
+stock Wine is separate evidence. Linux libc, raw/inline syscalls, Linux TLS and
+signals, initialized-prefix setup and separate unrouted wineserver remain
+stand-in dependencies; there is no full UWP or Xbox acceptance claim. No
+DONE-R4H is written because the required no-wineboot gate remains unresolved.

@@ -60,3 +60,8 @@ windows-smoke-test:
 windows-file-test:
 	./run-windows-smoke.sh --file-only
 .PHONY: windows-file-test
+
+# Bounded live backend check plus explicitly labelled saved longer-run evidence.
+evidence-replay: $(OUT)/backend_test
+	./evidence-replay.sh
+.PHONY: evidence-replay

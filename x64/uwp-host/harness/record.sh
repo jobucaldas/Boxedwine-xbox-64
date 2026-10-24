@@ -31,7 +31,9 @@ work=$1
 log=$2
 shift 2
 exec > >(tee "$log") 2>&1
-printf 'R4H terminal proof on Linux box (not Xbox device)\nCommand:'
+printf 'R4H terminal proof on Linux box (not Xbox device)\n'
+if [[ -n ${UWPH_RECORD_LABEL:-} ]]; then printf 'Recording label: %s\n' "$UWPH_RECORD_LABEL"; fi
+printf 'Command:'
 printf ' %q' "$@"
 printf '\n'
 setsid timeout --kill-after=2s 50s "$@" &

@@ -313,11 +313,9 @@ loader code; the entire map/relocate/import/entry sequence is Wine's.
 ### How this packages inside a Dev Mode UWP app (design, no code)
 - The UWP app's install directory (its own app storage) ships: Wine's loader + the PE-side
   DLLs (ntdll.dll/kernel32.dll/...) + the Unix side, and the guest `.exe` the user owns.
-- On Xbox (ARM64) there is no host Linux, so Wine's Unix side is provided by an emulated
-  Linux — the BoxedWine model (Approach 1). On ARM64, the x86-64 guest code that Wine's
-  loader maps is executed by a CPU backend (box64/FEX-style `wowbox64.dll`, as in Hangover),
-  reached through the same WoW64 CPU-backend seam shown by `wow64cpu.dll` above. The
-  `codeGeneration` capability covers the JIT'd native code.
+- Xbox Series is x86-64: owned x64 guest code runs natively. Wine's Unix side
+  needs a POSIX host implemented with documented UWP capabilities; Linux is only
+  the R4H stand-in. No ARM64 translation or JIT is required by this architecture.
 - The launcher role (this file) is unchanged on Xbox: hand the owned guest `.exe` to Wine's
   own loader as input data. No image is mapped by our code, nothing is hidden from the OS
   loader, nothing is injected into other processes, and only files from the app's own
@@ -327,7 +325,7 @@ Skipped sub-part: none. R2 asked specifically for Wine's own loader path (not a 
 in-process mapper — that was declined earlier, see REFUSED-STEP2), and that is exactly what
 is demonstrated above.
 
-> **Correction (R3):** the R2 packaging note above says "On Xbox (ARM64)". That is wrong.
+> **Correction (R3, applied to the packaging note above):** Xbox is not ARM64.
 > Xbox Series X|S have an 8-core **x86-64** AMD Zen 2 CPU. x86-64 guest code can run
 > directly on the CPU, so no box64/FEX/`wowbox64` translator is needed. What's missing on
 > Xbox is not an ISA translator but a **POSIX host for Wine's Unix side**: there's no Linux
@@ -611,3 +609,15 @@ pages. Runtime-resolved API presence and the existing desktop VirtualProtect tes
 fallback do not establish UWP authorization. Xbox must use the documented app
 API/capability path; desktop Wine results cannot certify it. Linux smoke exercises
 portable logic and ENOSYS stubs rather than the Windows memory/thread/file backend.
+
+R4H O7 (2026-10-24): final evidence ledger is BLOCKED, no DONE-R4H.
+Parent all passes, backend 57/0 and ELF counter checks pass; required combined
+regression exits 2 because all four Wine traces attempt wineboot. Real ntdll
+open/read/close/mmap/munmap counters are positive with zero selected bypass;
+this is selected Linux uwph integration, not full UWP acceptance. O6 Windows
+uwph smoke hosted by stock Wine is separately 569/0 (saved results displayed).
+Separate Linux wineserver remains unrouted; 160 unsupported imports, 33 retained
+libc/internal imports, libc syscall() and two inline syscall sites remain gaps.
+O7 Linux-box recording is 17.6 seconds; seven videos validated with ffprobe.
+O5 was explicitly replayed to recover damaged command-log provenance, retaining
+the original. See /workspace/x64-run/RESULT-R4H-O7.md and O7-verify.log.
