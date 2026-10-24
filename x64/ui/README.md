@@ -90,3 +90,52 @@ and status. These are HOST-ONLY behavior tests, not live routing evidence. The C
 stock controls. Visible shell and Xvfb video are O3/O4 deliverables; O2 provides
 no visible UI to record. No real authentication, depot download, account,
 credential, or network behavior is implemented.
+
+O3 supplies the working standard-library curses shell and `MainPage.xaml` design
+reference. Run `python3 x64/ui/app.py` in a terminal (or xterm). Approve the
+explicit offline login placeholder with Enter or A. Left/right moves between
+three mock tiles; Down moves to Install, left/right switches Install/Launch,
+and Up returns to the selected tile. Escape or B returns to login, then exits.
+Focus is marked `>`; the details, busy/result status and latest log lines stay
+visible. These are keyboard/controller-style bindings, not physical gamepad
+support. Resize to a larger terminal for more logs; complete launch output is
+retained by O2 in `out/launch-*/child.log`. Exiting waits for a pending bounded
+adapter worker to finish; navigation stays responsive during work.
+
+Both visible buttons and headless scenarios call `Shell.dispatch`, which
+submits Install and Launch to a worker. Launch uses O2 `launch_async`, with no
+alternate direct-Wine path or simulated success. Only hello-demo is supported;
+fictional tiles pass their own IDs to the adapter and return unavailable.
+Install prepares our fixture and downloads nothing. Launch is the existing
+live multi-PE harness batch, not a single installed game. A blocked result is
+shown as BLOCKED with the adapter's raw evidence and exit code preserved.
+
+```sh
+python3 -m unittest discover -s x64/ui/tests -p 'test_ui_flow.py' -v
+python3 x64/ui/app.py --headless --scenario navigation
+python3 x64/ui/app.py --headless --scenario launch-hello
+make -C x64/uwp-host all
+git diff --check
+```
+
+Navigation and injected UI unit tests are HOST-ONLY. The live launch scenario
+uses THROUGH-layer runs (our run_via_wine -> Wine loader -> shim -> selected
+uwph Linux operations), plus separately identified stock Wine controls and an
+unrouted stock wineserver. Current expected exit is 2 / LAUNCH BLOCKED for the
+unchanged wineboot-attempt gate, even with positive selected counters. No Xbox
+execution, UWP package, real Steam login/download or physical gamepad is proved.
+
+`MainPage.xaml` is an uncompiled WinUI 3 desktop design reference: its buttons
+and status text are illustrative, with no event bindings or build claim. A UWP
+port needs a separate UWP project, compatible XAML controls/properties and
+spacing replacements where required, explicit focus/controller wiring,
+UI-thread dispatch of asynchronous results, platform credential-store access
+and validation of documented capabilities. Linux Python subprocess management
+must be replaced with the intended in-process Wine loader integration; this
+reference does not establish that integration or device/API authorization.
+
+O3 validation: 3 UI tests passed; navigation exited 0; live launch exited 2
+with the unchanged wineboot-attempt blocker; build and whitespace checks exited
+0. Linux capture: `/workspace/x64-run/videos/R5-O3.mp4` (H.264, 35 seconds),
+reviewed final frame `/workspace/x64-run/v2/R5/O3-final.png`. Display capture is
+HOST-ONLY; its live launch evidence is `out/launch-kmh5tjaa/`, status blocked.
