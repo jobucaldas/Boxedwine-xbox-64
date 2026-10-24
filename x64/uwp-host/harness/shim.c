@@ -20,7 +20,11 @@ _Static_assert(PROT_READ==UWPH_PROT_READ && PROT_WRITE==UWPH_PROT_WRITE &&
                MAP_SHARED==UWPH_MAP_SHARED && MAP_FIXED==UWPH_MAP_FIXED,"mapping ABI");
 #define BEGIN(op,fail) if(!count_begin(op,__builtin_return_address(0))) { errno=EDEADLK; return fail; }
 #define END(r,failed) do { int e=(failed) ? uwph_errno : saved; count_end(); errno=e; return r; } while(0)
+#ifdef UWPH_HARNESS_NATIVE_FDS
+static int owned(int fd) { return 1; }
+#else
 static int owned(int fd) { return fd>=0x100000 && fd<0x100400; }
+#endif
 static long native_result(long r) { if((unsigned long)r>=(unsigned long)-4095) { errno=-r; return -1; } return r; }
 int open(const char *path,int flags,...)
 {

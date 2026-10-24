@@ -168,3 +168,79 @@ Libc-internal classification is a retained Linux dependency, not UWP support.
 
 Record with `./record.sh O3 -- make -C x64/uwp-host/harness wine-surface-check`
 from the repository root (use the full harness path for record.sh).
+
+## O4: real PE execution (routing observed; wineboot-free gate BLOCKED)
+
+Build owned PEs with `x64/pe/tests/build.sh`, then run
+`make -C x64/uwp-host/harness wine-test`. `run-wine.sh` uses our unchanged
+`run_via_wine.c` launcher and the O3 checksum-pinned Wine 10.0 loader/ntdll.
+It copies `/workspace/megabonk/pfx-stock` (override with
+`UWPH_FIXTURE_PREFIX`) into `out/wine-o4/prefix`; never uses the normal prefix.
+The source is an already initialized stock-Wine fixture. `fixture.txt` records
+its source and registry/timestamp checksums; copying is setup, not routing
+proof. No preparation command runs wineboot or initializes a new prefix.
+Delete only this harness-owned copy to select a different fixture on a later
+run. A lock prevents concurrent tests sharing the owned prefix.
+
+A separate **unshimmed Linux wineserver64** is explicitly started for this
+prefix and stopped afterward. `WINESERVER=/bin/false` prevents an accidental
+replacement inheriting preload. Routing this real server is deferred: this
+order isolates ntdll callers and native Linux server behavior is not in-process
+Xbox-server feasibility evidence. LD_PRELOAD is scoped to each owned launcher
+and inherited Wine children, never the shell, timeout/strace, or server.
+
+O1/O2 private descriptor numbers cannot be passed to unwrapped fstat/fcntl or
+Wine's server descriptor transfers. O4 therefore builds a separate
+`wine_linux_backend.o` with `UWPH_HARNESS_NATIVE_FDS`, linked before the archive
+into `libuwph_wine_shim.so`. Public uwph open/read/close/mmap/munmap still execute
+the same backend syscall adapters/counter hooks. This variant returns real
+Linux descriptors, borrows them for read/map, and consumes them on close;
+other libc/Wine calls may use them directly. It has no private-slot rwlock:
+blocking Wine pipe reads must not prevent another thread from opening/closing
+unrelated native descriptors. Only this mixed Linux harness uses this contract;
+synthetic fd APIs must never consume these numbers. O1/O2 retain private slots
+and their existing exact-count tests.
+
+Every run has a unique evidence directory with both PE logs, exec traces,
+statuses, identity/inventory copies and PID-suffixed reports. The `_exit` hook
+flushes reports; PID suffixes prevent a Wine child overwriting main-process
+proof. No signal handler, remote inspection, Wine loader change, or fake
+Unix-side object is used. `verify_wine.py` matches the report PID to the traced
+launcher, resolves caller paths to canonical ntdll.so, checks hashes and real
+runtime relocation bindings, and requires nonzero matching wrapper/backend
+counts for all five selected operations, zero selected bypasses, zero
+recursion/unattributed/overflow, expected PE output, and Wine module-load traces.
+Control runs use our launcher and stock Wine without preload and must have no
+report. Each PE run has a 12-second timeout plus 2-second kill grace.
+
+**Observed blocker:** Wine 10.0's `build_initial_params` in
+`/tmp/wine-src/dlls/ntdll/unix/env.c` unconditionally calls `run_wineboot` for a
+new top-level process. An initialized registry and `.update-timestamp` do not
+skip this call. `WINEDLLOVERRIDES=wineboot.exe=d` stops the initialization PE
+from loading, but Wine still creates a Linux child to attempt it (exit 53,
+`failed to start wineboot c0000135`). The verifier rejects both attempts and
+actual spawns, including this case. Both routed PEs nevertheless exit 0 and
+show real ntdll -> shim -> uwph backend traffic, but the overall `wine-test`
+returns failure and **does not print `Wine uwph verification: PASS`**. No warm
+Wine fixture, synthetic boot event, loader edit, or suppressed trace is used
+to turn this failure green. A later order must resolve the cold-start/no-boot
+fixture requirement within the allowed process/loader constraints.
+
+The selected routed surface is only open/read/close/mmap/munmap. The O3
+inventory's other 160 unsupported imports, 33 retained libc/internal imports,
+`syscall()` and two inline syscall sites remain Linux dependencies/bypasses.
+Passing these counters would not mean full Unix-side portability. Wine's
+native Linux TLS/signals and memory behavior are not UWP equivalents.
+
+| O4 evidence | Routing and limit |
+| --- | --- |
+| Two routed owned PEs | Our launcher -> real Wine loader/ntdll.so -> shim -> public uwph -> Linux backend, five selected symbols; overall no-wineboot gate fails |
+| Two unshimmed controls | Our launcher + stock Wine; no uwph report |
+| Prefix copy, server and inventory | Stock-Wine setup / separate Linux stand-in dependencies; not uwph proof |
+| O1/O2 regressions | THROUGH uwph Linux backend; O2 negative control is stock Linux libc |
+| Linux smoke / ABI / archives | Portable uwph with default stub / host-only checks, not Wine routing |
+| Xvfb/xterm/ffmpeg recording | Linux-box execution evidence of the failed gate, not Xbox-device validation |
+
+Capture with `x64/uwp-host/harness/record.sh O4 -- make -C
+x64/uwp-host/harness wine-test` (on one shell line). Its nonzero status records
+the rejected acceptance run honestly; the resulting MP4 is still valid footage.

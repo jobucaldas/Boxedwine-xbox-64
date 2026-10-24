@@ -31,6 +31,7 @@ static long result(long r)
  * No adoption of borrowed host descriptors, including stdin/out/err. */
 #define BASE 0x100000
 #define SLOTS 1024
+#ifndef UWPH_HARNESS_NATIVE_FDS
 static int slots[SLOTS]; /* native fd + 1; zero = free */
 static pthread_rwlock_t lock = PTHREAD_RWLOCK_INITIALIZER;
 static int native(int fd)
@@ -38,28 +39,47 @@ static int native(int fd)
     if (fd < BASE || fd >= BASE + SLOTS || !slots[fd-BASE]) return -1;
     return slots[fd-BASE]-1;
 }
+#else
+/* Mixed Wine/libc harness only: native descriptors are borrowed for read/map,
+ * created by open and consumed by close. Never used by synthetic-fd APIs.
+ * This separately compiled adapter preserves O1/O2 private-handle contracts. */
+/* No private slot lifetime to pin. Holding an rwlock across a native pipe
+ * read would deadlock Wine's other threads trying to open/close descriptors. */
+static int native(int fd) { return fd; }
+#endif
+#ifdef UWPH_HARNESS_NATIVE_FDS
+#define RDLOCK() ((void)0)
+#define WRLOCK() ((void)0)
+#define UNLOCK() ((void)0)
+#else
+#define RDLOCK() pthread_rwlock_rdlock(&lock)
+#define WRLOCK() pthread_rwlock_wrlock(&lock)
+#define UNLOCK() pthread_rwlock_unlock(&lock)
+#endif
 static long fdcall(long nr, int fd, long b, long c, long d)
 {
-    pthread_rwlock_rdlock(&lock);
+    RDLOCK();
     int n = native(fd);
     long r = n < 0 ? -UWPH_EBADF : raw(nr,n,b,c,d,0,0);
-    pthread_rwlock_unlock(&lock);
+    UNLOCK();
     return result(r);
 }
 int uwph_linux_openat(int dirfd, const char *path, int flags, unsigned mode)
 {
-    pthread_rwlock_wrlock(&lock);
+    WRLOCK();
     /* Linux ignores dirfd for absolute paths; relative paths still require
      * an owned descriptor (or AT_FDCWD), never an arbitrary native fd. */
     int dir = path && path[0] == '/' ? UWPH_AT_FDCWD :
               dirfd == UWPH_AT_FDCWD ? dirfd : native(dirfd);
     long r = dir == -1 ? -UWPH_EBADF : raw(SYS_openat,dir,PTR(path),flags,mode,0,0);
+#ifndef UWPH_HARNESS_NATIVE_FDS
     if (r >= 0) {
         int i; for (i=0;i<SLOTS && slots[i];i++);
         if (i==SLOTS) { raw(SYS_close,r,0,0,0,0,0); r=-UWPH_EMFILE; }
         else { slots[i]=r+1; r=BASE+i; }
     }
-    pthread_rwlock_unlock(&lock);
+#endif
+    UNLOCK();
     return result(r);
 }
 int uwph_linux_open(const char *path, int flags, unsigned mode)
@@ -70,11 +90,13 @@ int uwph_linux_open(const char *path, int flags, unsigned mode)
 int uwph_linux_close(int fd)
 {
     COUNT(C_CLOSE);
-    pthread_rwlock_wrlock(&lock);
+    WRLOCK();
     int n=native(fd);
     long r=n<0 ? -UWPH_EBADF : raw(SYS_close,n,0,0,0,0,0);
+#ifndef UWPH_HARNESS_NATIVE_FDS
     if(n>=0) slots[fd-BASE]=0; /* Linux close releases fd even on EINTR. */
-    pthread_rwlock_unlock(&lock); return result(r);
+#endif
+    UNLOCK(); return result(r);
 }
 uwph_ssize_t uwph_linux_read(int fd, void *buf, size_t len) { COUNT(C_READ); return fdcall(SYS_read,fd,PTR(buf),len,0); }
 uwph_ssize_t uwph_linux_write(int fd, const void *buf, size_t len) { return fdcall(SYS_write,fd,PTR(buf),len,0); }
@@ -84,21 +106,21 @@ uwph_off_t uwph_linux_lseek(int fd, uwph_off_t off, int whence) { return fdcall(
 int uwph_linux_fstat(int fd, struct uwph_stat *st) { return fdcall(SYS_fstat,fd,PTR(st),0,0); }
 int uwph_linux_fstatat(int dirfd, const char *path, struct uwph_stat *st, int flags)
 {
-    pthread_rwlock_rdlock(&lock);
+    RDLOCK();
     int dir=path && path[0]=='/' ? UWPH_AT_FDCWD :
             dirfd==UWPH_AT_FDCWD ? dirfd : native(dirfd);
     long r=dir==-1 ? -UWPH_EBADF : raw(SYS_newfstatat,dir,PTR(path),PTR(st),flags,0,0);
-    pthread_rwlock_unlock(&lock); return result(r);
+    UNLOCK(); return result(r);
 }
 int uwph_linux_stat(const char *path, struct uwph_stat *st) { return uwph_linux_fstatat(UWPH_AT_FDCWD,path,st,0); }
 int uwph_linux_lstat(const char *path, struct uwph_stat *st) { return uwph_linux_fstatat(UWPH_AT_FDCWD,path,st,0x100); }
 void *uwph_linux_mmap(void *addr, size_t len, int prot, int flags, int fd, uwph_off_t off)
 {
     COUNT(C_MMAP);
-    pthread_rwlock_rdlock(&lock);
+    RDLOCK();
     int n=(flags & UWPH_MAP_ANONYMOUS) ? -1 : native(fd);
     long r=(!(flags & UWPH_MAP_ANONYMOUS) && n<0) ? -UWPH_EBADF : raw(SYS_mmap,PTR(addr),len,prot,flags,n,off);
-    pthread_rwlock_unlock(&lock); return (void *)result(r);
+    UNLOCK(); return (void *)result(r);
 }
 int uwph_linux_munmap(void *addr, size_t len) { COUNT(C_MUNMAP); return result(raw(SYS_munmap,PTR(addr),len,0,0,0,0)); }
 int uwph_linux_mprotect(void *addr, size_t len, int prot) { return result(raw(SYS_mprotect,PTR(addr),len,prot,0,0,0)); }

@@ -37,3 +37,14 @@ wine-surface-check: out/libuwph_shim.so
 	./prepare-wine.sh
 	./check_surface.sh
 .PHONY: wine-surface-check
+
+# Separate backend object: native fd interoperability is exclusive to Wine proof.
+$(OUT)/wine_linux_backend.o: linux_backend.c counters.h $(HEADERS)
+	$(CC) $(CFLAGS) -DUWPH_HARNESS_NATIVE_FDS -c $< -o $@
+$(OUT)/libuwph_wine_shim.so: shim.c counters.c counters.h $(OUT)/wine_linux_backend.o $(OUT)/libuwph.a $(OUT)/shim.map
+	$(CC) $(CFLAGS) -DUWPH_HARNESS_NATIVE_FDS -shared shim.c counters.c $(OUT)/wine_linux_backend.o $(OUT)/libuwph.a -ldl -Wl,--version-script=$(OUT)/shim.map -Wl,-z,defs -o $@
+$(OUT)/run_via_wine: ../../pe/launcher/run_via_wine.c
+	$(CC) -O2 -Wall -Wextra -Werror $< -o $@
+wine-test: $(OUT)/libuwph_wine_shim.so $(OUT)/run_via_wine
+	./run-wine.sh
+.PHONY: wine-test

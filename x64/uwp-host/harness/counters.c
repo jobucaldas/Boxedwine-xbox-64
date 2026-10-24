@@ -68,6 +68,15 @@ void uwph_shim_report(void)
     depth++;
     const char *path=getenv("UWPH_REPORT");
     if(!path) { depth--; errno=saved; return; }
+    /* Wine can create children even when wineboot's PE is disabled. Separate
+     * process reports prevent a child from overwriting the launcher evidence. */
+    char pidpath[4096];
+    if(getenv("UWPH_REPORT_PID")) {
+        int n=snprintf(pidpath,sizeof pidpath,"%s.%ld",path,
+                       harness_raw(SYS_getpid,0,0,0,0,0,0));
+        if(n<0 || (size_t)n>=sizeof pidpath) { depth--; errno=saved; return; }
+        path=pidpath;
+    }
     long fd=harness_raw(SYS_openat,AT_FDCWD,(long)path,O_WRONLY|O_CREAT|O_TRUNC,0600,0,0);
     if(fd<0) { depth--; errno=saved; return; }
     char buf[4096]; size_t used=0;
