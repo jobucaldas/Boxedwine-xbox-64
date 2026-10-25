@@ -3247,6 +3247,49 @@ Classification: host filesystem/download preflight only (build-only category);
 neither THROUGH-uwph nor stock Wine ran. No runtime proof or video was produced.
 O2 was not attempted (outside this assignment).
 
+## B78 O1
+
+Added a second pin for Valve build 1745623383; PIN.txt remains build 1792618285.
+The published OSW manifest and Valve bins_win32 archive agree on package SHA2
+ d455a298fe9d17a9222685f4268c66004df164d6f7242803e38303bb0c7dfefc.
+The verified archive yields steamclient64 SHA256
+40a45d285dd23d9e54b0b6a58dc62cdcbeaf7cad5e9e57c799e4af797bd4f895.
+fetch-pin.sh verifies manifest version/package/size/SHA2 and DLL hash, and extracts
+only steamclient64.dll, tier0_s64.dll and vstdlib_s64.dll unmodified into
+steamhost/out/client-1745623383/. Pin-specific builds avoid stale compiled pins.
+run.sh --pin FILE --check-pin uses a credential-free uwph runner with a fresh
+prefix, asserting no loginusers.vdf before guest launch. Alternate pins are
+limited to check-only for O1. No login, credential reader, or slot call is run.
+
+Evidence: /workspace/x64-run/lanes/B78/o1 and o1-default. THROUGH-uwph
+(wx,noproc -> our run_via_wine -> private W^X Wine loader -> uwph shim), stock
+Wine setup/services outside jail, external wineserver; no console proof.
+Old pin: pin=ok, client_build=1745623383, iface_pin=match, rc=0.
+Default: pin=ok, client_build=1792618285, iface_pin=mismatch, rc=6.
+Both temporary prefixes were deleted. Video /workspace/x64-run/videos/B78-O1.mp4
+is 4.7 seconds on a free Xvfb display.
+The exact compound test exits 1 only because its final literal leak scan matches
+its own pattern in the driver-owned ORDERS.md, B78-O1.prompt and session JSONL.
+Those files were left intact. This is a test-input collision, not a credential
+finding; the separate scan of x64/steam-min is clean.
+
+## B78 O2
+
+Stock Wine, anonymous, build 1745623383. Added isolated `run.sh --anon --wait` dispatch and a credential-free helper mode (Public / AnonUser / account 0, instance 0). The anonymous path calls only CreateGlobalUser, GetIClientUser, LogOn, RunFrame and the callback exports; it never reads a login cache, sets cached account credentials, or writes ActiveProcess. Existing default pin and authenticated runner stay in place.
+
+Outcome: no successful logon in 420 seconds (360-second requested wait plus 60-second outer allowance). Neither `logon=1` nor a literal `logon=0` was emitted: Wine faulted inside the LogOn call before it returned and waited in WineDbg until timeout, runner exit 124. CreateGlobalUser was sane (`global_user=1`, `pipe=1`); GetIClientUser was non-null (`iclientuser=1`). LogOnResponse EResult verbatim: unavailable; no RecvMsgClientLogOnResponse exists. Transport: no established CM transport recorded. No “client too old” or update-required text observed. This does not establish server acceptance or rejection of this build. Stopped after this single attempt, with no workaround, patching, or version spoofing.
+
+Wine stderr verbatim: `wine: Unhandled page fault on read access to FFFFFFFFFFFFFFFF at address 00006FFFFA06D981 (thread 0120), starting debugger...`. Preceding assertions report GetAdaptersAddresses returned 13 and missing SDL3.dll; no inference of root cause is made.
+
+B70 fix applied to a fresh prefix: `crl_seed_total=23 ok=23`; TLS verification kept enabled. Prefix was about 1.4 GB before cleanup and deleted (`cleanup.log: prefix_deleted=1`). Disk before cached archive verification: 7.8 GB free; no Valve package download was needed. Package SHA2 and DLL pin verified. No loginusers.vdf before or after guest execution; webhelper_count=0. Credential-marker scan passed. Exact test failed (shell exit 1 at its first grep); output preserved in `/workspace/x64-run/lanes/B78/o2/exact-test-output.txt`. Separate checks confirmed absent logged-on/OK response, absent loginusers, zero webhelpers, prefix removal, and clean credential scan. Video: `/workspace/x64-run/videos/B78-O2.mp4`, 55 seconds, free Xvfb display. Route is stock Wine; no THROUGH-uwph or console proof.
+
+No connection_log entries occurred in the final 60 seconds of the run. The last available 60-second window (indeed the entire timestamped log), verbatim:
+
+```text
+[2026-10-25 22:38:56] Client version: 1745623383
+[2026-10-25 22:38:56] Connectivity test: Starting test, fetching 'http://test.steampowered.com/204'
+[2026-10-25 22:38:57] [Logged Off, 0, 0] [U:1:0] CCMInterface::SetSteamID( [U:1:0] )
+```
 ## B81
 
 O2 (2026-10-25): BLOCKED by the required disk preflight. `df -h /`

@@ -13,6 +13,10 @@ set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 MIN=$(cd "$HERE/.." && pwd)
 EVID= MODE= SELFTEST= GAME= WAIT=360 GAME_SECS=60
+# Keep anonymous runs isolated from all credential seeding paths.
+for arg in "$@"; do
+    if [[ $arg == --anon ]]; then exec bash "$HERE/run-anon.sh" "$@"; fi
+done
 PIN="$HERE/PIN-1788652215.txt"
 CHECK_PIN=
 APPID=3405340
@@ -32,6 +36,10 @@ while (($#)); do
     esac
     shift
 done
+# Published legacy pins use the credential-free isolated gate runner.
+if [[ $CHECK_PIN == 1 && -z $(sed -n 's/^map_file=//p' "$PIN") ]]; then
+    exec bash "$HERE/check-pin.sh" "$PIN" "$EVID"
+fi
 [[ ( $MODE == stock || $MODE == uwph ) && -n $EVID && $WAIT =~ ^[0-9]+$ && $GAME_SECS =~ ^[0-9]+$ ]] || exit 2
 [[ -z $GAME || -z $SELFTEST ]] || exit 2
 # Validate before building, prefix setup, or any guest LoadLibrary path.

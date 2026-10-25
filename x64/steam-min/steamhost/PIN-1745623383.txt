@@ -1,0 +1,29 @@
+manifest_version=1745623383
+steamclient64_sha256=40a45d285dd23d9e54b0b6a58dc62cdcbeaf7cad5e9e57c799e4af797bd4f895
+manifest_url=https://raw.githubusercontent.com/OpenSteamClient/OpenSteamworks/3793a5db/Manifests/steam_client_win32.vdf
+package_file=bins_win32.zip.f5eaa61d1767c375d0c8817858df17cb309fe5f1
+package_sha2=d455a298fe9d17a9222685f4268c66004df164d6f7242803e38303bb0c7dfefc
+package_size=54091977
+# Valve client build the vtable tables below were dumped from. steamhost calls no
+# IClientEngine/IClientUser slot unless this equals manifest_version (prints iface_pin=mismatch, exit 6).
+osw_tables_build=1745623383
+
+Interface name: OpenSteamClient @ 8d4d18742555959b21453cde0efcd42f336735ee
+  src/client/ext/steamclient.h:7; factory call src/client/ext/steamclient.cpp:38-46.
+Export resolution: same revision src/client/ext/steamclient.cpp:12-20;
+  Steam_BGetCallback/Steam_FreeLastCallback signatures src/client/ext/steamclient.h:41-42.
+Bootstrapper signatures: OpenSteamClient @ b6703299c982315a0efdf8d6bcea330ab931614b
+  OpenSteamClient/Entry.cs:34-125. Launcher type = 5: C++ revision above,
+  include/opensteamworks/ELauncherType.h:8.
+
+Vtable slots (O2), newest published OSC tables: OpenSteamClient/OpenSteamworks
+  @ 3793a5db07d0df2774554333b7ebef891d971dc2 (2025-04-30; last change to these two files at
+  HEAD d0abbe85, 2026-09-23). Tables dumped for Valve client build 1745623383
+  (same revision Manifests/steam_client_win32.vdf:3), matching manifest_version above.
+  IClientEngine (OpenSteamworks/Generated/IClientEngine.cs, declaration order from line 18):
+    CreateGlobalUser = 2 (line 20), GetIClientUser = 8 (line 26), RunFrame = 19 (line 42)
+  IClientUser (OpenSteamworks/Generated/IClientUser.cs, "index:" comments):
+    LogOn = 2 (line 30), SetAccountNameForCachedCredentialLogin = 51 (line 96)
+    neighbours: InvalidateCredentials = 3 (line 31), DestroyCachedCredentials = 52 (line 98)
+  Callback ids: SteamServersConnected_t = 101, SteamServerConnectFailure_t = 102
+    (OpenSteamClient @ 8d4d1874 include/opensteamworks/UserCommon.h:266,297).
