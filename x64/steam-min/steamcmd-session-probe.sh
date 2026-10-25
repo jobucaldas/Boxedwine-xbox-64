@@ -199,7 +199,7 @@ if [ "$LOGON" = 1 ]; then
     # Init failure exits 1 by design; loader/setup failures must never count.
     if [ "$RC1" = 1 ] && [ "$RC2" = 1 ] && [ "$REG_OK" = 1 ] && [ "$ROUTE_OK" = 1 ] &&
        grep -qxF 'SteamAPI_Init=0 msg=Could not determine Steam client install directory.' "$EVID/probe1.log" &&
-       grep -qxF 'SteamAPI_Init=0 msg=Cannot create IPC pipe to Steam client process. Steam is probably not running.' "$EVID/probe2.log" &&
+       grep -qxF 'SteamAPI_Init=0 msg=Cannot create IPC pipe to Steam client process.  Steam is probably not running.' "$EVID/probe2.log" &&
        grep -qxF 'IsSteamRunning=1' "$EVID/probe2.log"; then
         PROBES_OK=1
     fi
