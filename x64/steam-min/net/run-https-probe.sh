@@ -10,6 +10,9 @@ trap cleanup EXIT
 x86_64-w64-mingw32-gcc -O2 -Wall -Wextra "$source_dir/https_probe.c" -o "$evidence/https_probe.exe" -lwinhttp -lcrypt32 -liphlpapi -lws2_32 2>"$evidence/build.log"
 wine --version > "$evidence/environment.log"
 timeout 60 wineboot -u > "$evidence/wineboot.log" 2>&1
+# B70 O2 fix (CRLs over HTTPS into the URL cache + no-:80 fast fail); TLS checks stay on.
+bash "$source_dir/fix-prefix-tls.sh" --prefix "$prefix" --evidence "$evidence" > "$evidence/prefix-tls-fix.out" 2>&1 \
+    || echo "prefix_tls_fix=partial (see prefix-tls-fix.log)" >> "$evidence/environment.log"
 # The earlier readiness executable is ours; rerun in this same fresh prefix if available.
 if [[ -f /workspace/xbox-readiness/bin/net_probe.exe ]]; then
     timeout 90 wine /workspace/xbox-readiness/bin/net_probe.exe > "$evidence/readiness-net.log" 2>&1 || true

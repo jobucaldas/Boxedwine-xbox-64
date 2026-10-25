@@ -1,5 +1,6 @@
 /* Stock-Wine transport/chain diagnostic; no credentials or TLS exceptions. */
 #define _WIN32_WINNT 0x0602
+#define CERT_CHAIN_PARA_HAS_EXTRA_FIELDS
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <windows.h>
@@ -26,6 +27,21 @@ static void chain(HINTERNET r, const wchar_t *host) {
         printf("chain_ssl_policy_ok=%d error=0x%08lx\n",ok,ps.dwError);
         CertFreeCertificateChain(cc);
     }
+    /* B70 O2: the same chain with revocation on (as Valve's verifier asks for), bounded wait. */
+    para.dwUrlRetrievalTimeout = 15000; cc = NULL;
+    DWORD t0 = GetTickCount();
+    ok = CertGetCertificateChain(NULL, cert, NULL, cert->hCertStore, &para, CERT_CHAIN_REVOCATION_CHECK_CHAIN_EXCLUDE_ROOT, NULL, &cc);
+    printf("chain_rev_ok=%d chain_rev_error_bits=0x%08lx ms=%lu\n", ok, cc ? cc->TrustStatus.dwErrorStatus : 0xffffffffUL, GetTickCount() - t0);
+    if (cc && cc->cChain) {
+        PCERT_SIMPLE_CHAIN sc = cc->rgpChain[0];
+        for (DWORD i = 0; i < sc->cElement; i++) {
+            PCERT_CHAIN_ELEMENT el = sc->rgpElement[i]; char cn[128] = "";
+            CertGetNameStringA(el->pCertContext, CERT_NAME_SIMPLE_DISPLAY_TYPE, 0, NULL, cn, sizeof cn);
+            printf("rev_element=%lu cn=\"%s\" trust_error=0x%08lx revocation=0x%08lx\n", i, cn, el->TrustStatus.dwErrorStatus,
+                   el->pRevocationInfo ? el->pRevocationInfo->dwRevocationResult : 0xffffffffUL);
+        }
+    }
+    if (cc) CertFreeCertificateChain(cc);
     CertFreeCertificateContext(cert);
 }
 static HINTERNET request(HINTERNET s, const wchar_t *host, const wchar_t *path, int ws, HINTERNET *c, DWORD *status, DWORD *err) {
