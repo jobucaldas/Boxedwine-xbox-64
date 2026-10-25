@@ -139,7 +139,8 @@ stub-test: $(OUT)/run_hello $(OUT)/stub_probe.exe
 	$(MAKE) -C ../wineserver lib
 $(OUT)/libuwph_inproc_server.so: inproc_server.c ../wineserver/server_thread.c ../wineserver/out/libwineserver.a
 	$(CC) $(CFLAGS) -shared $^ -Wl,-z,defs -o $@
-wine-test-inproc-build: $(OUT)/libuwph_wine_shim.so $(OUT)/libuwph_inproc_server.so $(OUT)/run_via_wine
+wine-test-inproc-build: $(OUT)/libuwph_wine_shim.so $(OUT)/libuwph_inproc_server.so $(OUT)/run_via_wine prebuilt-prefix
+	./run-wine.sh --stage-inproc
 wine-test-inproc: wine-test-inproc-build
 	./run-wine.sh --inproc-server
 FORCE:

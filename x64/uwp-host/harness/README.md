@@ -482,3 +482,33 @@ It imports two nonexistent `version.dll` exports and checks that both generated
 addresses have PAGE_EXECUTE_READ protection and separate allocation bases. It
 never invokes the missing functions. See NOTES-x64.md `## B18` for recorded
 commands, counts, console reachability, and limitations.
+
+## B27: isolated nofork acceptance
+
+`run-isolated.sh CMD...` runs one acceptance command under
+`unshare -Urpf --mount-proc` (unprivileged), so other lanes' wineservers on the
+same box are invisible. After CMD returns, still inside the namespace, it runs
+the unchanged check `pgrep -x wineserver64 || pgrep -f '/wineserver64'`; pass is
+empty output. Logs land in the staged run dir (`out/inproc-staged.txt`, or
+`$UWPH_ISOLATED_RUN`): `isolated.ns` (gating), `isolated.host` (host-wide pgrep,
+informational only), `isolated.status`, `isolated.cmd`. It never relaxes uwpjail
+`--nofork`, the seccomp filter, or any verifier.
+
+    make -C x64/uwp-host/harness wine-test-inproc-build
+    UWPH_INPROC_SERVER=1 x64/uwp-host/harness/run-isolated.sh \
+      /workspace/xbox-readiness/tests/uwp_run.sh nofork "$PWD/x64/uwp-host/harness" \
+      -- ./run-wine.sh --inproc-server --no-build
+
+## B32: `verify_wine.py --inproc`
+
+`verify_wine.py --inproc RUN` (or with `UWPH_INPROC_SERVER=1` in the
+environment) verifies an in-process-server run. Only `execv` is treated
+differently, and the rule is stricter than the default one: each routed case
+must report exactly `trace execv 0`, no case's `.exec` trace may contain an
+`execve` of any wineserver (failed attempts count too), and the routed log must
+carry the `[inproc] ... no separate server process` banner from
+`inproc_server.c`. Every other routed symbol still needs >0 uwph entries. With no
+flag and no env var, the behaviour is the same as before: a run with
+`execv:0` still fails "O2 traced symbol with zero uwph entries". Fixture tests:
+`python3 x64/uwp-host/harness/test_verify_wine_inproc.py` (also part of
+`make -C x64/uwp-host test`).

@@ -59,3 +59,19 @@ UWPH_API char *uwph_setlocale(int category, const char *locale)
     if (!r) uwph_errno = UWPH_EINVAL;
     return r;
 }
+
+/* Internal Linux nl_item ABI; Wine currently queries CODESET (14).
+ * UWP's C locale has an ASCII codeset; other items fail explicitly. */
+char *uwph_trace_nl_langinfo(int item)
+{
+    uwph_trace_hit(UWPH_TRACE_NL_LANGINFO);
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    UWPH_NATIVE(char *, "nl_langinfo", (int));
+    UWPH_NATIVE_RETURN(fn(item));
+#else
+    const char *locale = uwph_setlocale(UWPH_LC_CTYPE, NULL);
+    if (item == 14 && locale && (!strcmp(locale, "C") || !strcmp(locale, "POSIX")))
+        return "ANSI_X3.4-1968";
+    return UWPH_FAILP(UWPH_ENOSYS);
+#endif
+}

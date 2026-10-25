@@ -38,3 +38,5 @@ int uwph_linux_pipe2(int fds[2], int flags);
 int uwph_linux_native_fds(void);
 
 int uwph_linux_ftruncate(int fd, uwph_off_t len);
+int uwph_linux_dup(int fd);
+int uwph_linux_fchdir(int fd);

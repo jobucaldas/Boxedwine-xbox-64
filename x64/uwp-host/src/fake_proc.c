@@ -10,7 +10,8 @@
 /* Capture invocation identity before application code can change cwd.
  * No dependency on procfs, including when AT_EXECFN is relative. */
 static char invocation_exe[PATH_MAX];
-__attribute__((constructor)) static void capture_invocation_exe(void)
+/* Preload constructors (including the hosted server) may query this identity. */
+__attribute__((constructor(101))) static void capture_invocation_exe(void)
 {
     const char *exe = (const char *)getauxval(AT_EXECFN);
     if (!exe) return;
