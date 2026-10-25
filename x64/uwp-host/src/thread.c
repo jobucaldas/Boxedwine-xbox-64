@@ -128,6 +128,7 @@ static volatile int key_used[128];
 
 UWPH_API int uwph_pthread_key_create(uwph_pthread_key_t *k, void (*dtor)(void *))
 {
+    uwph_trace_hit(UWPH_TRACE_PTHREAD_KEY_CREATE);
 #ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
     UWPH_NATIVE(int, "pthread_key_create", (uwph_pthread_key_t *, void (*)(void *)));
     UWPH_NATIVE_RETURN(fn(k, dtor));
@@ -154,6 +155,7 @@ UWPH_API void *uwph_pthread_getspecific(uwph_pthread_key_t k)
 }
 UWPH_API int uwph_pthread_setspecific(uwph_pthread_key_t k, const void *v)
 {
+    uwph_trace_hit(UWPH_TRACE_PTHREAD_SETSPECIFIC);
 #ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
     UWPH_NATIVE(int, "pthread_setspecific", (uwph_pthread_key_t, const void *));
     UWPH_NATIVE_RETURN(fn(k, v));
@@ -188,11 +190,15 @@ static struct mutex_impl *mutex_get(uwph_pthread_mutex_t *m)
     return expect;
 }
 
-UWPH_API int uwph_pthread_mutexattr_init(uwph_pthread_mutexattr_t *a) { a->type = UWPH_PTHREAD_MUTEX_NORMAL; return 0; }
-UWPH_API int uwph_pthread_mutexattr_destroy(uwph_pthread_mutexattr_t *a) { (void)a; return 0; }
-UWPH_API int uwph_pthread_mutexattr_settype(uwph_pthread_mutexattr_t *a, int type) { a->type = type; return 0; }
+UWPH_API int uwph_pthread_mutexattr_init(uwph_pthread_mutexattr_t *a) {
+    uwph_trace_hit(UWPH_TRACE_PTHREAD_MUTEXATTR_INIT); a->type = UWPH_PTHREAD_MUTEX_NORMAL; return 0; }
+UWPH_API int uwph_pthread_mutexattr_destroy(uwph_pthread_mutexattr_t *a) {
+    uwph_trace_hit(UWPH_TRACE_PTHREAD_MUTEXATTR_DESTROY); (void)a; return 0; }
+UWPH_API int uwph_pthread_mutexattr_settype(uwph_pthread_mutexattr_t *a, int type) {
+    uwph_trace_hit(UWPH_TRACE_PTHREAD_MUTEXATTR_SETTYPE); a->type = type; return 0; }
 UWPH_API int uwph_pthread_mutex_init(uwph_pthread_mutex_t *m, const uwph_pthread_mutexattr_t *a)
 {
+    uwph_trace_hit(UWPH_TRACE_PTHREAD_MUTEX_INIT);
     m->impl = NULL;
     m->type = a ? a->type : UWPH_PTHREAD_MUTEX_NORMAL;
     mutex_get(m);

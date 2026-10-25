@@ -4,16 +4,25 @@
 #include <locale.h>
 #include <errno.h>
 
-UWPH_API int uwph_vsnprintf(char *buf, size_t size, const char *fmt, va_list ap)
+static int format_impl(char *buf, size_t size, const char *fmt, va_list ap)
 {
     int n;
-    uwph_trace_hit(UWPH_TRACE_SNPRINTF);
+
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    UWPH_NATIVE(int, "vsnprintf", (char *, size_t, const char *, va_list));
+    n = fn(buf,size,fmt,ap);
+#else
     n = vsnprintf(buf, size, fmt, ap);
+#endif
     if (n < 0) uwph_errno = UWPH_EINVAL;
     return n;
 }
+UWPH_API int uwph_vsnprintf(char *b, size_t n, const char *f, va_list ap)
+{ uwph_trace_hit(UWPH_TRACE_VSNPRINTF); return format_impl(b,n,f,ap); }
+int uwph_trace_snprintf(char *b, size_t n, const char *f, va_list ap)
+{ uwph_trace_hit(UWPH_TRACE_SNPRINTF); return format_impl(b,n,f,ap); }
 UWPH_API int uwph_snprintf(char *buf, size_t size, const char *fmt, ...)
-{ va_list ap; int n; va_start(ap, fmt); n=uwph_vsnprintf(buf,size,fmt,ap); va_end(ap); return n; }
+{ va_list ap; int n; va_start(ap, fmt); n=uwph_trace_snprintf(buf,size,fmt,ap); va_end(ap); return n; }
 UWPH_API int uwph_vasprintf(char **buf, const char *fmt, va_list ap)
 {
     va_list cp;
@@ -21,9 +30,9 @@ UWPH_API int uwph_vasprintf(char **buf, const char *fmt, va_list ap)
     uwph_trace_hit(UWPH_TRACE_ASPRINTF);
     *buf = NULL;
     va_copy(cp, ap);
-    n = vsnprintf(NULL, 0, fmt, cp);
+    n = format_impl(NULL, 0, fmt, cp);
     va_end(cp);
-    if (n >= 0 && (*buf = malloc((size_t)n + 1))) vsnprintf(*buf, (size_t)n + 1, fmt, ap);
+    if (n >= 0 && (*buf = malloc((size_t)n + 1))) format_impl(*buf, (size_t)n + 1, fmt, ap);
     if (!*buf) return UWPH_FAIL(n < 0 ? UWPH_EINVAL : UWPH_ENOMEM);
     return n;
 }

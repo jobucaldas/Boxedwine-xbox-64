@@ -38,6 +38,11 @@ UWPH_API int uwph_sigismember(const uwph_sigset_t *s, int sig)
 
 UWPH_API int uwph_sigaction(int sig, const struct uwph_sigaction *act, struct uwph_sigaction *old)
 {
+    uwph_trace_hit(UWPH_TRACE_SIGACTION);
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    UWPH_NATIVE(int, "sigaction", (int, const struct uwph_sigaction *, struct uwph_sigaction *));
+    UWPH_NATIVE_RETURN(fn(sig,act,old));
+#endif
     if (sig <= 0 || sig >= UWPH_NSIG || ((sig == UWPH_SIGKILL || sig == UWPH_SIGSTOP) && act))
         return UWPH_FAIL(UWPH_EINVAL);
     uwph_lock(&sig_lock);
@@ -88,8 +93,14 @@ UWPH_API int uwph_sigprocmask(int how, const uwph_sigset_t *set, uwph_sigset_t *
 
 UWPH_API int uwph_sigaltstack(const uwph_stack_t *ss, uwph_stack_t *old)
 {
+    uwph_trace_hit(UWPH_TRACE_SIGALTSTACK);
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    UWPH_NATIVE(int, "sigaltstack", (const uwph_stack_t *, uwph_stack_t *));
+    UWPH_NATIVE_RETURN(fn(ss,old));
+#endif
     struct uwph_thread *t = uwph_thread_current();
-    if (old) *old = t->altstack;
+    if (ss && !(ss->ss_flags & UWPH_SS_DISABLE)) return UWPH_ENOSYS_INT();
+    if (old) { *old = t->altstack; old->ss_flags = UWPH_SS_DISABLE; }
     if (ss) t->altstack = *ss;
     return 0;
 }

@@ -109,9 +109,10 @@ __attribute__((noreturn)) void _exit(int status)
 #include <time.h>
 extern int uwph_linux_native_mutex_lock(void *);
 extern int uwph_linux_native_mutex_unlock(void *);
+extern int uwph_trace_snprintf(char *,size_t,const char *,va_list);
 int snprintf(char *b, size_t n, const char *fmt, ...)
 { va_list ap; va_start(ap, fmt); /* formatting through uwph needs a va_list entry */
-  int r = uwph_vsnprintf(b, n, fmt, ap); va_end(ap); return r; }
+  int r = uwph_trace_snprintf(b, n, fmt, ap); va_end(ap); return r; }
 FILE *fopen(const char *p, const char *m) { FILE *r = (FILE *)uwph_fopen(p,m); if (!r) errno=uwph_errno; return r; }
 int fclose(FILE *f) { int r=uwph_fclose((uwph_FILE *)f); if(r<0) errno=uwph_errno; return r; }
 int feof(FILE *f) { return uwph_feof((uwph_FILE *)f); }
@@ -202,3 +203,30 @@ int lstat(const char *p,struct stat *s) { B06_INT(uwph_lstat(p,(struct uwph_stat
 int mkdir(const char *p,mode_t m) { B06_INT(uwph_mkdir(p,m)); }
 char *nl_langinfo(nl_item item) { char *r=uwph_trace_nl_langinfo(item); if(!r) errno=uwph_errno; return r; }
 DIR *opendir(const char *p) { DIR *r=(DIR *)uwph_opendir(p); if(!r) errno=uwph_errno; return r; }
+
+/* B08: retain native pthread ABI at the Linux Wine boundary. */
+extern int uwph_linux_native_mutex_init(void *,const void *);
+extern int uwph_linux_native_mutexattr_init(void *);
+extern int uwph_linux_native_mutexattr_destroy(void *);
+extern int uwph_linux_native_mutexattr_settype(void *,int);
+int pthread_key_create(pthread_key_t *k,void (*d)(void *)) { return uwph_pthread_key_create(k,d); }
+/* Pointer is an opaque TLS value (glibc declares access(none)). */
+__asm__(".text\n.globl pthread_setspecific\n.type pthread_setspecific,@function\npthread_setspecific:\n jmp uwph_pthread_setspecific\n.size pthread_setspecific,.-pthread_setspecific\n");
+int pthread_mutex_init(pthread_mutex_t *m,const pthread_mutexattr_t *a) { return uwph_linux_native_mutex_init(m,a); }
+int pthread_mutexattr_init(pthread_mutexattr_t *a) { return uwph_linux_native_mutexattr_init(a); }
+int pthread_mutexattr_destroy(pthread_mutexattr_t *a) { return uwph_linux_native_mutexattr_destroy(a); }
+int pthread_mutexattr_settype(pthread_mutexattr_t *a,int t) { return uwph_linux_native_mutexattr_settype(a,t); }
+char *secure_getenv(const char *n) { return uwph_secure_getenv(n); }
+int sigaction(int n,const struct sigaction *a,struct sigaction *o) { B06_INT(uwph_sigaction(n,(const struct uwph_sigaction *)a,(struct uwph_sigaction *)o)); }
+int sigaltstack(const stack_t *s,stack_t *o) { B06_INT(uwph_sigaltstack((const uwph_stack_t *)s,(uwph_stack_t *)o)); }
+int socket(int d,int t,int p) { B06_INT(uwph_socket(d,t,p)); }
+int socketpair(int d,int t,int p,int v[2]) { B06_INT(uwph_socketpair(d,t,p,v)); }
+int vsnprintf(char *b,size_t n,const char *f,va_list ap) { return uwph_vsnprintf(b,n,f,ap); }
+/* Fixed register slots preserve libc's x86-64 variadic syscall ABI, including
+ * unconsumed slots. Tail forwarding does not read absent C varargs. */
+extern long uwph_linux_syscall_entry(long,long,long,long,long,long,long);
+__asm__(".text\n.globl syscall\n.type syscall,@function\nsyscall:\n jmp uwph_linux_syscall_entry\n.size syscall,.-syscall\n");
+extern int uwph_linux_prctl_entry(int,unsigned long,unsigned long,unsigned long,unsigned long);
+__asm__(".text\n.globl prctl\n.type prctl,@function\nprctl:\n jmp uwph_linux_prctl_entry\n.size prctl,.-prctl\n");
+_Static_assert(sizeof(struct sigaction)==sizeof(struct uwph_sigaction),"sigaction ABI");
+_Static_assert(sizeof(stack_t)==sizeof(uwph_stack_t),"sigaltstack ABI");
