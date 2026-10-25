@@ -64,9 +64,11 @@ PY
 cat > "$stage/payload/PACKAGING-NOTES.txt" <<'EOF'
 Loose x64 development layout. No signature or AppxBlockMap is supplied.
 The certificate and private-key PFX remain outside this payload.
-Use a supported Windows SDK packaging/signing workflow for a Device Portal
-upload: MakeAppx pack /d payload /p BoxedwineDev.appx, then SignTool sign
-/fd SHA256 /f test-cert.pfx BoxedwineDev.appx (empty test password).
+Linux (no Windows PC): make -C x64/on-device linux-appx packs with makemsix,
+signs with osslsigncode and verifies out/BoxedwineDev.appx; deploy-devportal.sh
+installs it through the Xbox Device Portal REST API.
+Windows SDK alternative: MakeAppx pack /d payload /p BoxedwineDev.appx, then
+SignTool sign /fd SHA256 /f test-cert.pfx BoxedwineDev.appx (empty test password).
 Trust test-cert.cer only on your own development device as required.
 rungs.exe implements a CoreApplication view; console activation is unverified.
 smoke.exe remains a console build diagnostic. expandedResources is deprecated

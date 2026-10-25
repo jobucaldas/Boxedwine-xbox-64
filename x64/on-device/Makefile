@@ -2,12 +2,19 @@ CC_WIN ?= x86_64-w64-mingw32-gcc
 OUT := out
 CFLAGS := -O2 -std=c11 -Wall -Wextra -Werror
 
-.PHONY: all smoke-exe ladder package offline-smoke kit clean
+.PHONY: all smoke-exe ladder package offline-smoke kit clean linux-appx linux-appx-test
 all: smoke-exe
 
 # Loose layout fallback; no SDK packer or device activation is implied.
 package: smoke-exe $(OUT)/rungs.exe combo-binaries
 	./pack.sh
+
+# B60: signed .appx on Linux (makemsix + osslsigncode), then offline checks.
+linux-appx: package
+	linux/pack-linux.sh
+
+linux-appx-test: linux-appx
+	linux/test-linux-appx.sh
 
 kit: smoke-exe ladder combo-binaries
 	./pack.sh --kit
