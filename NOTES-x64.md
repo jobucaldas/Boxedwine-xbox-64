@@ -1458,3 +1458,37 @@ Implication for O2 (not done here): build the hosted server against a server_pro
 Fix for the O1 root cause: `wineserver/build.sh prepare` now regenerates `wine/server_protocol.h`, `request_handlers.h` and `request_trace.h` into the private server copy with Wine's own `tools/make_requests`, run on a scratch tree holding only upstream `server/protocol.def` and `server/*.c` (no existing header). That is what debian/rules does for the repack, so `SERVER_PROTOCOL_VERSION` comes out as 1, matching the installed Debian ntdll.so and wineserver64. The prepare step asserts the value is 1. `-I$(COPYDIR)` puts the regenerated header ahead of `$WINE_SRC/include`. Apart from the version line, the generated header is byte-identical to upstream's, and `request_handlers.h`/`request_trace.h` are byte-identical too, so the request layout is unchanged. The version check is not patched.
 
 Exact test (`make -C x64/uwp-host/harness wine-test-inproc` + `verify_wine.py`, run `out/wine-o4/run-jPpVvIIe`): control-hello, control-hello_k32, routed-hello and routed-hello_k32 all exit 0. Each logs `[inproc] Wine loader pid=... server thread ready; no separate server process`, there are 0 wineserver execve in the traces, and the verifier prints PASS. A 0.1 s `pgrep -x wineserver64` monitor never saw a server for this run's prefix. The global pgrep was not empty, though: other lanes' live prefixes (xbox-readiness, B21) had their own servers. Evidence: `x64/uwp-host/harness/out/b19-o2/` (ignored). Video: `/workspace/x64-run/videos/B19-O2.mp4`.
+
+## B19 O3
+
+The existing hosted server validates `.update-timestamp` against the installed
+`/usr/share/wine/wine.inf` mtime before starting; its directory patch creates
+signalled permanent `\KernelObjects\__wineboot_event` only after that validation.
+Missing and mismatched stamps both return EINVAL (22), leave ready_fd untouched,
+and tell the packager to rerun `make prebuilt-prefix`.
+
+Completed the pre-existing uncommitted `run-wine.sh --nofork` path: a staged
+absolute `--run DIR`, `--case routed-hello|routed-hello_k32` and
+`--inproc-server` select one guest using Bash builtins/parameter expansion and
+plain exec, before the orchestration path's command substitutions. The normal
+harness stages the prefix and traces each guest through this same path. Removed
+the inherited wineboot.exe disable override and clear inherited DLL overrides;
+Wineboot remains available and the named event prevents its attempted launch.
+No verifier changes. Prefix preparation and tracing remain outside the jail.
+
+O3 exact command passed (exit 0), evidence `out/wine-o4/run-wG5V4c1j`:
+all four guests exit 0; verifier PASS, no wineboot in guest logs or exec traces.
+Routed guests go THROUGH our launcher, Wine's own W^X loader/ntdll and uwph's
+selected six syscall families; controls use stock Wine plus our launcher and
+hosted server, without uwph counters. This is Linux evidence, not Xbox acceptance.
+The verifier's fixed separate-stock-server sentence is generic text, not a
+measurement of this run; all four logs contain the in-process ready marker.
+
+Additional real `uwpjail --nofork` staged-path checks pass for routed hello and
+hello_k32, with nofork=1 and exit 0. Logs: `out/b19-o3/nofork.txt` and guest
+subdirectories. They reuse the exact run's writable prefix. An initial attempt
+to make extra prefix copies exhausted disk space; only those new proof copies
+were removed, then the successful checks reused the existing prefix. Video
+`/workspace/x64-run/videos/B19-O3.mp4` (3.2 seconds) records the live jail checks
+and explicitly labels the exact verifier output as from the previous run.
+O4's full acceptance command/global process check is not claimed here.

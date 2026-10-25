@@ -3,6 +3,45 @@
 # the private W^X ntdll.so from prepare-wine-wx.sh (R4X O2), because the shim
 # refuses WRITE|EXEC and stock ntdll maps PE images RWX.
 set -euo pipefail
+# --nofork --run DIR --case MODE-PE [--inproc-server]: one guest, fork-free for
+# uwpjail --nofork (no clone without CLONE_THREAD). Builtins and parameter
+# expansion only; the final process is started by plain exec. The caller (the
+# orchestrator below, outside any jail) stages DIR and owns strace/timeout/exit.
+if [[ ${1:-} == --nofork ]]; then
+    shift
+    inproc=0 run= name=
+    while (( $# )); do
+        case $1 in
+            --inproc-server) inproc=1 ;;
+            --no-build) ;;
+            --run) run=${2:?--run DIR}; shift ;;
+            --case) name=${2:?--case MODE-PE}; shift ;;
+            *) echo "Unknown --nofork argument: $1" >&2; exit 2 ;;
+        esac
+        shift
+    done
+    [[ $0 == */* ]] && cd -- "${0%/*}"
+    root=${PWD%/x64/uwp-host/harness}
+    [[ $root != "$PWD" && $root/x64/uwp-host/harness -ef . ]] || { echo 'run-wine.sh: cannot locate repo root' >&2; exit 2; }
+    mode=${name%%-*} pe=${name#*-}
+    case $mode:$pe in control:hello|control:hello_k32|routed:hello|routed:hello_k32) ;;
+        *) echo "Unknown --case: $name" >&2; exit 2 ;; esac
+    [[ $run == /* && -d $run ]] || { echo '--run must be an absolute staged run dir' >&2; exit 2; }
+    unset LD_PRELOAD LD_DEBUG UWPH_INPROC_SERVER UWPH_INPROC_OWNER WINEDLLOVERRIDES
+    # Fallback hint only: Debian Wine tries its installed server before
+    # WINESERVER, so the in-process proof also inspects exec traces.
+    export WINESERVER=/bin/false WINEDEBUG=+loaddll,+process
+    export UWPH_REPORT_PID=1 UWPH_REPORT=$run/$name.report WINE_LOADER=/usr/lib/wine/wine64
+    if (( inproc )); then
+        export WINEPREFIX=$run/prefix UWPH_INPROC_SERVER=1 LD_PRELOAD=$PWD/out/libuwph_inproc_server.so
+    else
+        export WINEPREFIX=$PWD/out/wine-o4/prefix
+    fi
+    if [[ $mode == routed ]]; then
+        export WINE_LOADER=$PWD/out/wine-wx/lib/wine/wine64 LD_PRELOAD=$PWD/out/libuwph_wine_shim.so LD_DEBUG=bindings
+    fi
+    exec "$PWD/out/run_via_wine" "$root/x64/pe/tests/$pe.exe" > "$run/$name.log" 2>&1
+fi
 cd "$(dirname "$0")"
 inproc=0
 for arg in "$@"; do
@@ -46,7 +85,7 @@ if [[ ! -d $work/prefix ]]; then
         echo "SETUP ONLY: copied initialized stock-Wine fixture from $(realpath "$source_prefix")"
         echo 'No wineboot command invoked by preparation; source prefix is never written.'
         sha256sum "$source_prefix/"{system.reg,user.reg,userdef.reg,.update-timestamp}
-        echo 'Proof disables wineboot.exe; any attempted initialization still FAILS acceptance.'
+        echo 'Wineboot remains enabled; any attempted initialization FAILS acceptance.'
     } > "$work/fixture.txt"
     mv "$work/prefix.tmp" "$work/prefix"
 fi
@@ -71,10 +110,7 @@ cp out/wine/direct-syscalls.tsv "$run/direct-syscalls.tsv"
 cp surface.tsv "$run/surface.tsv"
 echo "O4 evidence: $run"
 cat "$run/fixture.txt"
-if (( inproc )); then
-    export UWPH_INPROC_SERVER=1
-    unset UWPH_INPROC_OWNER
-else
+if (( ! inproc )); then
 server=/usr/lib/wine/wineserver64
 # Explicit separate stock Linux server, no preload/report inherited. Its process
 # is not uwph/UWP evidence; keep it alive only for this owned prefix/test.
@@ -88,26 +124,17 @@ trap cleanup EXIT
 sleep .2
 kill -0 "$server_pid"
 fi
-# Fallback hint only: Debian Wine tries its installed server before WINESERVER.
-# The in-process proof must therefore also inspect exec traces for server spawns.
-export WINESERVER=/bin/false
-export WINEDEBUG=+loaddll,+process
-export WINEDLLOVERRIDES=wineboot.exe=d
+case_args=(); if (( inproc )); then case_args=(--inproc-server); fi
 status=0
 for mode in control routed; do
     for pe in hello_k32 hello; do
         name=$mode-$pe
         rm -f "$run/$name.report"
-        extra=(WINE_LOADER=/usr/lib/wine/wine64)
-        if (( inproc )); then extra+=(LD_PRELOAD="$PWD/out/libuwph_inproc_server.so"); fi
-        if [[ $mode == routed ]]; then
-            extra=(WINE_LOADER="$wx/lib/wine/wine64" LD_PRELOAD="$PWD/out/libuwph_wine_shim.so" LD_DEBUG=bindings)
-        fi
+        # Each guest goes through the fork-free --nofork path (also used inside
+        # uwpjail --nofork); it writes $run/$name.log itself.
         rc=0
         timeout --kill-after=2s 12s strace -f -e trace=execve -o "$run/$name.exec" \
-            env -u LD_PRELOAD UWPH_REPORT_PID=1 UWPH_REPORT="$run/$name.report" "${extra[@]}" \
-            "$PWD/out/run_via_wine" "$root/x64/pe/tests/$pe.exe" \
-            > "$run/$name.log" 2>&1 || rc=$?
+            "$PWD/run-wine.sh" --nofork "${case_args[@]}" --run "$run" --case "$name" || rc=$?
         echo "$rc" > "$run/$name.exit"
         echo "$name exit=$rc ($([[ $mode == routed ]] && echo 'selected calls THROUGH W^X ntdll -> shim -> uwph' || echo 'stock Wine / launcher-only control'))"
         # Show owned output/handoff without drowning the terminal in bindings.
