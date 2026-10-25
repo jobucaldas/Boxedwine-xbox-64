@@ -55,7 +55,7 @@ $(OUT)/win/unixside.o: tests/unixside.c $(HDRS)
 
 $(OUT)/win/smoke.exe: tests/smoke.c $(OUT)/win/unixside.o $(OUT)/win/libuwph.a
 	$(CC_WIN) $(CFLAGS_COMMON) $(WIN_DEFS) -Isrc -o $@ tests/smoke.c $(OUT)/win/unixside.o \
-	    $(OUT)/win/libuwph.a -lbcrypt -lsynchronization -lwindowsapp
+	    $(OUT)/win/libuwph.a -lbcrypt -lsynchronization -lwindowsapp -lws2_32
 
 # O2 traced set: each O1-priority symbol through its uwph entry + counter
 $(OUT)/linux/traced: tests/traced.c $(OUT)/linux/libuwph.a
@@ -63,14 +63,19 @@ $(OUT)/linux/traced: tests/traced.c $(OUT)/linux/libuwph.a
 
 $(OUT)/win/traced.exe: tests/traced.c $(OUT)/win/libuwph.a
 	$(CC_WIN) $(CFLAGS_COMMON) $(WIN_DEFS) -o $@ tests/traced.c \
-	    $(OUT)/win/libuwph.a -lbcrypt -lsynchronization -lwindowsapp
+	    $(OUT)/win/libuwph.a -lbcrypt -lsynchronization -lwindowsapp -lws2_32
 
 # Bounded real Wine 10.0 inventory / binding diagnostic only. Unsupported imports
 # remain visible and block full-coverage claims; this does not run a PE.
 check: $(OUT)/linux/libuwph.a $(OUT)/win/libuwph.a
 	$(MAKE) -C harness wine-surface-check
 
-test: all
+$(OUT)/linux/inet_loopback: tests/inet_loopback.c src/inet_loopback.h
+	@mkdir -p $(@D)
+	$(CC_LINUX) $(CFLAGS_COMMON) -Isrc -o $@ $<
+
+test: all $(OUT)/linux/inet_loopback
+	$(OUT)/linux/inet_loopback
 	$(OUT)/linux/abi_check
 	$(OUT)/linux/smoke "$(CURDIR)/tests"
 	@# smoke.exe's default fixture root is relative to the repo root; make -C runs
