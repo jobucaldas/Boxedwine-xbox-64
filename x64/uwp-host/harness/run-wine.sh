@@ -5,10 +5,19 @@
 set -euo pipefail
 # Packaging has already copied the prefix and evidence outside the nofork jail.
 # Rewrite this invocation into the existing single-guest path using builtins.
-if [[ $# == 2 && ( ${1:-}:${2:-} == --inproc-server:--no-build || ${1:-}:${2:-} == --no-build:--inproc-server ) ]]; then
+if [[ ( $# == 2 || $# == 4 ) && ( ${1:-}:${2:-} == --inproc-server:--no-build || ${1:-}:${2:-} == --no-build:--inproc-server ) ]]; then
+    staged_case=routed-hello
+    if (( $# == 4 )); then
+        [[ $3 == --case ]] || { echo 'Expected --case routed-hello|routed-hello_k32' >&2; exit 2; }
+        case $4 in
+            routed-hello|routed-hello_k32) staged_case=$4 ;;
+            *) echo "Unknown staged --case: $4" >&2; exit 2 ;;
+        esac
+    fi
     [[ $0 == */* ]] && cd -- "${0%/*}"
+    # Both guests use the prefix and evidence directory prepared outside jail.
     IFS= read -r staged_run < out/inproc-staged.txt
-    set -- --nofork --inproc-server --run "$staged_run" --case routed-hello
+    set -- --nofork --inproc-server --run "$staged_run" --case "$staged_case"
     # The single-guest path below must not cd relative to $0 a second time.
     exec "$PWD/run-wine.sh" "$@"
 fi
