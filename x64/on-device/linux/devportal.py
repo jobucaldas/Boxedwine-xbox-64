@@ -10,6 +10,7 @@ device-portal-api-core and .../xbox-apps/wdp-xboxsettings-api):
   DELETE /api/app/packagemanager/package?package=FULLNAME
   POST/DELETE /api/taskmanager/app?appid=B64&package=B64
   GET  /api/filesystem/apps/files|file?knownfolderid=LocalAppData&...
+  GET  /api/debug/dump/usermode/dumps|crashdump (observe-only)
   GET/PUT /ext/settings[/NAME]
   GET  /ext/screenshot?download=true
   POST /api/control/restart
@@ -204,6 +205,9 @@ def main(argv=None):
     p.add_argument('--path', default='\\LocalState'); p.add_argument('--out', default='devportal-pull')
     p = sub.add_parser('pull-logs', help='download every *.log/*.txt/*.json in LocalState into DIR')
     p.add_argument('out', nargs='?', default='devportal-pull'); p.add_argument('--path', default='\\LocalState')
+    sub.add_parser('dumps', help='list available app crash dumps (Xbox support unknown)')
+    p = sub.add_parser('pull-dump', help="download this package's crash dump (observe-only)")
+    p.add_argument('name'); p.add_argument('--out', default='devportal-dumps')
     sub.add_parser('settings', help='list /ext/settings (look for the UWP-as-Game default)')
     p = sub.add_parser('set-setting', help='PUT /ext/settings/NAME {"Value": VALUE}')
     p.add_argument('name'); p.add_argument('value')
@@ -270,6 +274,25 @@ def main(argv=None):
                     raise DPError(f'bad file name {n!r}')
                 size = dp.pull(full, a.path, n, outdir / n)
                 print(f'pulled {a.path}\\{n} -> {outdir / n} ({size} bytes)')
+        elif a.cmd in ('dumps', 'pull-dump'):
+            query = None
+            endpoint = '/api/debug/dump/usermode/dumps'
+            if a.cmd == 'pull-dump':
+                if not a.name or '/' in a.name or '\\' in a.name or a.name in ('.', '..'):
+                    raise DPError(f'bad file name {a.name!r}')
+                full = dp.find(ident)['PackageFullName']
+                endpoint = '/api/debug/dump/usermode/crashdump'
+                query = {'packageFullName': full, 'fileName': a.name}
+            status, data = dp.request('GET', endpoint, query, ok=(200, 404, 405))
+            if status in (404, 405):
+                print('not exposed on this device')
+            elif a.cmd == 'dumps':
+                print(json.dumps(json.loads(data or b'{}'), indent=2))
+            else:
+                dest = Path(a.out) / a.name
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                dest.write_bytes(data)
+                print(f'pulled dump -> {dest} ({len(data)} bytes)')
         elif a.cmd == 'settings':
             data = dp.json('GET', '/ext/settings')
             items = data.get('Settings', data if isinstance(data, list) else [])

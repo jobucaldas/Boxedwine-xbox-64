@@ -1,9 +1,9 @@
-probe_d3d12 R4G-O4 build Oct 24 2026 21:09:13
-log: Z:\workspace\wt\R4G\x64\graphics\evidence\R4G-O4\probe_d3d12.log
+probe_d3d12 R4G-O4 build Oct 25 2026 17:24:28
+log: Z:\workspace\wt\B17\x64\graphics\evidence\R4G-O4\probe_d3d12.log
 runtime: dxgi.dll=ok d3d12.dll=ok
 adapter[0]: "NVIDIA GeForce GTX 470" vendor=0x10de device=0x06cd subsys=0x00000000 rev=0 vram=16002MiB shared=8001MiB software=0
 device: created on adapter[0]
 device: max feature level 11_1 (0xb100)
 offscreen: 64x64 RGBA8 clear expect=0xffff00ff pixels=4096 mismatches=0
-present: PASS (3600 frames, 640x360 flip-discard HWND swapchain)
+present: PASS (120 frames, 640x360 flip-discard HWND swapchain)
 RESULT: PASS adapter="NVIDIA GeForce GTX 470" feature_level=11_1 offscreen=PASS present=PASS

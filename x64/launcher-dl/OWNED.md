@@ -18,16 +18,12 @@ size/hash TSV in `out/megabonk-native`. DLC depots fail closed pending explicit
 ownership selection. The existing per-file allocation bound remains 256 MiB; files are currently
 assembled in memory, so this still needs a streaming port for console memory.
 
-Only `x64/steam-min/seed-login.py` opens the original token JSON. Its added
-`--launcher-token-out` mode writes a private, exclusive-create, mode-600 staging
-file under its gitignored `out/`. The test moves that file under launcher `out/`
-for the sandbox, passes only its path to the PE, and removes it on exit/signals.
-The PE reads the staged platform/account/SteamID/refresh fields from that path;
-no token is passed on a command line or printed. The reader is the B50 O2 script,
-carried into this lane with its original login-cache behavior preserved. Do not
-run its cache-seeding mode for this test. The QR path holds its result only in
-memory and proceeds directly to the same owned login/download code. It does not
-persist a new login, so a future launch without staged input requires another QR.
+The plaintext token export option has been removed from
+`x64/steam-min/seed-login.py`. Lane orders prohibit copying real refresh tokens;
+mode 0600 and eventual deletion do not authorize a plaintext staging file.
+`test-owned.sh` is disabled and exits 1 before builds, credential reads, copies,
+or network activity. No owned-download acceptance proof is established.
+The QR implementation is unchanged and was not exercised in this review fix.
 
 QR requests explicitly set SteamClient (1) in both platform fields. The only
 authentication data displayed is the `https://s.team/q/...` challenge URL (suitable
@@ -37,15 +33,11 @@ polling respects the server interval and stops after three minutes without
 confirmation. The user must approve the challenge in their own Steam mobile app.
 No password flow is implemented.
 
-Run `bash x64/launcher-dl/test-owned.sh` for the exact owned-download proof.
-It builds, prepares a stock Wine prefix at packaging time, then runs THROUGH
-`uwp_run.sh(nofork,wx,noproc)` -> our launcher -> Wine's own W^X PE loader ->
-uwph with Wine's server hosted in process. It requires a fresh output directory;
-archive an earlier output before rerunning. `test-qr.sh` exercises QR session
-creation without opening the token file; it intentionally times out without
-mobile confirmation. Neither script claims Xbox execution. Desktop WinHTTP is
-still the transport; the documented WinRT host transport discussed in DECISION.md
-is not implemented here. No UWP networking/console PASS is established.
+`test-owned.sh` reports BLOCKED; do not use it as a runnable acceptance proof.
+`test-qr.sh` is outside this credential-free review fix. Neither script establishes
+Xbox execution. Desktop WinHTTP remains the transport; the documented WinRT
+host transport discussed in DECISION.md is not implemented here.
+No UWP networking/console PASS is established.
 
 Protocol references checked 2026-10-25:
 

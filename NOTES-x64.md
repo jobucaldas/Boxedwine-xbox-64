@@ -3044,6 +3044,107 @@ not run under this O1-only order. Video:
 No security constraints, verifier defaults, surface gates, or remotes were
 changed; no commit or push was performed.
 
+## B36 O1
+
+Fixed a loader-lock startup cycle exposed by Megabonk under the B35 opt-in:
+its guest DLL initialization requests the desktop while holding Wine's
+loader_section; the new desktop thread cannot finish Wine thread initialization
+until that lock is released. The first run logged RtlpWaitForCriticalSection
+and desktop readiness STATUS_TIMEOUT (0x102), reached unityplayer, and had no
+screenshots. Its initial private Xvfb also expired with its launching shell;
+the final proof uses a live foreground Xvfb session on free display :3.
+
+Added wine-desktop-bootstrap.patch to Wine's own ntdll loader_init. Only when
+WINE_INPROC_DESKTOP is exactly 1, after core system DLL attachment and before
+guest dependency attachment, it loads/attaches Wine's uwpdesktop.dll, releases
+loader_section while uwp_desktop_start waits for its in-process thread, then
+reacquires it before continuing guest initialization. Failure terminates the
+process without spawning a fallback. The non-opt-in path continues normally.
+prepare-wine-wx.sh applies/hashes this patch, and the harness Makefile tracks
+it as a loader build dependency. No owned game files or constraints changed.
+
+Exact O1 test passed (exit 0), with make -C x64/uwp-host test passing,
+172 passed / 0 failed in the traced host test and 7 passed / 0 failed in the
+in-process verifier tests. Final run:
+x64/uwp-host/harness/out/megabonk/run-f2tIK3Gw.
+Runtime exit=0; MEGABONK reached=gfx-init; NtCreateUserProcess attempts: 1
+(wine-internal: 0, guest: 1). The guest attempt remains UnityCrashHandler64.exe
+--attach 32 140737481412608, reported as-is. No failed-to-start-explorer or
+nodrv_CreateWindow messages. Enforcement: uwpjail seccomp wx=1 nofork=1
+(34 insns), invocation constraints=nofork,wx,noproc. Eight screenshots exist;
+shot-003.png has grayscale mean 0.383994 and stddev 0.160251, and shot-004.png
+visibly shows the Megabonk main menu. The first loading screenshot is mostly
+black; subsequent screenshots pass the required >0.02 mean/stddev thresholds.
+The stage remains gfx-init per the existing conservative harness classifier.
+Full exact output: /workspace/x64-run/lanes/B36/B36-O1.exact-output.log.
+
+Video: /workspace/x64-run/videos/B36-O1.mp4, 59 seconds, 8,417,700 bytes.
+Free Xvfb display :3, 1280x720x24; recording command:
+ffmpeg -y -loglevel error -f x11grab -video_size 1280x720 -framerate 15
+-i :3 -t 59 -c:v libx264 -preset ultrafast -pix_fmt yuv420p
+/workspace/x64-run/videos/B36-O1.mp4. No Encom.
+
+Proof is THROUGH uwp_run.sh(nofork,wx,noproc) -> our launcher -> Wine's own
+W^X loader -> shim -> uwph, with in-process server and desktop. Linux proof
+only; Xbox untested. Stock Wine was used solely for packaging the prebuilt
+prefix, not runtime acceptance. Generated surface-trace.tsv output was restored
+to its original tracked contents after evidence collection. No gates, verifier
+defaults, security constraints, remotes, or third-party repositories changed.
+No commit or push. O2 not implemented. One overlapping initial build failed
+on an object being written by the other build; it ended before the sequential
+passing exact test and does not represent a source failure.
+
+## B36 O2
+
+Implemented opt-in MEGABONK_NO_CRASH_HANDLER=1 in run-megabonk.sh,
+documented in its header. Each per-run staging directory symlinks all six
+remaining top-level install entries (including directories), omitting only
+UnityCrashHandler64.exe. The original install remains mounted read-only so
+symlink targets resolve inside noproc; env -C enters the staging directory
+before our launcher. The owned crash handler remains present and no owned
+install files were changed. An initial run used staging as the jail's install
+mount and failed to resolve the symlink targets (c0000135); the final run fixes
+that without modifying the wrapper or any security constraint.
+
+BLOCKED: Unity still attempts its crash handler with the executable absent.
+Exact remaining attempt from x64/uwp-host/harness/out/megabonk/run-eGgeaqmJ/wine.log:56:
+
+```text
+0024:trace:process:CreateProcessInternalW app (null) cmdline L"\"Z:\\workspace\\wt\\B36\\x64\\uwp-host\\harness\\out\\megabonk\\run-eGgeaqmJ\\game\\UnityCrashHandler64.exe\" --attach 32 140737480364032"
+```
+
+The exact O2 shell test exits 0, but its NT-only metric does not capture this
+earlier CreateProcessInternalW call. Reported honestly: CreateProcess attempts: 1;
+NtCreateUserProcess attempts: 0 (wine-internal: 0, guest: 0). Runtime exit=0,
+MEGABONK reached=gfx-init, wineboot spawn failures: 0, no failed-to-start
+explorer/wineboot. Enforcement: seccomp wx=1 nofork=1 (34 insns), with
+constraints=nofork,wx,noproc. Required make -C x64/uwp-host test passed,
+including 172 passed / 0 failed in the traced host test and 7 passed / 0 failed
+in the in-process verifier tests. Full exact output:
+/workspace/x64-run/lanes/B36/B36-O2.exact-output.log.
+
+Main menu visually confirmed in x64/uwp-host/harness/out/megabonk/run-eGgeaqmJ/shot-003.png:
+grayscale mean 0.251721, standard deviation 0.112428 (>0.02 each).
+No menu input was needed; existing outside-jail xdotool Alt+F4 shut down the
+game. O1 window/menu proof remains intact in run-f2tIK3Gw and B36-O1.mp4.
+Staging links checked individually against the original install.
+
+Video: /workspace/x64-run/videos/B36-O2.mp4, 58 seconds, private free Xvfb :5,
+1280x720x24, ffmpeg x11grab at 15fps with libx264 ultrafast/yuv420p. Recording
+command: ffmpeg -y -loglevel error -f x11grab -video_size 1280x720 -framerate 15
+-i :5 -t 85 -c:v libx264 -preset ultrafast -pix_fmt yuv420p
+/tmp/b36-o2-full.mp4. Final video joins its first 25 seconds (menu), last 25
+seconds (shutdown, exact test and metrics), and an 8-second Xvfb capture of
+the explicit BLOCKED status and exact attempt; command line is on screen.
+No Encom. Generated surface-trace.tsv restored after collection.
+
+Linux proof through the Xbox-bound stack, Xbox untested. THROUGH-uwph:
+uwp_run.sh(nofork,wx,noproc) -> our launcher -> Wine's own W^X loader -> shim
+-> uwph, with in-process server and desktop. Stock Wine was used only for
+build-time prebuilt-prefix preparation, not runtime acceptance. No gates,
+verifier defaults, constraints, third-party repositories, or remotes changed.
+No commit or push. Despite the passing exact shell predicate and zero NT
+attempts, O2 remains BLOCKED under its explicit crash-handler-attempt rule.
 ## B70 O1
 
 2026-10-25, stock Wine 10.0 on the Linux box only (not THROUGH-uwph, not Xbox). Added our mingw-x86_64 WinHTTP directory/WSS diagnostic and a fresh-prefix runner. The runner also reruns the earlier readiness net_probe.exe in the SAME prefix when present; it deletes only its own temporary prefix on exit. No credentials, Valve binary changes, certificate exceptions, or O2 environment fixes.
@@ -3097,6 +3198,37 @@ nor stock Wine was executed. No runtime/console compatibility claim. Evidence:
 `/workspace/x64-run/lanes/B80/o1.txt`, `network-failure.txt`; seven-second Xvfb
 terminal recording `/workspace/x64-run/videos/B80-O1.mp4`. No prefix created.
 
+## B77 O1
+
+B70 marker `fix-prefix-tls` was present. No code changes. Route: stock Wine; this is neither THROUGH-uwph nor console proof. Logged on: **no**, `logon=0 after 360s`. Exact gate failed (`run_rc=1`, `exact_gate_rc=1`); the gate stopped at its first logon check. Independently checked: webhelper_count=0 (363 samples, one spawn attempt of the absent helper), CRL total present, and the prescribed token scan passed with no matches. Initial disk free: 14 GB; prefix reached 1.7 GB and was deleted after evidence collection.
+
+`connection_log.txt` has no GetCMListForConnect (therefore no OK), no Connect(), no RecvMsgClientLogOnResponse, and no [Logged On]. No EResult or CM transport was reported: **no CM connect was attempted**. Connectivity test repeatedly reports `TimedOut` for 198.18.0.1:80; port 80 is blackholed on this box, so that result is a box artefact. IPv6 HTTP timed out and IPv6 UDP reported no addresses resolved. This run does not establish why the client never initiated CM logon.
+
+`steamui_html.txt` still says `Timed out waiting for webhelper init` (22:32:36); logon did not happen anyway. `prefix-tls-fix.log`: `crl_seed_total=23 ok=23` (23 seeds with cache_hit=1); two intermediate CRL URLs reported HTTPS fetch failure. SteamAPI_Init/BIsSubscribedApp probe and game were skipped because logon failed; they are informational and outside this gate.
+
+Last 60 seconds of connection_log (22:37:47–22:38:47, using its final timestamp):
+
+```text
+[2026-10-25 22:37:59] Connectivity test: Starting test, fetching 'http://steamconnecttest.com/204'
+[2026-10-25 22:38:14] Connectivity test (198.18.0.1:80 (198.18.0.1:80)): HTTP fetch failed
+[2026-10-25 22:38:14] Connectivity test: result=TimedOut (since 312.3s ago), prev=Unknown, in progress=0
+[2026-10-25 22:38:33] Connectivity test: Starting test, fetching 'http://steamconnecttest.com/204'
+[2026-10-25 22:38:47] [Logged Off, 0, 0] [U:1:0] ResetVoiceRecording() (was recording: 0) (last get voice time: 1792964327 seconds ago)
+[2026-10-25 22:38:47] [Logged Off, 0, 0] [U:1:0] Log session ended
+```
+
+Evidence: `/workspace/x64-run/lanes/B77/o1`. Video: `/workspace/x64-run/videos/B77-O1.mp4`, free Xvfb :170 + ffmpeg, 8.000 seconds. Test output ended:
+
+```text
+[run-minimal 18:38:38] logon=0 after 360s
+[run-minimal 18:38:38] BLOCKED: Valve client did not reach logged-on state; no alternate credential path attempted
+[run-minimal 18:38:52] webhelper samples=363 running_max=0 spawn_attempts=1 count=0
+run_rc=1
+exact_gate_rc=1
+token_scan=PASS
+```
+
+The script also emitted missing-file grep diagnostics for probe-wine.log and game-wine.log, since both stages were skipped. No follow-up orders started; no commit or remote operations performed.
 ## B47 (B13 retry)
 
 O1 BLOCKED: preflight `df -BG /` reports only 14G available (128G total,
@@ -3158,3 +3290,20 @@ No connection_log entries occurred in the final 60 seconds of the run. The last 
 [2026-10-25 22:38:56] Connectivity test: Starting test, fetching 'http://test.steampowered.com/204'
 [2026-10-25 22:38:57] [Logged Off, 0, 0] [U:1:0] CCMInterface::SetSteamID( [U:1:0] )
 ```
+## B81
+
+O2 (2026-10-25): BLOCKED by the required disk preflight. `df -h /`
+reports 6.3G available (128G total, 96% used), below the >=10G free rule.
+Neither Ghidra analyzeHeadless nor rizin/radare2 is installed/on PATH;
+searches of /opt, /workspace, /usr/local and /home/box found no tool executable.
+No tool download was attempted under the disk constraint, and no unrelated
+files were deleted. No DLL execution or static disassembly was performed.
+Intended method: verify pinned SHA256, resolve the four interface RTTI/COL
+and version strings, enumerate vtables, then compare slots and method string
+xrefs to OSW @3793a5db (1745623383). This method is NOT implemented or validated.
+Slot counts vs baseline: unavailable; confidence histogram: unavailable.
+No generated map/header, Ghidra projects, prefixes, or video were created.
+Exact O2 test exited 127 at its first command:
+`bash: x64/steam-min/ifacemap/derive.sh: No such file or directory`.
+Evidence category: build-only/static-analysis preflight; no THROUGH-uwph or
+stock Wine run, and no console result. O2 remains incomplete.
