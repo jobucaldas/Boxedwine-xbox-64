@@ -19,6 +19,7 @@
 # include <sys/socket.h>
 # include <unistd.h>
 # include <sys/wait.h>
+# include <pthread.h>
 #endif
 
 static int fails, passes;
@@ -459,6 +460,72 @@ static void test_b07(void)
 #endif
 }
 
+static int b08_format(char *b, size_t n, const char *f, ...)
+{
+    va_list ap; int r; va_start(ap,f); r=uwph_vsnprintf(b,n,f,ap); va_end(ap); return r;
+}
+static void test_b08(void)
+{
+    char b[32], name[16]={0};
+    CHECK(b08_format(b,4,"%s:%d","abc",12)==6 && !strcmp(b,"abc"), "B08 vsnprintf truncation and length");
+    CHECK(b08_format(NULL,0,"%d",123)==3, "B08 vsnprintf sizing");
+    CHECK(uwph_setenv("UWPH_B08_ENV","yes",1)==0 && uwph_secure_getenv("UWPH_B08_ENV") &&
+          !strcmp(uwph_secure_getenv("UWPH_B08_ENV"),"yes"), "B08 secure_getenv ordinary environment");
+    CHECK(uwph_secure_getenv("UWPH_B08_ABSENT")==NULL, "B08 secure_getenv absent");
+    CHECK(uwph_prctl(UWPH_PR_GET_NAME,(uint64_t)(uintptr_t)name,0,0,0)==0, "B08 prctl get thread name");
+    CHECK(uwph_prctl(UWPH_PR_SET_NAME,(uint64_t)(uintptr_t)"uwph-b08",0,0,0)==0 &&
+          uwph_prctl(UWPH_PR_GET_NAME,(uint64_t)(uintptr_t)b,0,0,0)==0 && !strcmp(b,"uwph-b08"), "B08 prctl name roundtrip");
+    uwph_prctl(UWPH_PR_SET_NAME,(uint64_t)(uintptr_t)name,0,0,0);
+#ifndef UWPH_BACKEND_LINUX_PASSTHROUGH
+    CHECK(uwph_prctl(-1,0,0,0,0)==-1 && uwph_errno==UWPH_ENOSYS, "B08 prctl unknown UWP operation ENOSYS");
+#endif
+    uwph_pthread_key_t k;
+    CHECK(uwph_pthread_key_create(&k,NULL)==0 && uwph_pthread_setspecific(k,b)==0 && uwph_pthread_getspecific(k)==b,
+          "B08 TLS key create/set/get");
+    CHECK(uwph_pthread_setspecific(k,NULL)==0 && uwph_pthread_getspecific(k)==NULL, "B08 TLS clear");
+    uwph_pthread_mutexattr_t a;
+    uwph_pthread_mutex_t m;
+    CHECK(uwph_pthread_mutexattr_init(&a)==0 && uwph_pthread_mutexattr_settype(&a,UWPH_PTHREAD_MUTEX_RECURSIVE)==0 &&
+          uwph_pthread_mutex_init(&m,&a)==0 && uwph_pthread_mutexattr_destroy(&a)==0, "B08 mutex attributes lifecycle");
+    CHECK(uwph_pthread_mutex_lock(&m)==0 && uwph_pthread_mutex_lock(&m)==0 &&
+          uwph_pthread_mutex_unlock(&m)==0 && uwph_pthread_mutex_unlock(&m)==0, "B08 recursive mutex locks twice");
+    struct uwph_sigaction act={0}, old, got;
+    act.u.handler=(uwph_sighandler_t)UWPH_SIG_IGN;
+    CHECK(uwph_sigaction(10,&act,&old)==0 && uwph_sigaction(10,NULL,&got)==0 &&
+          got.u.handler==act.u.handler && uwph_sigaction(10,&old,NULL)==0, "B08 signal action set/query/restore");
+    CHECK(uwph_sigaction(0,NULL,NULL)==-1 && uwph_errno==UWPH_EINVAL, "B08 sigaction invalid signal");
+    uwph_stack_t st;
+    CHECK(uwph_sigaltstack(NULL,&st)==0, "B08 sigaltstack query");
+#ifndef UWPH_BACKEND_LINUX_PASSTHROUGH
+    uwph_stack_t requested={0}; requested.ss_sp=b; requested.ss_size=sizeof(b);
+    CHECK(uwph_sigaltstack(&requested,NULL)==-1 && uwph_errno==UWPH_ENOSYS, "B08 alternate stack execution unsupported on UWP");
+#endif
+    int fd=uwph_socket(UWPH_AF_UNIX,UWPH_SOCK_STREAM,0), sv[2];
+    CHECK(fd>=0, "B08 socket creates private endpoint"); if(fd>=0) uwph_close(fd);
+    CHECK(uwph_socketpair(UWPH_AF_UNIX,UWPH_SOCK_STREAM,0,sv)==0, "B08 socketpair creates endpoints");
+    CHECK(uwph_send(sv[0],"b08",3,0)==3 && uwph_recv(sv[1],b,3,0)==3 && !memcmp(b,"b08",3), "B08 socketpair payload");
+    uwph_close(sv[0]); uwph_close(sv[1]);
+    CHECK(uwph_socket(-1,UWPH_SOCK_STREAM,0)==-1, "B08 socket invalid domain");
+    CHECK(uwph_syscall(UWPH_NR_gettid)==uwph_gettid(), "B08 syscall gettid no arguments");
+    CHECK(uwph_syscall(-1)==-1 && uwph_errno==UWPH_ENOSYS, "B08 syscall unknown number ENOSYS");
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    /* These are the exact native-object bridges used by the Wine shim. */
+    pthread_mutex_t native_m;
+    pthread_mutexattr_t native_a;
+    extern int uwph_linux_native_mutex_init(void *,const void *);
+    extern int uwph_linux_native_mutexattr_init(void *);
+    extern int uwph_linux_native_mutexattr_destroy(void *);
+    extern int uwph_linux_native_mutexattr_settype(void *,int);
+    CHECK(uwph_linux_native_mutexattr_init(&native_a)==0 &&
+          uwph_linux_native_mutexattr_settype(&native_a,PTHREAD_MUTEX_RECURSIVE)==0 &&
+          uwph_linux_native_mutex_init(&native_m,&native_a)==0 &&
+          uwph_linux_native_mutexattr_destroy(&native_a)==0 &&
+          pthread_mutex_lock(&native_m)==0 && pthread_mutex_lock(&native_m)==0 &&
+          pthread_mutex_unlock(&native_m)==0 && pthread_mutex_unlock(&native_m)==0 &&
+          pthread_mutex_destroy(&native_m)==0, "B08 native mutex ABI survives companion libc calls");
+#endif
+}
+
 int main(int argc, char **argv)
 {
     uwph_snprintf(root, sizeof(root), "%s", argc > 1 ? argv[1] : "x64/uwp-host/tests");
@@ -474,6 +541,7 @@ int main(int argc, char **argv)
 
     test_b06();
     test_b07();
+    test_b08();
     test_format();
     test_threads();
     test_process();

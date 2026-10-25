@@ -2487,6 +2487,78 @@ path stat/lstat/access answer directories from mapped-path metadata
 keep the handle-based fstat, and access W_OK still honours read-only mounts.
 Tests now cover registry/main-handle hit and miss on every backend plus
 access/stat/lstat of a newly created directory.
+
+## B08
+
+O1 implements every remaining numbered import in `harness/surface-trace.tsv`:
+priorities 51–64. **There are 14, not 15**: the numbered import trace ends at
+64 after B07's priority 50. No untraced fifteenth symbol or inline-syscall
+site was substituted. The literal 15-import requirement needs another traced
+entry or an explicit scope adjustment; the remaining 14 and the >=10 THROUGH
+increase are implemented and verified.
+
+| Import | Win32/UWP backend and Linux boundary |
+| --- | --- |
+| prctl | Virtual per-thread SET_NAME/GET_NAME; other operations counted ENOSYS. Linux native prctl. |
+| pthread_key_create | Existing per-thread key/destructor registry; Linux native key ABI. |
+| pthread_mutex_init | Existing private mutex; Linux shim preserves native mutex objects. |
+| pthread_mutexattr_destroy | Private attribute lifecycle; Linux native attr ABI. |
+| pthread_mutexattr_init | Private normal-mutex default; Linux native attr ABI. |
+| pthread_mutexattr_settype | Existing private recursive/normal type; Linux native attr ABI. |
+| pthread_setspecific | Private thread-local values; Linux native key ABI. |
+| secure_getenv | App-local environment (no privileged-execution mode on UWP); Linux native secure_getenv, preserving libc secure-mode filtering. |
+| sigaction | Existing cooperative in-process action table; Linux native sigaction. No new UWP synchronous exception hook or alternate-stack delivery. |
+| sigaltstack | Query/disable supported; enabling an alternate execution stack returns counted ENOSYS. Linux native registration/query. |
+| socket | Existing in-process Unix stream endpoints; INET remains counted ENOSYS on UWP. Linux Wine-fd mode uses native socket. |
+| socketpair | Existing private Unix stream pair; Linux Wine-fd mode uses native socketpair. |
+| syscall | Existing typed UWP dispatch for gettid/futex/tgkill/tkill/arch_prctl/utimensat; unknown numbers counted ENOSYS. Linux public typed dispatch calls native libc for known arities; Linux-only shim adapter preserves the native register-slot ABI. No raw guest instruction interception. |
+| vsnprintf | Host CRT formatting with a separate counter from snprintf; Linux resolves past the shim to prevent recursive interposition. |
+
+Each has a counter and shim export; the binding inventory now requires all
+71 exports and all 64 trace counters. Public API signatures are unchanged.
+Native pthread mutex/attribute adapters keep Wine objects compatible with
+uninterposed libc companion calls. Linux x86-64 tail thunks preserve opaque
+TLS pointers and native syscall/prctl register arguments without speculative
+C va_arg extraction. Tests cover all 14 symbols on stub, Win32/UWP and Linux,
+including recursive mutex lifecycle, native mutex ABI companion calls, TLS
+set/clear, signal query/set/restore, alternate-stack ENOSYS, Unix socketpair
+payload, invalid domains/signals/syscalls, thread-name roundtrip, environment
+lookup and formatter truncation/sizing.
+
+Exact test `make -C x64/uwp-host test && make -C x64/uwp-host/harness windows-smoke-test`
+passes (exit 0): stub smoke 55/0, Win32 smoke 566/0, traced stub 174/0,
+Win32/UWP 189/0, Linux passthrough 206/0 (64 symbols each); separate desktop
+Windows smoke 569/0. Full output:
+`/workspace/x64-run/lanes/B08/B08-O1.exact.log`.
+
+Live evidence: `harness/out/wine-o4/run-b08-HKv5v2xG/`. All four control/routed
+PE cases exit 0. Both routed PEs go through this checkout's launcher -> Wine's
+own private W^X loader -> real ntdll bindings -> shim -> uwph. The new
+`harness/verify_b08.py` checks all 64 real ntdll bindings, successful PE output,
+clean stock controls, single-process counters and both the >=10 new-entry
+hits and >=10 absolute report increase. Both reports rise from B07's accepted
+49 to 60 (+11); 13 of the 14 new symbols have live hits. Current old-entry
+hits are 47 (startup-dependent dup/fork are unhit); execv and socketpair are
+also bound-unhit. Socketpair has direct cross-backend regression coverage;
+no PE execution hit is claimed. Surface output:
+`/workspace/x64-run/lanes/B08/B08-O1.surface.log`.
+
+The unchanged broader `verify_wine.py` still fails its all-symbols-hit gate;
+no existing gate or verifier was relaxed. The first two cold stock-control
+attempts printed hello but hit the existing 12-second strace process-tree
+cap. The final evidence explicitly starts desktop services with stock Wine
+as SETUP ONLY before measuring all four cases; the setup has no uwph report
+and contributes no surface counts. This avoids counting fixture startup as
+compatibility evidence. Full final collection output:
+`/workspace/x64-run/lanes/B08/B08-O1.proof3.log`.
+
+Classification: Linux off-device THROUGH-uwph PE evidence; separate stock
+Wine launcher controls and stock Linux wineserver infrastructure. Windows
+checks run uwph Windows code under stock Wine; APP-header UWP archive is
+build/test evidence, not Xbox-device execution. Video uses a free Xvfb display
+and ffmpeg: `/workspace/x64-run/videos/B08-O1.mp4` (12-second labelled replay
+of the saved PE evidence and exact-test summaries). No remotes,
+commits, credentials, game/client modifications or out-of-scope mechanisms.
 ## B28 O2
 
 Status: BLOCKED for an in-process desktop prototype; source investigation and

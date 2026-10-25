@@ -308,6 +308,7 @@ static struct endpoint *get_unix(int fd, int *flags)
 
 UWPH_API int uwph_socket(int domain, int type, int proto)
 {
+    uwph_trace_hit(UWPH_TRACE_SOCKET);
 #ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
     if (uwph_linux_native_fds()) {
         UWPH_NATIVE(int, "socket", (int, int, int));
@@ -331,6 +332,7 @@ UWPH_API int uwph_socket(int domain, int type, int proto)
 
 UWPH_API int uwph_socketpair(int domain, int type, int proto, int sv[2])
 {
+    uwph_trace_hit(UWPH_TRACE_SOCKETPAIR);
 #ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
     if (uwph_linux_native_fds()) {
         UWPH_NATIVE(int, "socketpair", (int, int, int, int *));

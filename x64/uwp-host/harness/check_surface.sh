@@ -20,7 +20,7 @@ export_names={line.split()[-1].split('@')[0] for line in exports.splitlines()}
 # O2 traced set plus proc provider/registry wrappers: exact export inventory.
 script=pathlib.Path('shim.map').read_text()
 selected={x.strip() for x in script.split('global:')[1].split('local:')[0].split(';') if x.strip()}-{'uwph_shim_report'}
-assert {'open','read','close','mmap','mprotect','munmap','_exit'}<=selected and len(selected)==60, sorted(selected)
+assert {'open','read','close','mmap','mprotect','munmap','_exit'}<=selected and len(selected)==74, sorted(selected)
 proc_exports={'readdir','closedir','pthread_create'}
 assert proc_exports <= selected
 assert all(policy[s]['classification']=='explicit host fallback' for s in proc_exports)
