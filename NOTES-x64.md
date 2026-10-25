@@ -763,3 +763,13 @@ and hash: `x64/graphics/evidence/R4G-O4/exact-test-resume.log`. This is
 build-only; earlier smoke/video and their hashes remain historical evidence,
 not a runtime test of this fresh rebuild. Recreated lane result/commitmsg;
 no commit or remote operations.
+
+O4 reviewer fixes (2026-10-25): initialize each EnumAdapters1 output and
+check its HRESULT before dereferencing; unexpected enumeration failures log
+the HRESULT and exit via RESULT: FAIL. Reject oversized PROBE_D3D12_LOG
+values and failed/truncated explicit-path formatting before adding candidates.
+Exact MinGW command rerun with -Wall -Wextra -Werror: exit 0, PE32+ x86-64
+output exists (82432 bytes). Fresh evidence and SHA256:
+`x64/graphics/evidence/R4G-O4/exact-test-review-fix.log`. Classification:
+build-only; retained THROUGH-uwph smoke/video are historical and do not
+validate this revised binary. Xbox execution remains unverified.

@@ -53,9 +53,13 @@ static void open_log(const wchar_t *explicit_path, wchar_t *used, size_t used_le
     wchar_t cand[5][MAX_PATH];
     int n = 0;
     used[0] = 0;
-    if (explicit_path)
-        swprintf(cand[n++], MAX_PATH, L"%ls", explicit_path);
-    if (GetEnvironmentVariableW(L"PROBE_D3D12_LOG", cand[n], MAX_PATH))
+    if (explicit_path) {
+        int written = swprintf(cand[n], MAX_PATH, L"%ls", explicit_path);
+        if (written > 0 && written < MAX_PATH)
+            n++;
+    }
+    DWORD env_len = GetEnvironmentVariableW(L"PROBE_D3D12_LOG", cand[n], MAX_PATH);
+    if (env_len > 0 && env_len < MAX_PATH)
         n++;
     DWORD len = GetModuleFileNameW(NULL, cand[n], MAX_PATH);
     if (len && len < MAX_PATH) {
@@ -408,8 +412,17 @@ int wmain(int argc, wchar_t **argv)
 
     if (create_factory && SUCCEEDED(create_factory(&IID_IDXGIFactory1, (void **)&factory))) {
         IDXGIFactory1_QueryInterface(factory, &IID_IDXGIFactory2, (void **)&f2);
-        IDXGIAdapter1 *a;
-        for (UINT i = 0; IDXGIFactory1_EnumAdapters1(factory, i, &a) != DXGI_ERROR_NOT_FOUND; i++) {
+        for (UINT i = 0; ; i++) {
+            IDXGIAdapter1 *a = NULL;
+            hr = IDXGIFactory1_EnumAdapters1(factory, i, &a);
+            if (hr == DXGI_ERROR_NOT_FOUND)
+                break;
+            if (FAILED(hr) || !a) {
+                logf_("dxgi: EnumAdapters1(%u) failed hr=0x%08lx null_adapter=%d\n",
+                      i, (unsigned long)hr, !a);
+                rc = g.dev ? 1 : 2;
+                goto done;
+            }
             DXGI_ADAPTER_DESC1 d;
             if (SUCCEEDED(IDXGIAdapter1_GetDesc1(a, &d))) {
                 log_adapter(i, &d);
