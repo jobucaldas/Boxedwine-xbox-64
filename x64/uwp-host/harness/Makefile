@@ -47,11 +47,13 @@ wine-surface-check: out/libuwph_shim.so out/run_hello
 
 # Separate backend object: native fd interoperability is exclusive to Wine proof.
 $(OUT)/wine_linux_backend.o: linux_backend.c counters.h $(HEADERS)
+	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) -DUWPH_HARNESS_NATIVE_FDS -c $< -o $@
 $(OUT)/libuwph_wine_shim.so: inproc_server.c ../wineserver/server_thread.c ../wineserver/out/libwineserver.a shim.c counters.c counters.h $(OUT)/wine_linux_backend.o $(OUT)/libuwph.a $(OUT)/shim.map
 	$(CC) $(CFLAGS) -DUWPH_HARNESS_NATIVE_FDS -shared inproc_server.c ../wineserver/server_thread.c ../wineserver/out/libwineserver.a shim.c counters.c $(OUT)/wine_linux_backend.o $(OUT)/libuwph.a -ldl -Wl,--version-script=$(OUT)/shim.map -Wl,-z,defs -o $@
-$(OUT)/run_via_wine: ../../pe/launcher/run_via_wine.c
-	$(CC) -O2 -Wall -Wextra -Werror $< -o $@
+# Bundles the private W^X loader: used instead of stock wine64 under the shim.
+$(OUT)/run_via_wine: ../../pe/launcher/run_via_wine.c $(OUT)/wine-wx/.stamp
+	$(CC) -O2 -Wall -Wextra -Werror -DRUN_VIA_WINE_WX_LOADER='"$(abspath $(OUT))/wine-wx/lib/wine/wine64"' $< -o $@
 wine-test: $(OUT)/libuwph_wine_shim.so $(OUT)/run_via_wine $(OUT)/wine-wx/.stamp
 	./run-wine.sh
 .PHONY: wine-test
