@@ -202,10 +202,13 @@ typedef struct ICoreApplication_ {
 } ICoreApplication_;
 
 /* Windows.UI.Core.ICoreWindow {79b9d5f2-...}: Dispatcher is slot 3, Activate slot 12. */
+typedef struct { float X, Y, Width, Height; } CoreRect_;
 typedef struct ICoreWindow_ {
     struct {
         IInspectableVtblX base;
-        void *get_AutomationHostProvider, *get_Bounds, *get_CustomProperties;
+        void *get_AutomationHostProvider;
+        HRESULT (STDMETHODCALLTYPE *get_Bounds)(void *, CoreRect_ *);
+        void *get_CustomProperties;
         HRESULT (STDMETHODCALLTYPE *get_Dispatcher)(void *, void **);
         void *get_FlowDirection, *put_FlowDirection, *get_IsInputEnabled, *put_IsInputEnabled;
         void *get_PointerCursor, *put_PointerCursor, *get_PointerPosition, *get_Visible;
@@ -377,6 +380,100 @@ static void rung_n2(void)
     ID3D12Device_Release(dev);
 }
 
+typedef struct {
+    UINT32 vendorId; /* GAMING_DEVICE_VENDOR_ID */
+    UINT32 deviceId; /* GAMING_DEVICE_DEVICE_ID */
+} gaming_model_t;
+
+static const char *model_name(UINT32 id)
+{
+    switch (id) {
+    case 0: return "not-xbox";
+    case 0x768BAE26: return "XboxOne";
+    case 0x2A7361D9: return "XboxOneS";
+    case 0x5AD617C7: return "XboxOneX";
+    case 0x10F7CDE3: return "XboxOneXDevkit";
+    /* Series values as in the Windows SDK header (also used by R4N probe_native). */
+    case 0x1D27FABB: return "XboxSeriesS";
+    case 0x2F7A3DFF: return "XboxSeriesX";
+    case 0xDE8A5661: return "XboxSeriesXDevkit";
+    default: return "unknown";
+    }
+}
+
+/* Minimal SDK ABI prefixes from Microsoft's windows.graphics.display.core.h.
+ * https://github.com/microsoft/win32metadata/blob/main/generation/WinSDK/RecompiledIdlHeaders/winrt/windows.graphics.display.core.h */
+typedef struct HdmiMode_ {
+    struct {
+        IInspectableVtblX base;
+        HRESULT (STDMETHODCALLTYPE *get_Width)(void *, UINT32 *);
+        HRESULT (STDMETHODCALLTYPE *get_Height)(void *, UINT32 *);
+    } *lpVtbl;
+} HdmiMode_;
+typedef struct HdmiInfo_ {
+    struct {
+        IInspectableVtblX base;
+        void *GetSupportedDisplayModes;
+        HRESULT (STDMETHODCALLTYPE *GetCurrentDisplayMode)(void *, HdmiMode_ **);
+    } *lpVtbl;
+} HdmiInfo_;
+typedef struct HdmiStatics_ {
+    struct {
+        IInspectableVtblX base;
+        HRESULT (STDMETHODCALLTYPE *GetForCurrentView)(void *, HdmiInfo_ **);
+    } *lpVtbl;
+} HdmiStatics_;
+
+static HRESULT swapchain_size(IUnknown *window, UINT *width, UINT *height)
+{
+    static const GUID iid = {0x6ce6b260,0xf42a,0x4a15,{0x91,0x4c,0x7b,0x8e,0x2a,0x5a,0x65,0xdf}};
+    const WCHAR name[] = L"Windows.Graphics.Display.Core.HdmiDisplayInformation";
+    HSTRING cls = NULL;
+    HdmiStatics_ *stat = NULL;
+    HdmiInfo_ *info = NULL;
+    HdmiMode_ *mode = NULL;
+    UINT32 w = 0, h = 0;
+    HRESULT hr = WindowsCreateString(name, ARRAYSIZE(name) - 1, &cls);
+    if (SUCCEEDED(hr)) hr = RoGetActivationFactory(cls, &iid, (void **)&stat);
+    if (SUCCEEDED(hr)) hr = stat->lpVtbl->GetForCurrentView(stat, &info);
+    if (SUCCEEDED(hr) && !info) hr = E_FAIL;
+    if (SUCCEEDED(hr)) hr = info->lpVtbl->GetCurrentDisplayMode(info, &mode);
+    if (SUCCEEDED(hr) && !mode) hr = E_FAIL;
+    if (SUCCEEDED(hr)) hr = mode->lpVtbl->get_Width(mode, &w);
+    if (SUCCEEDED(hr)) hr = mode->lpVtbl->get_Height(mode, &h);
+    if (mode) IUnknown_Release((IUnknown *)mode);
+    if (info) IUnknown_Release((IUnknown *)info);
+    if (stat) IUnknown_Release((IUnknown *)stat);
+    WindowsDeleteString(cls);
+    const char *source = "HdmiDisplayInformation";
+    if (FAILED(hr) || !w || !h) {
+        CoreRect_ bounds = {0};
+        note("n3 HDMI size unavailable hr=0x%08lx raw=%ux%u; using CoreWindow bounds", hx(hr), w, h);
+        hr = ((ICoreWindow_ *)window)->lpVtbl->get_Bounds(window, &bounds);
+        if (FAILED(hr)) return hr;
+        if (!isfinite(bounds.Width) || !isfinite(bounds.Height) ||
+            bounds.Width < 1 || bounds.Height < 1 || bounds.Width > 65535 || bounds.Height > 65535)
+            return E_INVALIDARG;
+        w = (UINT)bounds.Width; h = (UINT)bounds.Height;
+        source = "CoreWindow bounds";
+    }
+    typedef HRESULT (WINAPI *info_fn)(gaming_model_t *);
+    info_fn f = (info_fn)(void *)sym(L"api-ms-win-gaming-deviceinformation-l1-1-0.dll", "GetGamingDeviceModelInformation");
+    gaming_model_t m = {0};
+    UINT capw = 0, caph = 0;
+    if (f && SUCCEEDED(f(&m)) && m.vendorId == 0xC2EC5032) {
+        if (m.deviceId == 0x1D27FABB) { capw = 2560; caph = 1440; }
+        else if (m.deviceId == 0x2F7A3DFF || m.deviceId == 0xDE8A5661) { capw = 3840; caph = 2160; }
+    }
+    note("n3 size source=%s raw=%ux%u model=%s cap=%ux%u", source, w, h, model_name(m.deviceId), capw, caph);
+    if (capw && (w > capw || h > caph)) {
+        double scale = fmin((double)capw / w, (double)caph / h);
+        w = (UINT)fmax(1, floor(w * scale)); h = (UINT)fmax(1, floor(h * scale));
+    }
+    *width = w; *height = h;
+    return S_OK;
+}
+
 /* ---- n3: swapchain on the real CoreWindow ---- */
 /* Kept alive after n3 so the known colour stays on screen during later rungs. */
 static IDXGISwapChain1 *g_swap;
@@ -408,6 +505,11 @@ static void rung_n3(IUnknown *window)
         goto cleanup;
     }
     DXGI_SWAP_CHAIN_DESC1 d = {0};
+    hr = swapchain_size(window, &d.Width, &d.Height);
+    if (FAILED(hr)) {
+        stage("n3", "corewindow-swapchain", "FAIL", "buffer size hr=0x%08lx", hx(hr));
+        goto cleanup;
+    }
     d.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
     d.SampleDesc.Count = 1;
     d.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
@@ -416,8 +518,14 @@ static void rung_n3(IUnknown *window)
     d.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
     d.AlphaMode = DXGI_ALPHA_MODE_IGNORE;
     hr = IDXGIFactory2_CreateSwapChainForCoreWindow(fac, (IUnknown *)dev, window, &d, NULL, &g_swap);
+    note("n3 CreateSwapChainForCoreWindow FLIP_DISCARD hr=0x%08lx", hx(hr));
     if (FAILED(hr)) {
-        stage("n3", "corewindow-swapchain", "FAIL", "CreateSwapChainForCoreWindow(FLIP_DISCARD x2) hr=0x%08lx", hx(hr));
+        d.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
+        hr = IDXGIFactory2_CreateSwapChainForCoreWindow(fac, (IUnknown *)dev, window, &d, NULL, &g_swap);
+        note("n3 CreateSwapChainForCoreWindow FLIP_SEQUENTIAL hr=0x%08lx", hx(hr));
+    }
+    if (FAILED(hr)) {
+        stage("n3", "corewindow-swapchain", "FAIL", "CreateSwapChainForCoreWindow fallback hr=0x%08lx", hx(hr));
         goto cleanup;
     }
     IDXGISwapChain1_GetDesc1(g_swap, &d);
@@ -445,9 +553,9 @@ static void rung_n3(IUnknown *window)
         frames++;
     }
     stage("n3", "corewindow-swapchain", frames == 120 ? "PASS" : "FAIL",
-          "hr=0x%08lx size=%ux%u BGRA8 FLIP_DISCARD x2 colour=#0078D7 frames=%d/120 present_hr=0x%08lx "
+          "hr=0x%08lx size=%ux%u BGRA8 %s x2 colour=#0078D7 frames=%d/120 present_hr=0x%08lx "
           "avg_ms=%.2f max_ms=%.2f fl=0x%x",
-          hx(hr), d.Width, d.Height, frames, hx(phr), frames ? sum / frames : 0.0, worst, (unsigned)fl);
+          hx(hr), d.Width, d.Height, d.SwapEffect == DXGI_SWAP_EFFECT_FLIP_DISCARD ? "FLIP_DISCARD" : "FLIP_SEQUENTIAL", frames, hx(phr), frames ? sum / frames : 0.0, worst, (unsigned)fl);
 cleanup:
     if (rtv) ID3D11RenderTargetView_Release(rtv);
     if (tex) ID3D11Texture2D_Release(tex);
@@ -589,27 +697,6 @@ static void rung_n5(void)
 }
 
 /* ---- n6: Series S vs X ---- */
-typedef struct {
-    UINT32 vendorId; /* GAMING_DEVICE_VENDOR_ID */
-    UINT32 deviceId; /* GAMING_DEVICE_DEVICE_ID */
-} gaming_model_t;
-
-static const char *model_name(UINT32 id)
-{
-    switch (id) {
-    case 0: return "not-xbox";
-    case 0x768BAE26: return "XboxOne";
-    case 0x2A7361D9: return "XboxOneS";
-    case 0x5AD617C7: return "XboxOneX";
-    case 0x10F7CDE3: return "XboxOneXDevkit";
-    /* Series values as in the Windows SDK header (also used by R4N probe_native). */
-    case 0x1D27FABB: return "XboxSeriesS";
-    case 0x2F7A3DFF: return "XboxSeriesX";
-    case 0xDE8A5661: return "XboxSeriesXDevkit";
-    default: return "unknown";
-    }
-}
-
 static void rung_n6(void)
 {
     typedef HRESULT (WINAPI *info_fn)(gaming_model_t *);
@@ -945,13 +1032,92 @@ static HRESULT STDMETHODCALLTYPE obj_iids(void *This, ULONG *n, IID **iids)
 static HRESULT STDMETHODCALLTYPE obj_name(void *This, HSTRING *s) { (void)This; *s = NULL; return S_OK; }
 static HRESULT STDMETHODCALLTYPE obj_trust(void *This, TrustLevel *t) { (void)This; *t = BaseTrust; return S_OK; }
 
+/* SystemNavigationManager ABI, checked against Microsoft's windows-rs
+ * Windows/UI/Core metadata projection. EventHandler<T> inherits IUnknown,
+ * not IInspectable; WinRT Boolean is one byte. */
+static const GUID IID_ISystemNavigationManagerStatics_ =
+    {0xdc52b5ce, 0xbee0, 0x4305, {0x8c, 0x54, 0x68, 0x22, 0x8e, 0xd6, 0x83, 0xb5}};
+static const GUID IID_BackRequestedHandler_ =
+    {0x1373d28e, 0xca72, 0x53d3, {0xa4, 0x5a, 0xaa, 0xc9, 0xda, 0x76, 0xae, 0x65}};
+typedef struct back_args_t {
+    struct {
+        IInspectableVtblX base;
+        HRESULT (STDMETHODCALLTYPE *get_Handled)(void *, BOOLEAN *);
+        HRESULT (STDMETHODCALLTYPE *put_Handled)(void *, BOOLEAN);
+    } *lpVtbl;
+} back_args_t;
+typedef struct navigation_t {
+    struct {
+        IInspectableVtblX base;
+        HRESULT (STDMETHODCALLTYPE *add_BackRequested)(void *, void *, INT64 *);
+        HRESULT (STDMETHODCALLTYPE *remove_BackRequested)(void *, INT64);
+    } *lpVtbl;
+} navigation_t;
+typedef struct navigation_statics_t {
+    struct {
+        IInspectableVtblX base;
+        HRESULT (STDMETHODCALLTYPE *GetForCurrentView)(void *, navigation_t **);
+    } *lpVtbl;
+} navigation_statics_t;
+static navigation_t *g_navigation;
+static INT64 g_back_token;
+static HRESULT g_back_registration_hr = S_OK;
+static HRESULT STDMETHODCALLTYPE back_qi(void *This, REFIID iid, void **out)
+{
+    if (!out) return E_POINTER;
+    *out = NULL;
+    if (!IsEqualIID(iid, &IID_IUnknown) &&
+        !IsEqualIID(iid, &IID_IAgileObject_) &&
+        !IsEqualIID(iid, &IID_BackRequestedHandler_)) return E_NOINTERFACE;
+    *out = This; /* Static singleton, alive until process exit. */
+    return S_OK;
+}
+static HRESULT STDMETHODCALLTYPE back_invoke(void *This, void *sender, back_args_t *args)
+{
+    (void)This;
+    (void)sender;
+    if (!args) return E_POINTER;
+    HRESULT hr = args->lpVtbl->put_Handled(args, TRUE);
+    if (SUCCEEDED(hr)) out_line("back-requested handled");
+    else note("BackRequested put_Handled hr=0x%08lx", hx(hr));
+    return hr;
+}
+static struct {
+    HRESULT (STDMETHODCALLTYPE *QueryInterface)(void *, REFIID, void **);
+    ULONG (STDMETHODCALLTYPE *AddRef)(void *);
+    ULONG (STDMETHODCALLTYPE *Release)(void *);
+    HRESULT (STDMETHODCALLTYPE *Invoke)(void *, void *, back_args_t *);
+} back_vtbl = {back_qi, obj_addref, obj_release, back_invoke};
+static struct { void *lpVtbl; } g_back_handler = {&back_vtbl};
+
+static HRESULT register_back_requested(void)
+{
+    static const WCHAR name[] = L"Windows.UI.Core.SystemNavigationManager";
+    HSTRING cls = NULL;
+    navigation_statics_t *stat = NULL;
+    navigation_t *manager = NULL;
+    HRESULT hr = WindowsCreateString(name, (UINT32)wcslen(name), &cls);
+    if (SUCCEEDED(hr)) hr = RoGetActivationFactory(cls, &IID_ISystemNavigationManagerStatics_, (void **)&stat);
+    if (SUCCEEDED(hr)) hr = stat->lpVtbl->GetForCurrentView(stat, &manager);
+    if (SUCCEEDED(hr)) hr = manager->lpVtbl->add_BackRequested(manager, &g_back_handler, &g_back_token);
+    if (SUCCEEDED(hr)) g_navigation = manager;
+    else {
+        if (manager) manager->lpVtbl->base.Release(manager);
+        note("BackRequested registration hr=0x%08lx", hx(hr));
+    }
+    if (stat) stat->lpVtbl->base.Release(stat);
+    if (cls) WindowsDeleteString(cls);
+    return hr;
+}
+
 static HRESULT STDMETHODCALLTYPE view_init(void *This, void *app_view) { (void)This; (void)app_view; return S_OK; }
 static HRESULT STDMETHODCALLTYPE view_set_window(void *This, void *window)
 {
     (void)This;
     g_window = window;
     g_window->lpVtbl->base.AddRef(g_window);
-    return S_OK;
+    g_back_registration_hr = register_back_requested();
+    return g_back_registration_hr;
 }
 /* Load receives the manifest EntryPoint, including for Dev Home activation.
  * A separate explicitly named tile provides opt-in without desktop argv. */
@@ -974,13 +1140,22 @@ static HRESULT STDMETHODCALLTYPE view_run(void *This)
     g_window->lpVtbl->get_Dispatcher(g_window, (void **)&g_dispatcher);
     pump();
     run_all((IUnknown *)g_window);
-    if (g_log) fclose(g_log);
-    g_log = NULL;
+    /* Keep the log open for BackRequested events while idle. */
     /* Keep the window (and the n3 colour) up until the user leaves the app. */
     if (g_dispatcher) g_dispatcher->lpVtbl->ProcessEvents(g_dispatcher, 2);
     return S_OK;
 }
-static HRESULT STDMETHODCALLTYPE view_uninit(void *This) { (void)This; return S_OK; }
+static HRESULT STDMETHODCALLTYPE view_uninit(void *This)
+{
+    (void)This;
+    if (g_navigation) {
+        HRESULT hr = g_navigation->lpVtbl->remove_BackRequested(g_navigation, g_back_token);
+        if (FAILED(hr)) note("BackRequested removal hr=0x%08lx", hx(hr));
+        g_navigation->lpVtbl->base.Release(g_navigation);
+        g_navigation = NULL;
+    }
+    return S_OK;
+}
 
 static HRESULT STDMETHODCALLTYPE source_create(void *This, view_t **out);
 static struct {
@@ -1087,6 +1262,12 @@ int main(int argc, char **argv)
         HRESULT hr = WindowsCreateString(name, (UINT32)wcslen(name), &cls);
         if (SUCCEEDED(hr)) hr = RoGetActivationFactory(cls, &IID_ICoreApplication_, (void **)&app);
         if (SUCCEEDED(hr)) hr = app->lpVtbl->Run(app, &g_source);
+        if (FAILED(g_back_registration_hr)) {
+            if (app) app->lpVtbl->base.Release(app);
+            if (cls) WindowsDeleteString(cls);
+            if (g_log) fclose(g_log);
+            return (int)g_back_registration_hr; /* Platform refusal: stop, no fallback. */
+        }
         if (FAILED(hr)) {
             g_device = 0;
             note("CoreApplication.Run hr=0x%08lx; running rungs without a CoreWindow", hx(hr));
