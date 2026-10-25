@@ -50,7 +50,7 @@ this README and `/workspace/x64-run/ON-DEVICE-TOMORROW.md` exists in the built
 kit, and that every kit entry and rung is documented here. It's build-only.
 
 `package` stages files only and does not execute the ladder or print stage records. The packaged hosted
-`ladder` prints 26 STAGE lines (a–h, combo, p1–p6, n0–n8, n10, n11).
+`ladder` prints 27 STAGE lines (a–h, combo, p1–p6, n0–n8, n10, n11, s1).
 The current loose payload includes `probe_native.exe`; this remains optional
 and is copied only when the R4N build output exists. The generated
 `kit-manifest.txt` records the actual optional probes available at kit-build time.
@@ -173,7 +173,7 @@ routing of smoke.exe, UWP activation, or Xbox behaviour.
 ## Hosted ladder (O2)
 
 `make -C x64/on-device ladder && ./x64/on-device/out/ladder --offline` prints
-26 STAGE lines (a–h, combo, p1–p6, n0–n8, n10, n11) and overwrites `LocalState/ladder.log`, flushing each
+27 STAGE lines (a–h, combo, p1–p6, n0–n8, n10, n11, s1) and overwrites `LocalState/ladder.log`, flushing each
 line. Use `--local-state PATH` to pick another LocalState directory. Adapter stages
 time out after 20 seconds by default (`--timeout 1..60`); the offline combo
 has a 60-second bound with 20 seconds per guest. A stage FAIL or SKIP
@@ -501,3 +501,28 @@ and uwph with `nofork,noproc,wx`, TEB/thread checks and routing counters verifie
 until that native combo adapter exists, report SKIP (the Linux runner cannot run
 inside UWP). Hosted online mode accepts `LocalState/adapters/combo` under the
 same exit-code/routing contract as the other loader adapters.
+
+## Steam download rung s1 (B54: blocked on UWP transport)
+
+The kit carries the B53 downloader at `payload/combo/steam-dl/steamdl.exe`,
+with DECISION.md and OWNED.md beside it. This is a desktop WinHTTP diagnostic,
+excluded from the console Appx with the other hosted combo assets. It is not
+activated by the console app. Rung s1 reports SKIP and appends the blocker to
+`LocalState/steam-dl.log`; no download or throughput result is claimed.
+
+Off device, list the plan without network, credentials or file writes:
+
+    ./x64/on-device/out/ladder --offline --dry-run
+
+| Console step | Required behavior | Current status |
+| --- | --- | --- |
+| s1 anonymous tile | Download app 1007 to a fresh LocalState/steam-downloads/1007 directory from steampipe.akamaized.net; verify chunk SHA-1 and reconstructed file SHA-1/size, then reopen and verify; log bytes/s and verified bytes to LocalState/steam-dl.log | BLOCKED: documented UWP TLS/WebSocket transport and in-process host integration missing |
+| s1 optional separate QR tile | João scans the QR on the TV with his phone and approves; session token stays in memory, never copied onto the console; download small owned app 3405340, verify and log as above | BLOCKED: same transport plus QR rendering and opt-in tile missing; no token-file input on console |
+| s1 foreground | Keep the screen on and this app in foreground; no background downloads in Game mode (DOCS-ANSWERS row 19) | Required for future console runs; suspension/checkpoint handling pending |
+
+Do not try launching the desktop downloader as a console child process. The
+next implementation must use documented UWP networking in process and preserve
+certificate checks, ownership checks and the B53 integrity checks. Failed or
+interrupted downloads cannot be reported VERIFIED. B53 currently requires a
+fresh destination after interruption. No credentials, QR challenges or tokens
+belong in logs or videos. Send back LocalState/steam-dl.log with the ladder logs.

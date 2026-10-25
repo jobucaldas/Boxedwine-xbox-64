@@ -10,7 +10,7 @@ import tempfile
 STAGES = (
     ('a', 'uwph-smoke'), ('b', 'hello'), ('c', 'hello_k32'),
     ('d', 'wx-jit'), ('e', 'wineserver-in-process'), ('f', 'd3d12-dzn'),
-    ('g', 'SteamAPI_Init'), ('h', 'Megabonk'),
+    ('g', 'SteamAPI_Init'), ('h', 'Megabonk'), ('s1', 'steam-download'),
     ('combo', 'hello+hello_k32-nofork,noproc,wx'),
 )
 
@@ -77,12 +77,24 @@ def standin(base, timeout):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--offline', action='store_true')
+    parser.add_argument('--dry-run', action='store_true', help='list s1 console plan without executing or accessing credentials/network')
     parser.add_argument('--big-file', action='store_true', help='opt in to native >2 GB storage rung')
     parser.add_argument('--local-state', type=Path)
     parser.add_argument('--timeout', type=int, default=20)
     args = parser.parse_args()
     if args.timeout < 1 or args.timeout > 60:
         parser.error('--timeout must be 1..60 seconds')
+    if args.dry_run:
+        for step in (
+            'foreground: keep screen on; Game mode has no background downloads (DOCS-ANSWERS row 19)',
+            'anonymous tile: download app 1007 into fresh LocalState/steam-downloads/1007 via steampipe.akamaized.net',
+            'integrity: verify chunk and file SHA-1, reopen files and verify size/hash; log bytes/s to LocalState/steam-dl.log',
+            'optional separate tile: display QR on TV; Joao scans and approves on phone; hold login only in memory, never copy a token to console',
+            'owned: download app 3405340 only when owned; verify SHA-1 and log bytes/s; no launch or DRM modification',
+            'BLOCKED: B53 desktop WinHTTP transport needs documented in-process UWP transport and QR rendering before either tile can run',
+        ):
+            print('STEP s1 ' + step)
+        return 0
     # out/ladder and source ladder.py both resolve to the same on-device root.
     location = Path(__file__).resolve().parent
     base = location.parent if location.name == 'out' else location
@@ -92,7 +104,9 @@ def main():
     with (state / 'ladder.log').open('w', encoding='utf-8') as log:
         for letter, name in STAGES:
             adapter = state / 'adapters' / letter
-            if letter == 'g' and not (state / 'private' / 'steam.token').is_file():
+            if letter == 's1':
+                status, reason = 'SKIP', 'B53 kit diagnostic only; UWP transport, in-process integration and QR tiles pending; no console download proof'
+            elif letter == 'g' and not (state / 'private' / 'steam.token').is_file():
                 status, reason = 'SKIP', 'no token file (contents never read by ladder)'
             elif letter == 'h' and not (state / 'payload' / 'Megabonk.exe').is_file():
                 status, reason = 'SKIP', 'payload absent'

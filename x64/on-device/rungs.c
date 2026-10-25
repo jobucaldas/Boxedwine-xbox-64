@@ -951,11 +951,25 @@ static void rung_n11(void)
 
 #include "input/probe.inc"
 
+/* B53 is a desktop WinHTTP executable, never launch it as a UWP child. */
+static void rung_s1(void)
+{
+    WCHAR path[MAX_PATH];
+    state_path(path, MAX_PATH, L"steam-dl.log");
+    FILE *log = _wfopen(path, L"a");
+    if (log) {
+        fputs("STAGE s1 steam-download SKIP: UWP transport, in-process integration and QR tiles pending; bytes=0; bytes/s=unmeasured; keep screen on; no background downloads in Game mode\n", log);
+        fclose(log);
+    }
+    stage("s1", "steam-download", "SKIP", "B53 desktop diagnostic only; UWP transport/in-process integration/QR tiles pending; see LocalState/steam-dl.log; no download attempted");
+}
+
 static void run_all(IUnknown *window)
 {
     if (!g_device) note("off-device: successful stand-in API calls are labelled SKIP; no console PASS");
     note("rungs.exe O5: native-API + Game-mode rungs; ctx=%s host=%s", g_ctx, g_host);
     readiness_rungs();
+    rung_s1();
     rung_n0();
     rung_n1();
     rung_n2();
