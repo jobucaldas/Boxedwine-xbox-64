@@ -1429,3 +1429,76 @@ wow64win are less mature than old-style. O2 should set WINEDLLPATH in the uwph
 run. Video /workspace/x64-run/videos/B20-O1.mp4 (19 s): prefix check,
 old-style 32-bit process, in-process wow64 cmd.exe. Probe scripts:
 /workspace/x64-run/lanes/B20/o1-*.sh.
+
+## B20 O2
+
+Same SteamSetup.exe as B10 (/workspace/steam-owned/SteamSetup.exe), `/S`, no
+login, no token, no Steam patching. Reproduction scripts + small evidence:
+`x64/uwp-host/harness/steam-evidence/b20-o2/`; raw logs under
+`harness/out/b20/o2/` (gitignored) and /workspace/x64-run/lanes/B20.
+
+**Stock Wine (control):** default Debian `wine SteamSetup.exe /S` into the O1
+prefix `out/b20/pfx-wow64` -> rc 0, installs
+`Program Files (x86)/Steam/Steam.exe` (4379496 bytes) + bin/, public/,
+uninstall.exe. Old-style WoW64 (no "experimental wow64" marker; per O1 the
+32-bit PE runs in a separate i386 `/usr/lib/wine/wine` process).
+Note: the file is **`Steam.exe`** (capital S, as Valve ships it); the O2 exact
+test checks `.../Steam/steam.exe`, which fails on case-sensitive ext4. Nothing
+was renamed or linked to satisfy it.
+
+**THROUGH uwph:** `run_via_wine` -> private W^X loader (`out/wine-wx`, no
+32-bit `wine` sibling, so ntdll.so picks new-style in-process WoW64) +
+`libuwph_wine_shim.so` preloaded, separate stock wineserver64, wineboot
+disabled (same constraints as B10). Fresh prefix `out/b20/pfx-wow64-uwph`
+(setup-only stock `wineboot -i`).
+- Installer, WINEDLLPATH=/usr/lib/i386-linux-gnu/wine: B10's c0000135 is gone;
+  SteamSetup.exe runs "in experimental wow64 mode" and **exits 0 having
+  installed Steam.exe** in the routed prefix. Its post-install
+  steamservice.exe fails (`WS2_32.dll failed to initialize`), and
+  winex11.so wasn't found for the 32-bit side (see below). 417834 shim-routed
+  open/read/close/mmap/munmap/mprotect calls over 19 per-pid reports.
+- Client run 1, same WINEDLLPATH: Steam.exe exits 66 after ~10 s:
+  `CRYPT32.dll failed to initialize`. Cause: for a 32-bit builtin, ntdll.so
+  loads the 64-bit unix side from `<dll dir>/../x86_64-unix/<name>.so`, i.e.
+  `/usr/lib/i386-linux-gnu/wine/x86_64-unix/crypt32.so`, which Debian doesn't
+  have (also bcrypt.so, ws2_32.so, winex11.so). Debian's 64-bit
+  x86_64-unix .so files do export the wow64 thunks (`__wine_unix_call_wow64_funcs`).
+- Fix (harness-side, symlinks only): `out/b20/wow64-dlls/{i386-windows ->
+  Debian i386 PE dlls, x86_64-unix -> wine-wx x86_64-unix}` as WINEDLLPATH.
+  This is also the **Xbox package layout**: ship `i386-windows/` next to the
+  64-bit `x86_64-unix/`; no i386-unix and no 32-bit ELF needed.
+- Client run 2 with the overlay: Steam.exe (32-bit) runs the full 180 s cap
+  (exit 124), draws its "Updating Steam... Checking for available updates"
+  window, loads winhttp/wininet/cryptnet and asks
+  `https://cdn.steamstatic.com/client/steam_client_win32`. After 60 s:
+  `Download failed: http error 0` -> "Steam needs to be online" dialog until
+  the cap. Wine log: `wininet:open_http_connection create_netconn failed:
+  12029` (cannot connect); secur32/schannel was never reached. **Same failure
+  under the stock-Wine old-style control** (stock-installed prefix, 120 s), so
+  this is this box's egress (host curl to the same URL gets 200), not
+  uwph/WoW64. Not chased further; logging in is out of scope anyway.
+
+Child processes (Windows names, routed): installer: SteamSetup.exe 1,
+conhost.exe 2, explorer.exe 1, winemenubuilder.exe 2, steamservice.exe 1
+(fails init). Client: Steam.exe 1, conhost.exe 1, explorer.exe 1;
+steamwebhelper.exe 0 (never reached, because the client package never
+downloaded). Each Windows process is a separate **x86-64 wine64** Linux process
+(strace: wine64 execve 5 installer / 4 client), with **zero i386 ELF
+execs**: 32-bit code stays inside the 64-bit process. So old-style WoW64 is
+NOT required. The remaining Xbox single-process issue is Wine's ordinary
+one-Linux-process-per-Windows-process model (explorer/conhost/steamservice,
+and later Chromium steamwebhelper), not 32-bit support.
+
+Missing imports: no unresolved guest import seen. Missing exports/modules
+logged as warnings: ole32!DllCanUnloadNow, kernel32!CreateMutexWW (installer
+probe), winemac.drv, CRYPTBASE.dll, CLBCATQ.dll, Steam crashhandler.dll
+(optional). `surface-trace-steam.tsv` (rewritten from B10's placeholder, 62
+data rows) lists these per phase, plus child processes, Linux execs, shim
+counters, last log lines and the bootstrap errors; generator
+`steam-evidence/b20-o2/o2-trace.py`. Last substantive client line:
+`[...] Error: Steam needs to be online to update.`; literal last Wine line is
+the normal ntdll PROCESS_DETACH.
+
+Video /workspace/x64-run/videos/B20-O2.mp4 (60 s, Xvfb :122): routed client
+run 2, the 32-bit Steam updater window under uwph. Run 1 (installer + crypt32
+failure) is kept as /workspace/x64-run/lanes/B20/B20-O2-run1.mp4.
