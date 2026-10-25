@@ -10,6 +10,7 @@ make --no-print-directory package
 
 echo '== 2/3 offline ladder (stage a THROUGH public uwph Linux backend) =='
 ./out/ladder --offline
+grep -q '^STAGE combo .* PASS:' LocalState/ladder.log
 
 echo '== 3/3 payload smoke.exe THROUGH our run_via_wine -> Wine loader =='
 cc -O2 -Wall -Wextra -Werror -o out/run_via_wine ../pe/launcher/run_via_wine.c

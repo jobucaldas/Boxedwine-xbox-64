@@ -79,11 +79,12 @@ routing of smoke.exe, UWP activation, or Xbox behaviour.
 ## Hosted ladder (O2)
 
 `make -C x64/on-device ladder && ./x64/on-device/out/ladder --offline` prints
-twenty-three STAGE lines (a–h, p1–p6, n0–n8) and overwrites `LocalState/ladder.log`, flushing each
-line. Use `--local-state PATH` to pick another LocalState directory. Each stage
-times out after 20 seconds by default (`--timeout 1..60`). A stage FAIL or SKIP
+twenty-four STAGE lines (a–h, p1–p6, n0–n8) and overwrites `LocalState/ladder.log`, flushing each
+line. Use `--local-state PATH` to pick another LocalState directory. Adapter stages
+time out after 20 seconds by default (`--timeout 1..60`); the offline combo
+has a 60-second bound with 20 seconds per guest. A stage FAIL or SKIP
 doesn't stop the run, and the exit code stays 0. An unwritable log is an error.
-Offline mode runs only stage a, which is the public uwph Linux backend test.
+Offline mode runs stage a (public uwph Linux backend) and the combo rung.
 Stages b–h and n0–n8 stay SKIP. This is a hosted Python tool, so it doesn't run on the
 console.
 
@@ -286,3 +287,23 @@ nonfinite values mapped to zero. Packet number is zero: this stateless mapper
 does not track changes. No Wine xinput integration is included. The probe uses
 the installed SDK-compatible MinGW Gamepad ABI declarations. Host mapping tests
 are native C tests, not THROUGH-uwph or stock Wine runtime evidence.
+
+## B21 combo rung
+
+`STAGE combo hello+hello_k32-nofork,noproc,wx` runs the existing B21 hellos
+through the packaged launcher, bundled W^X Wine loader, shim and uwph on Linux.
+`offline-smoke` requires this rung to PASS, including noproc reports and all
+20 ntdll-to-uwph bindings/counters; constraints remain `nofork,noproc,wx`.
+`package` and `kit` carry both PE guests plus the Linux runner, launcher, shim,
+W^X loader tree and verifiers in `payload/combo/`. The Linux loader tree retains
+B21's links to matching installed Debian Wine 10.0 DLLs/data: these are hosted
+diagnostics, not a Windows/UWP runtime. Build-time `prebuilt-prefix` preparation
+uses stock Wine; the routed run copies that explicit fixture, disables wineboot,
+and retains a separate stock Linux wineserver concession. Logs/reports remain
+in `x64/uwp-host/harness/out/kit-combo.*/`; no prefix is packaged.
+
+On device, PASS means both hellos exit 0 through an in-process Wine W^X loader
+and uwph with `nofork,noproc,wx`, TEB/thread checks and routing counters verified;
+until that native combo adapter exists, report SKIP (the Linux runner cannot run
+inside UWP). Hosted online mode accepts `LocalState/adapters/combo` under the
+same exit-code/routing contract as the other loader adapters.

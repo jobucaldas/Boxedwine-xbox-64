@@ -32,6 +32,14 @@ test "$(openssl x509 -inform DER -in out/test-cert.cer -noout -subject -nameopt 
 
 mkdir -p "$stage/payload/Assets"
 cp AppxManifest.xml out/smoke.exe out/rungs.exe "$stage/payload/"
+# Hosted combo assets: keep Linux runtime separate from the native UWP entry.
+combo="$stage/payload/combo"
+mkdir -p "$combo"
+cp out/combo-guests/hello.exe out/combo-guests/hello_k32.exe "$combo/"
+cp ../uwp-host/harness/out/run_via_wine ../uwp-host/harness/out/libuwph_wine_shim.so "$combo/"
+cp -a ../uwp-host/harness/out/wine-wx "$combo/"
+cp combo.sh "$combo/run"
+cp ../uwp-host/harness/verify_{noproc,acceptance}.py ../uwp-host/harness/surface-trace.tsv "$combo/"
 # Copy only the optional probe, never modify its source worktree.
 probe=/workspace/wt/R4N/x64/native-gfx/out/probe_native.exe
 if [[ -s "$probe" ]]; then cp "$probe" "$stage/payload/probe_native.exe"; fi

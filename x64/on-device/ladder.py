@@ -10,6 +10,7 @@ STAGES = (
     ('a', 'uwph-smoke'), ('b', 'hello'), ('c', 'hello_k32'),
     ('d', 'wx-jit'), ('e', 'wineserver-in-process'), ('f', 'd3d12-dzn'),
     ('g', 'SteamAPI_Init'), ('h', 'Megabonk'),
+    ('combo', 'hello+hello_k32-nofork,noproc,wx'),
 )
 
 
@@ -58,6 +59,10 @@ def main():
                     ['make', '-C', str(repo / 'x64/uwp-host/harness'), 'backend-test'],
                     repo, args.timeout)
                 reason += '; THROUGH public uwph Linux backend; not Xbox proof'
+            elif letter == 'combo' and args.offline:
+                status, reason = execute(
+                    [str(base / 'out/payload/combo/run')], repo, 60)
+                reason += '; nofork,noproc,wx THROUGH launcher -> bundled W^X Wine loader -> uwph; Linux only'
             elif args.offline:
                 status, reason = 'SKIP', 'offline: device/loader adapter disabled'
             elif not adapter.is_file():
