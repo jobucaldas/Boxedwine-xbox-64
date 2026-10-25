@@ -87,7 +87,7 @@ acceptance-test:
 	./run-acceptance.sh
 .PHONY: acceptance-test
 # R4X O2: private W^X ntdll.so (RW map/relocate, then per-section RX/R/RW).
-$(OUT)/wine-wx/.stamp: prepare-wine-wx.sh wine-image-wx.patch wine-loader-stub-wx.patch
+$(OUT)/wine-wx/.stamp: prepare-wine-wx.sh wine-image-wx.patch wine-loader-stub-wx.patch wine-desktop-bootstrap.patch
 	./prepare-wine-wx.sh
 $(OUT)/run_hello: run-hello.sh prefix-hygiene.sh $(OUT)/libuwph_wine_shim.so $(OUT)/run_via_wine $(OUT)/wine-wx/.stamp
 	cp $< $@

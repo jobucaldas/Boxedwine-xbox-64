@@ -2738,3 +2738,53 @@ not run under this O1-only order. Video:
 `/workspace/x64-run/videos/B35-O1.mp4` (6.2 seconds, Xvfb + ffmpeg; no Encom).
 No security constraints, verifier defaults, surface gates, or remotes were
 changed; no commit or push was performed.
+
+## B36 O1
+
+Fixed a loader-lock startup cycle exposed by Megabonk under the B35 opt-in:
+its guest DLL initialization requests the desktop while holding Wine's
+loader_section; the new desktop thread cannot finish Wine thread initialization
+until that lock is released. The first run logged RtlpWaitForCriticalSection
+and desktop readiness STATUS_TIMEOUT (0x102), reached unityplayer, and had no
+screenshots. Its initial private Xvfb also expired with its launching shell;
+the final proof uses a live foreground Xvfb session on free display :3.
+
+Added wine-desktop-bootstrap.patch to Wine's own ntdll loader_init. Only when
+WINE_INPROC_DESKTOP is exactly 1, after core system DLL attachment and before
+guest dependency attachment, it loads/attaches Wine's uwpdesktop.dll, releases
+loader_section while uwp_desktop_start waits for its in-process thread, then
+reacquires it before continuing guest initialization. Failure terminates the
+process without spawning a fallback. The non-opt-in path continues normally.
+prepare-wine-wx.sh applies/hashes this patch, and the harness Makefile tracks
+it as a loader build dependency. No owned game files or constraints changed.
+
+Exact O1 test passed (exit 0), with make -C x64/uwp-host test passing,
+172 passed / 0 failed in the traced host test and 7 passed / 0 failed in the
+in-process verifier tests. Final run:
+x64/uwp-host/harness/out/megabonk/run-f2tIK3Gw.
+Runtime exit=0; MEGABONK reached=gfx-init; NtCreateUserProcess attempts: 1
+(wine-internal: 0, guest: 1). The guest attempt remains UnityCrashHandler64.exe
+--attach 32 140737481412608, reported as-is. No failed-to-start-explorer or
+nodrv_CreateWindow messages. Enforcement: uwpjail seccomp wx=1 nofork=1
+(34 insns), invocation constraints=nofork,wx,noproc. Eight screenshots exist;
+shot-003.png has grayscale mean 0.383994 and stddev 0.160251, and shot-004.png
+visibly shows the Megabonk main menu. The first loading screenshot is mostly
+black; subsequent screenshots pass the required >0.02 mean/stddev thresholds.
+The stage remains gfx-init per the existing conservative harness classifier.
+Full exact output: /workspace/x64-run/lanes/B36/B36-O1.exact-output.log.
+
+Video: /workspace/x64-run/videos/B36-O1.mp4, 59 seconds, 8,417,700 bytes.
+Free Xvfb display :3, 1280x720x24; recording command:
+ffmpeg -y -loglevel error -f x11grab -video_size 1280x720 -framerate 15
+-i :3 -t 59 -c:v libx264 -preset ultrafast -pix_fmt yuv420p
+/workspace/x64-run/videos/B36-O1.mp4. No Encom.
+
+Proof is THROUGH uwp_run.sh(nofork,wx,noproc) -> our launcher -> Wine's own
+W^X loader -> shim -> uwph, with in-process server and desktop. Linux proof
+only; Xbox untested. Stock Wine was used solely for packaging the prebuilt
+prefix, not runtime acceptance. Generated surface-trace.tsv output was restored
+to its original tracked contents after evidence collection. No gates, verifier
+defaults, security constraints, remotes, or third-party repositories changed.
+No commit or push. O2 not implemented. One overlapping initial build failed
+on an object being written by the other build; it ended before the sequential
+passing exact test and does not represent a source failure.
