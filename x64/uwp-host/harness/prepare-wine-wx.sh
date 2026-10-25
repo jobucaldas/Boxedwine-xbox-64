@@ -16,7 +16,7 @@ grep -qx 'Wine version 10.0' "$src/VERSION" || { echo "prepare-wine-wx: $src is 
 if [[ ! -d $deb ]]; then
     mkdir -p /tmp/R4W-debian && tar -xJf /tmp/R4W-wine.debian.tar.xz -C /tmp/R4W-debian
 fi
-stamp=$( (cat "$src/VERSION" wine-image-wx.patch wine-loader-stub-wx.patch prepare-wine-wx.sh /usr/share/wine/nls/locale.nls; cat "$deb"/fixes/{temporary-directory,ntdll-398da925,ntdll-5c45391e,binutils2.44}.patch "$deb"/debianization/install-paths.patch) | sha256sum | cut -d' ' -f1)
+stamp=$( (cat "$src/VERSION" wine-image-wx.patch wine-loader-stub-wx.patch wine-desktop-bootstrap.patch prepare-wine-wx.sh /usr/share/wine/nls/locale.nls; cat "$deb"/fixes/{temporary-directory,ntdll-398da925,ntdll-5c45391e,binutils2.44}.patch "$deb"/debianization/install-paths.patch) | sha256sum | cut -d' ' -f1)
 if [[ -f $tree/.stamp && $(cat "$tree/.stamp") == "$stamp" ]]; then exit 0; fi
 
 # Apply only the hunks of a patch that touch the listed files.
@@ -41,6 +41,7 @@ apply_files "$deb/debianization/install-paths.patch" dlls/ntdll/unix/loader.c
 patch -d "$out/wine-wx-source" -p1 --forward --no-backup-if-mismatch < wine-image-wx.patch
 apply_files "$deb/fixes/binutils2.44.patch" dlls/ntdll/loader.c tools/winebuild/import.c
 patch -d "$out/wine-wx-source" -p1 --forward --no-backup-if-mismatch < wine-loader-stub-wx.patch
+patch -d "$out/wine-wx-source" -p1 --forward --no-backup-if-mismatch < wine-desktop-bootstrap.patch
 # Debian lists the new header via a makedep.c rule; register it with makedep instead.
 sed -i 's|^\twine/server.h \\$|&\n\twine/server_tmpdir.h \\|' "$out/wine-wx-source/include/Makefile.in"
 # The repack drops generated files and debian/rules reruns make_requests, which

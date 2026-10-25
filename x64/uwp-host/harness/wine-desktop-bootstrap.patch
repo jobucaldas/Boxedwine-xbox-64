@@ -1,0 +1,46 @@
+--- a/dlls/ntdll/loader.c
++++ b/dlls/ntdll/loader.c
+@@ -4440,6 +4440,43 @@
+             NtTerminateProcess( GetCurrentProcess(), status );
+         }
+ 
++        /* An opt-in desktop must be ready before a guest DllMain can ask for
++         * it while holding loader_section. Initialize only Wine's desktop DLL
++         * here, then drop the lock while its thread starts. attach_done and
++         * imports_fixup_done are already published for that thread. */
++        {
++            UNICODE_STRING env;
++            if (!get_env_var( L"WINE_INPROC_DESKTOP", 0, &env ))
++            {
++                BOOL enabled = env.Length == sizeof(WCHAR) && env.Buffer[0] == '1';
++                RtlFreeUnicodeString( &env );
++                if (enabled)
++                {
++                    WINE_MODREF *desktop;
++                    NTSTATUS (WINAPI *start)( DWORD );
++                    status = load_dll( NULL, L"uwpdesktop.dll", 0, &desktop, FALSE );
++                    if (!status) status = process_attach( desktop->ldr.DdagNode, context );
++                    if (!status)
++                    {
++                        start = RtlFindExportedRoutineByName( desktop->ldr.DllBase, "uwp_desktop_start" );
++                        if (!start) status = STATUS_ENTRYPOINT_NOT_FOUND;
++                        else
++                        {
++                            RtlLeaveCriticalSection( &loader_section );
++                            status = start( 10000 );
++                            RtlEnterCriticalSection( &loader_section );
++                        }
++                    }
++                    if (status)
++                    {
++                        ERR( "early in-process desktop failed, status %lx\n", status );
++                        NtTerminateProcess( GetCurrentProcess(), status );
++                    }
++                    TRACE( "early in-process desktop ready\n" );
++                }
++            }
++        }
++
+         if ((status = walk_node_dependencies( wm->ldr.DdagNode, context, process_attach )))
+         {
+             if (last_failed_modref)
