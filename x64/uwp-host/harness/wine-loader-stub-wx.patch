@@ -1,0 +1,49 @@
+B18 O1: publish missing-import stubs RW then RX, one allocation per stub.
+
+--- a/dlls/ntdll/loader.c
++++ b/dlls/ntdll/loader.c
+@@ -442,20 +442,18 @@
+ static ULONG_PTR allocate_stub( const char *dll, const char *name )
+ {
+ #define MAX_SIZE 65536
+-    static struct stub *stubs;
+     static unsigned int nb_stubs;
+-    struct stub *stub;
++    struct stub *stub = NULL;
++    SIZE_T size = sizeof(*stub);
++    ULONG old_protect;
+ 
+     if (nb_stubs >= MAX_SIZE / sizeof(*stub)) return 0xdeadbeef;
+ 
+-    if (!stubs)
+-    {
+-        SIZE_T size = MAX_SIZE;
+-        if (NtAllocateVirtualMemory( NtCurrentProcess(), (void **)&stubs, 0, &size,
+-                                     MEM_COMMIT, PAGE_EXECUTE_READWRITE ) != STATUS_SUCCESS)
+-            return 0xdeadbeef;
+-    }
+-    stub = &stubs[nb_stubs++];
++    /* Each published stub keeps its own RX page. A shared pool would require
++     * making earlier executable stubs writable while adding another one. */
++    if (NtAllocateVirtualMemory( NtCurrentProcess(), (void **)&stub, 0, &size,
++                                 MEM_COMMIT, PAGE_READWRITE ) != STATUS_SUCCESS)
++        return 0xdeadbeef;
+ #ifdef __i386__
+     stub->pushl1    = 0x68;  /* pushl $name */
+     stub->name      = name;
+@@ -497,6 +495,15 @@
+     stub->jmpq_rax[0]     = 0xff;  /* jmp %rax */
+     stub->jmpq_rax[1]     = 0xe0;
+ #endif
++    if (NtProtectVirtualMemory( NtCurrentProcess(), (void **)&stub, &size,
++                                PAGE_EXECUTE_READ, &old_protect ) != STATUS_SUCCESS)
++    {
++        size = 0;
++        NtFreeVirtualMemory( NtCurrentProcess(), (void **)&stub, &size, MEM_RELEASE );
++        return 0xdeadbeef;
++    }
++    NtFlushInstructionCache( NtCurrentProcess(), stub, sizeof(*stub) );
++    nb_stubs++;
+     return (ULONG_PTR)stub;
+ }
+ 

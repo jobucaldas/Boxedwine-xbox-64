@@ -101,6 +101,15 @@ typedef int32_t  uwph_clockid_t;
 #define UWPH_F_DUPFD_CLOEXEC  1030
 #define UWPH_FD_CLOEXEC       1
 
+/* setlocale categories (glibc numbering; uwph_setlocale maps to the CRT) */
+#define UWPH_LC_CTYPE         0
+#define UWPH_LC_NUMERIC       1
+#define UWPH_LC_TIME          2
+#define UWPH_LC_COLLATE       3
+#define UWPH_LC_MONETARY      4
+#define UWPH_LC_MESSAGES      5
+#define UWPH_LC_ALL           6
+
 #define UWPH_SEEK_SET 0
 #define UWPH_SEEK_CUR 1
 #define UWPH_SEEK_END 2

@@ -4,6 +4,14 @@
 # refuses WRITE|EXEC and stock ntdll maps PE images RWX.
 set -euo pipefail
 cd "$(dirname "$0")"
+inproc=0
+for arg in "$@"; do
+    case "$arg" in
+        --inproc-server) inproc=1 ;;
+        --no-build) ;; # Builds are always performed by the Make targets.
+        *) echo "Unknown argument: $arg" >&2; exit 2 ;;
+    esac
+done
 root=$(realpath ../../..)
 work=$PWD/out/wine-o4
 mkdir -p "$work"
@@ -19,6 +27,15 @@ PY
 [[ -f out/wine-wx/.stamp ]] || ./prepare-wine-wx.sh
 wx=$PWD/out/wine-wx
 # Never use ~/.wine. Only copy an already initialized, explicit fixture.
+if (( inproc )); then
+    source_prefix=$PWD/prebuilt-prefix
+    [[ -d $source_prefix ]] || { echo 'Run make prebuilt-prefix at packaging time' >&2; exit 1; }
+    run=$(mktemp -d "$work/run-XXXXXXXX")
+    cp -a --reflink=auto "$source_prefix" "$run/prefix"
+    chmod -R u+w "$run/prefix"
+    export WINEPREFIX=$run/prefix
+    printf 'Copied read-only prebuilt prefix: %s\n' "$source_prefix" > "$run/fixture.txt"
+else
 source_prefix=${UWPH_FIXTURE_PREFIX:-/workspace/megabonk/pfx-stock}
 if [[ ! -d $work/prefix ]]; then
     for f in system.reg user.reg userdef.reg .update-timestamp; do
@@ -35,8 +52,9 @@ if [[ ! -d $work/prefix ]]; then
 fi
 export WINEPREFIX=$work/prefix
 run=$(mktemp -d "$work/run-XXXXXXXX")
+fi
 cp out/wine/identity.json "$run/identity.json"
-# Routed identity: same PE dlls (symlinks), private W^X loader copy + ntdll.so.
+# Routed identity: private W^X Unix + PE ntdll; other DLLs are symlinks.
 python3 - "$run/identity-wx.json" "$wx" <<'PY'
 import hashlib,json,pathlib,sys
 tree=pathlib.Path(sys.argv[2])
@@ -44,15 +62,19 @@ paths=dict(loader=tree/'lib/wine/wine64', pe_ntdll=tree/'lib/x86_64-linux-gnu/wi
            unix_ntdll=tree/'lib/x86_64-linux-gnu/wine/x86_64-unix/ntdll.so')
 def identity(p):
     return dict(path=str(p.resolve()),sha256=hashlib.sha256(p.read_bytes()).hexdigest())
-data=dict(selection='private W^X ntdll.so (prepare-wine-wx.sh, wine-image-wx.patch); other files = installed Debian Wine',
+data=dict(selection='private W^X Unix + PE ntdll (prepare-wine-wx.sh, image + stub patches); other DLLs = installed Debian Wine',
           stamp=(tree/'.stamp').read_text().strip(), artifacts={k:identity(v) for k,v in paths.items()})
 pathlib.Path(sys.argv[1]).write_text(json.dumps(data,indent=2)+'\n')
 PY
-cp "$work/fixture.txt" "$run/fixture.txt"
+if (( ! inproc )); then cp "$work/fixture.txt" "$run/fixture.txt"; fi
 cp out/wine/direct-syscalls.tsv "$run/direct-syscalls.tsv"
 cp surface.tsv "$run/surface.tsv"
 echo "O4 evidence: $run"
 cat "$run/fixture.txt"
+if (( inproc )); then
+    export UWPH_INPROC_SERVER=1
+    unset UWPH_INPROC_OWNER
+else
 server=/usr/lib/wine/wineserver64
 # Explicit separate stock Linux server, no preload/report inherited. Its process
 # is not uwph/UWP evidence; keep it alive only for this owned prefix/test.
@@ -65,7 +87,9 @@ cleanup() {
 trap cleanup EXIT
 sleep .2
 kill -0 "$server_pid"
-# Prevent automatic server startup from inheriting preload if our server dies.
+fi
+# Fallback hint only: Debian Wine tries its installed server before WINESERVER.
+# The in-process proof must therefore also inspect exec traces for server spawns.
 export WINESERVER=/bin/false
 export WINEDEBUG=+loaddll,+process
 export WINEDLLOVERRIDES=wineboot.exe=d
@@ -75,6 +99,7 @@ for mode in control routed; do
         name=$mode-$pe
         rm -f "$run/$name.report"
         extra=(WINE_LOADER=/usr/lib/wine/wine64)
+        if (( inproc )); then extra+=(LD_PRELOAD="$PWD/out/libuwph_inproc_server.so"); fi
         if [[ $mode == routed ]]; then
             extra=(WINE_LOADER="$wx/lib/wine/wine64" LD_PRELOAD="$PWD/out/libuwph_wine_shim.so" LD_DEBUG=bindings)
         fi
