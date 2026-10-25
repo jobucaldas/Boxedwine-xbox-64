@@ -2944,6 +2944,35 @@ Steam UI log: `[2026-10-25 17:20:57] Started webhelper process 0`. Wine trace re
 
 Added `run-minimal.sh --uwph` via `run-wine.sh --guest`: launcher -> Wine own W^X loader -> shim -> uwph, constraints `wx,noproc`, nofork OFF, external stock wineserver concession. Linux only. Valve bootstrap reached “Suppressing Steam update” but no connection log/logged-on state appeared within 120s. Probe and game skipped by the login gate; no SteamAPI or game-progress proof. Webhelper count 0 (127 samples, max 0, matching CreateProcess lines 0). Exact test exited 1. Host tests and Windows smoke command exited 0 (500 smoke checks passed). Evidence and detailed limitations: `/workspace/x64-run/lanes/B50/o3`, `B50-O3.result`; video `/workspace/x64-run/videos/B50-O3.mp4` (8s). No alternate credential path or CEF attempted.
 
+## B71 O1
+
+BLOCKED (stock Wine 10.0 only, not THROUGH uwph, not console): B50 O2 rerun with `--steam-wait 360`, no code changes. B70's net fix is not merged (B70 O1 BLOCKED, O2 in progress), so this ran without it. Valve steam.exe stayed `[Logged Off, 0, 0] [U:1:0]` for all 360 s. **No CM connect was ever attempted.** connection_log has no `GetCMListForConnect`, `YieldingConnect`, `Connect()`, `LogOnResponse`, transport choice (WebSocket/UDP dice roll) or EResult. Its only network activity is the HTTP :80 connectivity probe, which times out every ~25 s, plus the IPv6 checks. Probe and Megabonk were skipped by the logon gate, so there is no probe output and no Player.log. webhelper_count=0 (363 samples, running max 0). webhelper_spawn_attempts=1: one CreateProcess of the physically absent `bin\cef\cef.win64\steamwebhelper.exe`. CEF never appeared in the prefix.
+
+This differs from the network hypothesis in STEAMHOST §2B. steamcmd under the same box networking does fetch the CM list and log on over UDP in ~30–150 s. steam.exe never reaches that code path at all. Two log lines point to the missing browser as the blocker:
+
+```text
+steamui_html.txt: Started webhelper process 0
+steamui_html.txt: Timed out waiting for webhelper init
+steamui_html.txt: STARTUP SteamUI browser requested at +130239ms
+console_log.txt:  src\steamUI\steamuisharedjscontroller.cpp (583) : Failed creating offscreen shared JS context
+console_log.txt:  src\common\net_misc.cpp (252) : Assertion Failed: CalcUnIPThisBox - GetAdaptersAddresses returned 13
+```
+
+This is consistent with the current client starting logon from its SteamUI/SharedJSContext, which CEF hosts. Without a webhelper, the client never asks for a CM logon. That is correlation from Valve's own logs, not a disassembly-level proof. The HTTP :80 connectivity failures do not gate CM connects in steamcmd. Last 60 s of connection_log (verbatim):
+
+```text
+[2026-10-25 21:07:24] Connectivity test: Starting test, fetching 'http://steamconnecttest.com/204'
+[2026-10-25 21:07:39] Connectivity test (198.18.0.1:80 (198.18.0.1:80)): HTTP fetch failed
+[2026-10-25 21:07:39] Connectivity test: result=TimedOut (since 340.8s ago), prev=Unknown, in progress=0
+[2026-10-25 21:07:57] Connectivity test: Starting test, fetching 'http://steamconnecttest.com/204'
+[2026-10-25 21:08:12] Connectivity test (198.18.0.1:80 (198.18.0.1:80)): HTTP fetch failed
+[2026-10-25 21:08:12] Connectivity test: result=TimedOut (since 374.4s ago), prev=Unknown, in progress=0
+[2026-10-25 21:08:19] [Logged Off, 0, 0] [U:1:0] ResetVoiceRecording() (was recording: 0) (last get voice time: 1792958899 seconds ago)
+[2026-10-25 21:08:19] [Logged Off, 0, 0] [U:1:0] Log session ended
+```
+
+The exact test exited 1 at run-minimal.sh, so the following `&&` assertions did not run. The separate leak check (`! grep -rIl --exclude-dir=pfx eyJ $E x64/steam-min`) exited 0. Evidence: `/workspace/x64-run/lanes/B71/o1/` (redacted steam-logs/, processes.txt, flags.txt, webhelper_*). Video: `/workspace/x64-run/videos/B71-O1.mp4` (8 s, logged-off branch; free Xvfb + ffmpeg, no Encom). Prefix `x64/steam-min/out/pfx` (1.7 GB) deleted. Implication: under João's no-browser rule, steam.exe as the logon driver looks like a dead end. The B72–B75 own-host route (IClientUser logon + callback pump) is the remaining path. A B70 fix alone is not expected to change this result.
+
 ## B34
 
 O2 implementation is **BLOCKED at runtime proof**, not DONE. The new
