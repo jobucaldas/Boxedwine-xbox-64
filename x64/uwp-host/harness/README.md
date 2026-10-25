@@ -67,9 +67,9 @@ yet be used as evidence of Wine integration. Linux raw memory semantics still
 do not demonstrate UWP memory policy.
 
 Instrumentation is separately linked into the shim; optional weak hooks in the
-five selected backend entries increment atomic totals independently of wrapper
-counts. A mutex protects immediate-caller module names and per-module wrapper
-and backend counts; TLS carries attribution only for the current wrapper call.
+selected backend entries (five; mprotect is the sixth since R4X O2) increment
+atomic totals independently of wrapper counts. A mutex protects
+immediate-caller module names and per-module wrapper and backend counts; TLS carries attribution only for the current wrapper call.
 dladdr identifies the immediate return-address module (not a complete causal
 stack). Module names are hex-encoded in reports, alongside process PID.
 Thirty-two module slots and 511-byte names are bounded; overflow and unknown
@@ -208,7 +208,8 @@ proof. No signal handler, remote inspection, Wine loader change, or fake
 Unix-side object is used. `verify_wine.py` matches the report PID to the traced
 launcher, resolves caller paths to canonical ntdll.so, checks hashes and real
 runtime relocation bindings, and requires nonzero matching wrapper/backend
-counts for all five selected operations, zero selected bypasses, zero
+counts for all selected operations (five in R4H O4; six since R4X O2 added
+mprotect), zero selected bypasses, zero
 recursion/unattributed/overflow, expected PE output, and Wine module-load traces.
 Control runs use our launcher and stock Wine without preload and must have no
 report. Each PE run has a 12-second timeout plus 2-second kill grace.
@@ -226,7 +227,11 @@ Wine fixture, synthetic boot event, loader edit, or suppressed trace is used
 to turn this failure green. A later order must resolve the cold-start/no-boot
 fixture requirement within the allowed process/loader constraints.
 
-The selected routed surface is only open/read/close/mmap/munmap. The O3
+The selected routed surface is only open/read/close/mmap/munmap (R4H O4),
+plus mprotect since R4X O2. Since R4X O2 the routed runs also use the private
+W^X ntdll.so (`out/wine-wx`, see the R4X O2 section): the shim refuses
+WRITE|EXEC and stock ntdll maps PE images RWX, so routed stock Wine now exits
+13. Controls stay on stock Debian Wine without preload. The O3
 inventory's other 160 unsupported imports, 33 retained libc/internal imports,
 `syscall()` and two inline syscall sites remain Linux dependencies/bypasses.
 Passing these counters would not mean full Unix-side portability. Wine's
@@ -234,7 +239,7 @@ native Linux TLS/signals and memory behavior are not UWP equivalents.
 
 | O4 evidence | Routing and limit |
 | --- | --- |
-| Two routed owned PEs | Our launcher -> real Wine loader/ntdll.so -> shim -> public uwph -> Linux backend, five selected symbols; overall no-wineboot gate fails |
+| Two routed owned PEs | Our launcher -> real Wine loader/ntdll.so -> shim -> public uwph -> Linux backend, five selected symbols (six, W^X ntdll.so since R4X O2); overall no-wineboot gate fails |
 | Two unshimmed controls | Our launcher + stock Wine; no uwph report |
 | Prefix copy, server and inventory | Stock-Wine setup / separate Linux stand-in dependencies; not uwph proof |
 | O1/O2 regressions | THROUGH uwph Linux backend; O2 negative control is stock Linux libc |
@@ -348,7 +353,10 @@ RWX emulation is unchanged for other callers.
 
 The harness shim now also exports `mprotect` (routed to uwph_protect; counted
 as `mprotect`), and its `mmap` refuses WRITE|EXEC before any backend entry, so
-a refused RWX request shows as a wrapper call without a backend entry.
+a refused RWX request shows as a wrapper call without a backend entry
+(mmap), or as a wrapper call whose uwph_protect returned EACCES before the
+backend (mprotect). This applies to every shim user, so `wine-test`'s routed
+mode now runs the W^X ntdll.so below; with stock ntdll it would exit 13.
 
 `prepare-wine-wx.sh` builds a private `out/wine-wx/` tree: upstream Wine 10.0
 (`/tmp/wine-src`) + the Debian 10.0~repack-6 Unix-ntdll patches (install paths,
@@ -366,7 +374,7 @@ Exact test, from the repository root:
 `make -C x64/uwp-host && /workspace/xbox-readiness/bin/uwpjail --wx -- x64/uwp-host/harness/out/run_hello`.
 `run_hello` runs hello.exe through our launcher -> W^X Wine loader/ntdll.so ->
 shim -> uwph Linux backend. It exits 3 when hello passes but no protect call
-reached the backend or an RWX mmap was refused. `WINE_LOADER=/usr/lib/wine/wine64`
+reached the backend or an RWX mmap/mprotect was refused. `WINE_LOADER=/usr/lib/wine/wine64`
 selects the stock Debian ntdll as a control; under `--wx` that exits 13.
 `make -C x64/uwp-host/harness protect-test` checks the API alone under --wx.
 
@@ -377,3 +385,4 @@ selects the stock Debian ntdll as a control; under `--wx` that exits 13.
 | protect-test | uwph API only, no PE |
 | Windows uwph_protect | Build-only (mingw APP headers); no VirtualProtectFromApp run |
 | Separate wineserver | Stock Linux wineserver64 (unshimmed), as in R4H O4 |
+| wine-test (R4H O4 gate) | Routed = W^X ntdll.so + shim -> uwph, both PEs exit 0; controls = stock Wine; still BLOCKED only by wineboot attempts |

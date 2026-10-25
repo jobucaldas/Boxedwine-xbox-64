@@ -1018,6 +1018,9 @@ dlls/msvcp90/tests/string.c:137:                                                
   Wine loader -> shim -> uwph: 129 uwph_protect backend calls in the main process
   (131 total), 0 refused RWX mmaps, strace shows no PROT_WRITE|PROT_EXEC
   syscall. Stock Debian ntdll under the same jail exits 13.
+- The shim's RWX refusal applies to every shim user, so R4H `wine-test` routed
+  mode now uses out/wine-wx (stock ntdll + shim exits 13); its controls stay
+  stock. wine-test: all four PEs exit 0, still BLOCKED only by wineboot.
 - Still RWX elsewhere (not hit by hello): virtual_create_builtin_view
   (:3539/:3552, ELF-embedded builtins) and PE code that asks for
   PAGE_EXECUTE_READWRITE. Both now get EACCES from uwph_protect/--wx instead of

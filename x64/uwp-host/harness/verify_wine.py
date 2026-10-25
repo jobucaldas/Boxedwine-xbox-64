@@ -11,14 +11,19 @@ import sys
 
 
 def verify(run):
-    identity = json.loads((run / 'identity.json').read_text())
-    for item in identity['artifacts'].values():
-        assert hashlib.sha256(pathlib.Path(item['path']).read_bytes()).hexdigest() == item['sha256'], 'artifact changed'
-    ntdll = pathlib.Path(identity['artifacts']['unix_ntdll']['path']).resolve()
+    # Controls: stock Debian Wine. Routed: private W^X ntdll.so (R4X O2).
+    ntdlls = {}
+    for mode, file in (('control', 'identity.json'), ('routed', 'identity-wx.json')):
+        identity = json.loads((run / file).read_text())
+        for item in identity['artifacts'].values():
+            assert hashlib.sha256(pathlib.Path(item['path']).read_bytes()).hexdigest() == item['sha256'], 'artifact changed'
+        ntdlls[mode] = pathlib.Path(identity['artifacts']['unix_ntdll']['path']).resolve()
+    assert ntdlls['control'] != ntdlls['routed'], 'routed run must use the W^X ntdll.so'
     shim = (pathlib.Path(__file__).resolve().parent / 'out/libuwph_wine_shim.so').resolve()
     selected = ('open', 'read', 'close', 'mmap', 'munmap', 'mprotect')
     blockers = []
     for mode in ('control', 'routed'):
+        ntdll = ntdlls[mode]
         for pe in ('hello_k32', 'hello'):
             name = f'{mode}-{pe}'
             log = (run / f'{name}.log').read_text()
