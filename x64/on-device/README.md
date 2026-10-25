@@ -232,3 +232,42 @@ Activation API reference: [IFrameworkView.Load](https://learn.microsoft.com/en-u
 4. Review the files before sharing. Omit credentials, tokens, private keys
    (`.pfx`), `LocalState/private/`, and owned game payloads. Review diagnostic
    captures/dumps for private data; send only the relevant reviewed evidence.
+
+## Readiness ladder p1–p6 (B02 O1)
+
+These stages run before n0 in the packaged CoreApplication. No child process,
+Wine, or PE loader is needed: p1–p4 and p6 are PE probe sources linked into
+`rungs.exe`. Execution requires verified Xbox UWP activation and LocalState.
+The hosted ladder emits six SKIPs, including when adapters exist. Build and
+offline output are not console evidence.
+
+| Rung | Probe | Native action / current limitation |
+| --- | --- | --- |
+| p1 | seh_probe | Runs frame-based x64 SEH: AV, divide by zero, illegal instruction, breakpoint, software exception, 10,000 AV recoveries and stack growth. Limits: replaces VEH; guard-page and concurrent VEH checks remain uncovered. |
+| p2 | thread_probe | Runs 64 workers, TLS, exact CS/SRW counters, event ping-pong, timer, mutex, semaphore and condition-variable timeout. Validates creation and bounds every wait; closes completed worker handles and retains static resources if a worker times out. |
+| p3 | fs_probe | Runs CreateFile2 save/read, case-insensitive reopen, 1MB CreateFileMappingFromApp/MapViewOfFileFromApp mapping, flush/readback, delete and free-space assertions in verified LocalState. Desktop known-folder redirection and install-directory writes remain uncovered. |
+| p4 | net_probe | Runs Winsock startup and ephemeral same-process TCP bind/listen/connect/accept/payload assertions, using nonblocking sockets and bounded select waits. External DNS/TLS/WebSocket, fixed-port and cross-app checks remain uncovered; no Steam endpoints or requests. Container denial reports FAIL with socket errors. |
+| p5 | jit_probe | SKIP: original VirtualProtect/VirtualAlloc and RWX dual-map test is not rebuilt against app-safe APIs. No original JIT PE executes. A future full port must use VirtualProtectFromApp. |
+| p6 | uwph Windows smoke | Runs unchanged `x64/uwp-host/tests/smoke.c` plus unixside and Windows backend in-process, THROUGH-uwph. Creates `smoke-input.txt` in LocalState; full self-test assertions determine exit status. |
+
+Copied readiness sources are under `readiness/`, originally from
+`/workspace/xbox-readiness/src/pe`; the SEH/thread/filesystem/network ports are compiled. Originals
+remain unchanged. These ports and the uwph self-test compile with
+`WINAPI_FAMILY=2` and implicit API declarations rejected. This is a header
+check, not Windows SDK certification or console activation proof. Detailed
+probe assertions go to stdout; the final exit status goes to ladder-native.log.
+Unsupported tests remain explicit SKIPs rather than desktop API fallbacks.
+
+The SEH port uses MinGW's x64 frame scope-table primitive, with ordinary
+`__C_specific_handler` dispatch; it installs no vectored handler. App-safe
+mapping references: [CreateFileMappingFromApp](https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-createfilemappingfromapp),
+[MapViewOfFileFromApp](https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-mapviewoffilefromapp).
+Frame handling: [Microsoft x64 exception handling](https://learn.microsoft.com/en-us/cpp/build/exception-handling-x64).
+
+Desktop regression: `./x64/on-device/readiness/check.sh` builds a separate
+fault-instrumented test PE and runs it THROUGH our launcher and Wine's own
+loader, with a disposable prefix and a 25-second per-process timeout. It
+checks the four ports plus failures creating the first worker, ping-pong
+worker, release event and either ping-pong event. Injected failures must
+return probe failure without hanging. Production `rungs.exe` contains no
+fault wrappers. These are desktop diagnostics, not UWP/console PASS evidence.
