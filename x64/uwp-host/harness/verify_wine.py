@@ -2,15 +2,23 @@
 """Fail closed on Wine identity, attribution, selected bypasses or boot activity.
 
 Routing diagnostics can pass while the overall wineboot-free gate is BLOCKED.
+
+--inproc (or UWPH_INPROC_SERVER=1): in-process server run. execv is then held to
+a stricter rule instead of >0: exactly 0 uwph entries, no wineserver execve in
+any case's exec trace, and the inproc_server.c banner in the routed log. Every
+other routed symbol keeps the >0 requirement; default mode is unchanged.
 """
 import hashlib
 import json
+import os
 import pathlib
 import re
 import sys
 
+INPROC_BANNER = re.compile(r'\[inproc\] .*no separate server process')
 
-def verify(run):
+
+def verify(run, inproc=False):
     # Controls: stock Debian Wine. Routed: private W^X ntdll.so (R4X O2).
     ntdlls = {}
     for mode, file in (('control', 'identity.json'), ('routed', 'identity-wx.json')):
@@ -40,6 +48,9 @@ def verify(run):
             # Includes failed startup attempts; disabling wineboot cannot green it.
             if 'wineboot' in log.lower() or 'wineboot' in trace.lower():
                 blockers.append(f'{name}: wineboot activity/attempt in trace')
+            if inproc:
+                spawns = [line for line in trace.splitlines() if re.search(r'execve\(.*wineserver', line)]
+                assert not spawns, f'{name}: in-process mode but wineserver execve in exec trace: {spawns[0]}'
             main_pids = re.findall(r'^(\d+)\s+execve\(".*/out/run_via_wine"', trace, re.M)
             assert len(main_pids) == 1, 'ambiguous launcher process'
             report = run / f'{name}.report.{main_pids[0]}'
@@ -95,10 +106,19 @@ def verify(run):
             o2 = [s for s in o2 if s not in selected or s == "mprotect"]
             assert set(traced) == set(o2), f'trace rows {sorted(traced)} != routed O2 set {o2}'
             print(f'{name}: O2 traced uwph entries ' + ','.join(f'{s}:{traced[s]}' for s in o2))
+            if inproc:
+                assert 'execv' in o2 and traced['execv'] == 0, \
+                    f"{name}: in-process mode requires exactly 0 uwph execv entries, got {traced.get('execv')}"
+                assert INPROC_BANNER.search(log), f'{name}: in-process mode missing [inproc] no-separate-server banner'
+                print(f'{name}: in-process server: banner present, execv:0, no wineserver execve')
+                o2 = [s for s in o2 if s != 'execv']
             assert all(traced[s] > 0 for s in o2), f'{name}: O2 traced symbol with zero uwph entries'
     classes = [line.split('\t')[1] for line in (run / 'surface.tsv').read_text().splitlines()[1:]]
     print(f"Remaining bypasses: {classes.count('unsupported')} unsupported imports, {classes.count('libc internal')} retained libc/internal imports, libc syscall(), two inline syscall sites; see surface.tsv/direct-syscalls.tsv.")
-    print('Separate stock Linux wineserver: NOT routed; NOT in-process Xbox/UWP evidence.')
+    if inproc:
+        print('In-process mode: wineserver runs as a thread in the Wine loader process; no separate server process.')
+    else:
+        print('Separate stock Linux wineserver: NOT routed; NOT in-process Xbox/UWP evidence.')
     if blockers:
         raise AssertionError('; '.join(blockers))
     print('Wine uwph verification: PASS')
@@ -106,7 +126,8 @@ def verify(run):
 
 if __name__ == '__main__':
     try:
-        verify(pathlib.Path(sys.argv[1]))
+        args = [arg for arg in sys.argv[1:] if arg != '--inproc']
+        verify(pathlib.Path(args[0]), '--inproc' in sys.argv[1:] or os.environ.get('UWPH_INPROC_SERVER') == '1')
     except (AssertionError, OSError, ValueError, KeyError) as error:
         print(f'Wine uwph verification: BLOCKED: {error}', file=sys.stderr)
         sys.exit(1)

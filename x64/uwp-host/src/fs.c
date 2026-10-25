@@ -487,7 +487,15 @@ UWPH_API uwph_ssize_t uwph_readlink(const char *p, char *b, size_t l)
 FS_STUB(int, fchmod, (int fd, uwph_mode_t m), (void)fd, (void)m)
 FS_STUB(int, chmod, (const char *p, uwph_mode_t m), (void)p, (void)m)
 FS_STUB(int, fsync, (int fd), (void)fd)
-FS_STUB(int, ftruncate, (int fd, uwph_off_t l), (void)fd, (void)l)
+/* Win32 split backend deliberately remains an ENOSYS prototype stub. */
+UWPH_API int uwph_ftruncate(int fd, uwph_off_t l)
+{
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    return uwph_linux_ftruncate(fd, l);
+#else
+    (void)fd; (void)l; return UWPH_ENOSYS_INT();
+#endif
+}
 FS_STUB(int, posix_fallocate, (int fd, uwph_off_t o, uwph_off_t l), (void)fd, (void)o, (void)l)
 FS_STUB(int, futimens, (int fd, const struct uwph_timespec t[2]), (void)fd, (void)t)
 FS_STUB(int, utimensat, (int d, const char *p, const struct uwph_timespec t[2], int f), (void)d, (void)p, (void)t, (void)f)

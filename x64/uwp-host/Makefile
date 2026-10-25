@@ -84,6 +84,8 @@ test: all
 	    WINEDEBUG=-all $(WINE) $(OUT)/win/traced.exe "$$root"
 	$(MAKE) -C harness traced-test
 	$(MAKE) -C harness proc-unit-test
+	$(MAKE) -C harness bigfile-test
+	python3 harness/test_verify_wine_inproc.py
 
 clean:
 	rm -rf $(OUT)
