@@ -1,0 +1,49 @@
+make: Entering directory '/workspace/wt/R4G/x64/uwp-host/harness'
+make: 'out/libuwph_wine_shim.so' is up to date.
+make: 'out/run_via_wine' is up to date.
+make: Leaving directory '/workspace/wt/R4G/x64/uwp-host/harness'
+[launcher] exec /usr/lib/wine/wine64 -> /workspace/wt/R4G/x64/graphics/out/o3/vulkan_clear.exe (handing guest to Wine's loader)
+O3 offscreen Vulkan clear/readback attempt; lavapipe != Xbox D3D12
+create(&ci,NULL,&instance) = 0
+MESA: error: Failed to create DXCore adapter factory
+WARNING: dzn is not a conformant Vulkan implementation, testing use only.
+38350.079:0020:0024:info:vkd3d-proton:vkd3d_instance_apply_application_workarounds: Program name: "vulkan_clear.exe" (hash: 056f430fa52510d4)
+38350.079:0020:0024:info:vkd3d-proton:vkd3d_instance_deduce_config_flags_from_environment: shader_cache is used, global_pipeline_cache is enforced.
+38350.079:0020:0024:info:vkd3d-proton:vkd3d_config_flags_init_once: VKD3D_CONFIG=''.
+38350.080:0020:0024:info:vkd3d-proton:vkd3d_get_vk_version: vkd3d-proton - applicationVersion: 3.0.1.
+38350.080:0020:0024:info:vkd3d-proton:vkd3d_instance_init: vkd3d-proton - build: 3b10bd7a7ec6a73.
+38350.081:0020:0024:info:vkd3d-proton:d3d12_device_create: Forcing singleton device due to RenderDoc being enabled.
+38350.135:0020:0024:info:vkd3d-proton:vkd3d_memory_info_decide_hvv_usage: Topology: UMA-like topology.
+38350.135:0020:0024:info:vkd3d-proton:vkd3d_memory_info_upload_hvv_memory_properties: Topology: HVV usage is allowed, using DEVICE_LOCAL | HOST_COHERENT for UPLOAD.
+38350.135:0020:0024:info:vkd3d-proton:vkd3d_bindless_state_get_bindless_flags: Enabling fast paths for advanced ExecuteIndirect() graphics and compute (EXT_dgc).
+38350.135:0020:0024:info:vkd3d-proton:vkd3d_bindless_state_get_bindless_flags: Device supports VK_EXT_mutable_descriptor_type.
+38350.236:0020:0024:info:vkd3d-proton:d3d12_device_determine_ray_tracing_tier: DXR support enabled.
+38350.236:0020:0024:info:vkd3d-proton:d3d12_device_determine_ray_tracing_tier: DXR 1.1 support enabled.
+38350.236:0020:0024:info:vkd3d-proton:vkd3d_pipeline_library_init_disk_cache: Remapping VKD3D_SHADER_CACHE to: vkd3d-proton.cache.
+38350.236:0020:0024:info:vkd3d-proton:vkd3d_pipeline_library_init_disk_cache: Attempting to load disk cache from: vkd3d-proton.cache.
+38350.237:0020:0048:info:vkd3d-proton:vkd3d_pipeline_library_disk_thread_main: Performing async setup of stream archive ...
+38350.237:0020:0048:info:vkd3d-proton:vkd3d_pipeline_library_disk_cache_merge: No write cache exists. No need to merge any disk caches.
+38350.237:0020:0048:info:vkd3d-proton:vkd3d_pipeline_library_disk_cache_initial_setup: Merging pipeline libraries took 0.142 ms.
+38350.237:0020:0048:info:vkd3d-proton:vkd3d_pipeline_library_disk_cache_initial_setup: Failed to map read-only cache: vkd3d-proton.cache.
+38350.237:0020:0048:info:vkd3d-proton:vkd3d_pipeline_library_disk_thread_main: Done performing async setup of stream archive.
+vkEnumeratePhysicalDevices(instance,&count,NULL) = 0
+physicalDeviceCount=1
+vkEnumeratePhysicalDevices(instance,&count,physical) = 0
+adapter=Microsoft Direct3D12 (NVIDIA GeForce GTX 470)
+38350.369:0020:0048:info:vkd3d-proton:vkd3d_pipeline_library_disk_thread_main: Pipeline cache marked dirty. Flush is scheduled.
+vkCreateDevice(physical[0],&di,NULL,&device) = 0
+vkCreateImage(device,&ii,NULL,&image) = 0
+vkAllocateMemory(device,&ai,NULL,&imem) = 0
+vkBindImageMemory(device,image,imem,0) = 0
+vkCreateBuffer(device,&bi,NULL,&buffer) = 0
+vkAllocateMemory(device,&ai,NULL,&bmem) = 0
+vkBindBufferMemory(device,buffer,bmem,0) = 0
+vkCreateCommandPool(device,&pi,NULL,&pool) = 0
+vkAllocateCommandBuffers(device,&ca,&cmd) = 0
+vkBeginCommandBuffer(cmd,&begin) = 0
+vkEndCommandBuffer(cmd) = 0
+vkQueueSubmit(queue,1,&submit,VK_NULL_HANDLE) = 0
+vkQueueWaitIdle(queue) = 0
+vkMapMemory(device,bmem,0,VK_WHOLE_SIZE,0,(void **)&pixels) = 0
+red clear readback: pixels=4096 mismatches=0
+PASS offscreen clear/readback only; no presentation or Xbox proof

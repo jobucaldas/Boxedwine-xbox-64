@@ -4,8 +4,9 @@
 
 UWPH_API long uwph_syscall(long nr, ...)
 {
+    uwph_trace_hit(UWPH_TRACE_SYSCALL);
     va_list ap;
-    int64_t a[6];   /* not long: long is 32-bit on the Windows build (LLP64) */
+    int64_t a[6] = {0};   /* not long: long is 32-bit on the Windows build (LLP64) */
     int nargs;
     switch (nr) {
     case UWPH_NR_gettid: return uwph_gettid();
@@ -19,6 +20,10 @@ UWPH_API long uwph_syscall(long nr, ...)
     for (int i = 0; i < nargs; i++) a[i] = va_arg(ap, int64_t);
     va_end(ap);
 
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    UWPH_NATIVE(long, "syscall", (long,...));
+    UWPH_NATIVE_RETURN(fn(nr,a[0],a[1],a[2],a[3],a[4],a[5]));
+#endif
     switch (nr) {
     case UWPH_NR_gettid:
         return uwph_gettid();

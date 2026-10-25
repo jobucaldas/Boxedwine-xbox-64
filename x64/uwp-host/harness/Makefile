@@ -5,7 +5,7 @@ SOURCES := $(wildcard ../src/*.c) linux_backend.c
 HEADERS := $(wildcard ../include/uwph/*.h ../src/*.h)
 OBJECTS := $(patsubst %.c,$(OUT)/%.o,$(notdir $(SOURCES)))
 vpath %.c ../src .
-$(OUT)/%.o: %.c $(HEADERS) counters.h
+$(OUT)/%.o: %.c $(HEADERS) counters.h bigfile.inc
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) -c $< -o $@
 $(OUT)/libuwph.a: $(OBJECTS)
@@ -122,6 +122,11 @@ prebuilt-prefix:
 	./prepare-wine.sh --prebuilt-prefix
 .PHONY: prebuilt-prefix
 
+proc-unit-test: $(OUT)/fake_proc_test
+	$(OUT)/fake_proc_test --host-proc
+	bwrap --ro-bind / / --tmpfs /proc -- $(OUT)/fake_proc_test
+.PHONY: proc-unit-test
+
 # B18: two intentionally absent exports; never execute the generated stubs.
 $(OUT)/stub_probe.def:
 	@mkdir -p $(OUT)
@@ -149,3 +154,9 @@ FORCE:
 # B34 O1: explorer sources built as a separate, currently unused PE DLL.
 $(OUT)/wine-wx/.desk-stamp: prepare-wine-desk.sh wine-desktop-thread.patch $(OUT)/wine-wx/.stamp
 	./prepare-wine-desk.sh
+
+$(OUT)/test_bigfile: ../tests/test_bigfile.c $(OUT)/libuwph.a
+	$(CC) $(CFLAGS) $< $(OUT)/libuwph.a -ldl -o $@
+bigfile-test: $(OUT)/test_bigfile
+	timeout 30s $(OUT)/test_bigfile
+.PHONY: bigfile-test

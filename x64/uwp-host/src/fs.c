@@ -476,6 +476,7 @@ UWPH_API uwph_ssize_t uwph_readlink(const char *p, char *b, size_t l)
         if ((size_t)n > l) n = (int)l;
         memcpy(b, exe, n); return n;
     }
+    if (!strncmp(p, "/proc/", 6)) return uwph_fake_proc_link(p, b, l);
 #ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
     UWPH_NATIVE(uwph_ssize_t, "readlink", (const char *, char *, size_t));
     UWPH_NATIVE_RETURN(fn(p, b, l));
@@ -486,7 +487,15 @@ UWPH_API uwph_ssize_t uwph_readlink(const char *p, char *b, size_t l)
 FS_STUB(int, fchmod, (int fd, uwph_mode_t m), (void)fd, (void)m)
 FS_STUB(int, chmod, (const char *p, uwph_mode_t m), (void)p, (void)m)
 FS_STUB(int, fsync, (int fd), (void)fd)
-FS_STUB(int, ftruncate, (int fd, uwph_off_t l), (void)fd, (void)l)
+/* Win32 split backend deliberately remains an ENOSYS prototype stub. */
+UWPH_API int uwph_ftruncate(int fd, uwph_off_t l)
+{
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    return uwph_linux_ftruncate(fd, l);
+#else
+    (void)fd; (void)l; return UWPH_ENOSYS_INT();
+#endif
+}
 FS_STUB(int, posix_fallocate, (int fd, uwph_off_t o, uwph_off_t l), (void)fd, (void)o, (void)l)
 FS_STUB(int, futimens, (int fd, const struct uwph_timespec t[2]), (void)fd, (void)t)
 FS_STUB(int, utimensat, (int d, const char *p, const struct uwph_timespec t[2], int f), (void)d, (void)p, (void)t, (void)f)
@@ -584,6 +593,8 @@ struct uwph_dir {
 UWPH_API uwph_DIR *uwph_opendir(const char *path)
 {
     uwph_trace_hit(UWPH_TRACE_OPENDIR);
+    if (path && (!strcmp(path, "/proc") || !strncmp(path, "/proc/", 6)))
+        return uwph_fake_opendir(path);
 #ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
     UWPH_NATIVE(uwph_DIR *, "opendir", (const char *));
     UWPH_NATIVE_RETURN(fn(path));
@@ -612,6 +623,7 @@ UWPH_API uwph_DIR *uwph_opendir(const char *path)
 }
 UWPH_API struct uwph_dirent *uwph_readdir(uwph_DIR *dir)
 {
+    if (uwph_fake_dir_owned(dir)) return uwph_fake_readdir(dir);
 #ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
     UWPH_NATIVE(struct uwph_dirent *, "readdir", (uwph_DIR *));
     UWPH_NATIVE_RETURN(fn(dir));
@@ -635,6 +647,7 @@ UWPH_API struct uwph_dirent *uwph_readdir(uwph_DIR *dir)
 }
 UWPH_API int uwph_closedir(uwph_DIR *dir)
 {
+    if (uwph_fake_dir_owned(dir)) return uwph_fake_closedir(dir);
 #ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
     UWPH_NATIVE(int, "closedir", (uwph_DIR *));
     UWPH_NATIVE_RETURN(fn(dir));

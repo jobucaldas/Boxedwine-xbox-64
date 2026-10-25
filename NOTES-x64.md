@@ -652,6 +652,127 @@ uwp-host build/surface check. No uwp-host runtime, launcher or stock Wine
 execution is exercised; UI routing evidence and Linux-box video are deferred
 to their respective later orders. See x64/ui/README.md for the exact checks.
 
+## R4G O1
+
+Documented the exact dzn and isolated DComp commands and cited retained stock
+Wine logs in `x64/graphics/RESULT-dzn.md` (raw copies under
+`x64/graphics/evidence/R4G-O1/`). O1 evidence check PASS; runtime BLOCKED:
+DCompositionCreateDevice returns E_NOTIMPL (0x80004001), NULL device; dzn
+instance succeeds but physical-device enumeration returns -3 (process exit 10).
+Mesa 25.1.9 source root `/workspace/xbox-readiness/dzn/src/mesa-25.1.9`:
+`src/vulkan/wsi/wsi_common_win32.cpp:954` is the DComp call; NULL maps to
+initialization failure at :992. `src/microsoft/vulkan/dzn_device.c:1164`
+initializes WSI during device creation, before any requested surface.
+Next missing integration piece: composition swapchain (:795), then HWND target
+(:802), visual/SetRoot/SetContent/Commit (:806–809), all in that WSI file.
+These later dependencies are source-inspected and untested, not measured
+failures. A UWP CoreWindow path remains unimplemented. Evidence classification:
+cited STOCK WINE only; THROUGH-uwph/launcher not exercised, no new build.
+Lavapipe is not Xbox D3D12; no GPU/presentation or console proof. O1 only.
+
+## R4G O2
+
+Added an opt-in, enumeration-only `x64/graphics/dcomp_stub.cpp`: exported
+DCompositionCreateDevice returns S_OK and a real reference-counted
+IDCompositionDevice for Mesa's NULL-DXGI request. COM identity, unsupported
+IIDs, output clearing, lifetime and E_NOTIMPL presentation behavior are unit
+tested. All composition operations remain unimplemented; input arrays are
+preserved. Build `make -C x64/graphics` exit 0; test
+`x64/graphics/tests/run.sh` exit 0 with
+`PASS DCompositionCreateDevice HRESULT=0x00000000; COM identity/lifetime/errors; compositor E_NOTIMPL`.
+Evidence: `x64/graphics/evidence/R4G-O2/`. Proof is THROUGH our launcher,
+Wine's own PE loader and selected ntdll Unix calls routed via uwp-host shim;
+stock separate wineserver remains, no full uwph acceptance claim. This is a
+Linux stand-in unit proof only: actual dzn enumeration, swapchain/presentation,
+UWP deployment/API authorization and Xbox GPU execution remain untested.
+No platform DComp API is invoked by the compatibility DLL. Lavapipe is not
+Xbox D3D12. No visual output/video for this textual unit test. O2 only.
+
+## R4G O3
+
+Off-device offscreen Vulkan clear/readback PASS (2026-10-24). Added
+`x64/graphics/vulkan_clear.c` and `tests/run-clear.sh`; `make -C x64/graphics`
+builds/links the x64 PE against the repository's Vulkan headers (exit 0,
+-Wall -Wextra -Werror). Direct ICD loading uses the existing local Mesa
+25.1.9 vulkan_dzn.dll and official DXIL dependency, plus VKD3D-Proton and the
+O2 enumeration-only dcomp.dll. No ICD registration or loader replacement.
+Exact runtime: `DISPLAY=:99 x64/graphics/tests/run-clear.sh` (exit 0);
+repeat `VK_LOADER_DEBUG=driver DISPLAY=:99 x64/graphics/tests/run-clear.sh`
+also exits 0. Logs/hashes/PID-specific reports: `x64/graphics/evidence/R4G-O3/`.
+
+Measured output: physicalDeviceCount=1; vkCreateDevice=0; vkQueueSubmit=0;
+vkQueueWaitIdle=0; `red clear readback: pixels=4096 mismatches=0`;
+`PASS offscreen clear/readback only; no presentation or Xbox proof`.
+A 64x64 RGBA8 optimal image is cleared to red, copied to a coherent staging
+buffer, synchronized to host access, and all 4096 pixels checked. No shader,
+triangle, window, surface, swapchain or presentation was exercised.
+
+Proof classification: THROUGH our run_via_wine launcher -> Wine's own PE
+loader, with selected ntdll Unix calls routed via the uwp-host preload shim
+(positive open/read/close/mmap/munmap counters). A separate stock Linux
+wineserver and initialized O2 desktop prefix remain dependencies. This is not
+full uwph acceptance or an in-process UWP deployment. The guest's adapter name
+`Microsoft Direct3D12 (NVIDIA GeForce GTX 470)` is Wine's reported identity,
+not hardware evidence: loader diagnostics identify lvp_icd.json,
+libvulkan_lvp.so and llvmpipe (LLVM 19.1.7, 256 bits). **lavapipe ≠ Xbox D3D12**.
+
+Proposed STATUS dzn row update text:
+`dzn | off-device clear/readback PASS through launcher + selected uwph routing;
+4096/4096 pixels correct on lavapipe; presentation/CoreWindow, UWP authorization
+and Xbox D3D12 UNPROVEN (lavapipe ≠ Xbox D3D12).`
+The earlier O1 E_NOTIMPL wall is passed only by opting into O2's compatibility
+object. Its compositor methods remain E_NOTIMPL; this does not resolve WSI.
+
+Artifacts: `/workspace/x64-run/videos/R4G-O3.mp4` (6 seconds) and
+`/workspace/x64-run/videos/R4G-O3.png`: Xvfb :177 terminal capture explicitly
+labeled SAVED RESULTS FROM LIVE LAUNCHER TEST, displaying real retained output,
+not a rendered clear or fake game screenshot. Original executions used :99.
+No console access, commits, pushes or remote operations. O3 only.
+
+## R4G O4
+
+On-device D3D12 probe exe for R4D packaging (2026-10-24). Added
+`x64/graphics/probe_d3d12.c`, Makefile rule `out/probe_d3d12.exe` and
+`tests/run-probe.sh`; README "O4" section carries the R4D packaging snippet
+(args, log locations, RESULT line format, exit codes).
+
+Exact test: `x86_64-w64-mingw32-gcc -O2 -std=c11 -Wall -Wextra -Werror
+-municode -static-libgcc -s x64/graphics/probe_d3d12.c -o
+x64/graphics/out/probe_d3d12.exe -ldxguid` exit 0; file is `PE32+ executable
+(console) x86-64`, 82432 bytes, imports KERNEL32/msvcrt/USER32 only, sha256
+eaee3624...7219. Log: `x64/graphics/evidence/R4G-O4/exact-test.log`.
+
+Linux smoke of that same binary (hash in artifacts.sha256):
+`DISPLAY=:104 x64/graphics/tests/run-probe.sh --frames 3600` exit 0, THROUGH
+run_via_wine -> Wine's own PE loader with selected uwph routing (positive
+counters in PID reports) and a separate stock wineserver on the O2 prefix.
+Output: `offscreen: 64x64 RGBA8 clear expect=0xffff00ff pixels=4096
+mismatches=0`, `present: PASS (3600 frames, 640x360 flip-discard HWND
+swapchain)`, `RESULT: PASS adapter="NVIDIA GeForce GTX 470" feature_level=11_1`.
+That adapter is Wine's reported identity; backend is Wine builtin d3d12
+(vkd3d) over lavapipe. **lavapipe ≠ Xbox D3D12**: nothing here proves the
+probe runs, creates a device, or presents on Xbox. HWND presentation is
+expected to SKIP under UWP; CoreWindow presentation is not implemented.
+
+Video: `/workspace/x64-run/videos/R4G-O4.mp4` (6.6 s, Xvfb :104) shows the
+live probe window clearing green -> blue during the run above.
+
+O4 resume verification (2026-10-24): independently reran the exact MinGW
+command above, exit 0; PE32+ x86-64 output exists (82432 bytes). Fresh output
+and hash: `x64/graphics/evidence/R4G-O4/exact-test-resume.log`. This is
+build-only; earlier smoke/video and their hashes remain historical evidence,
+not a runtime test of this fresh rebuild. Recreated lane result/commitmsg;
+no commit or remote operations.
+
+O4 reviewer fixes (2026-10-25): initialize each EnumAdapters1 output and
+check its HRESULT before dereferencing; unexpected enumeration failures log
+the HRESULT and exit via RESULT: FAIL. Reject oversized PROBE_D3D12_LOG
+values and failed/truncated explicit-path formatting before adding candidates.
+Exact MinGW command rerun with -Wall -Wextra -Werror: exit 0, PE32+ x86-64
+output exists (82432 bytes). Fresh evidence and SHA256:
+`x64/graphics/evidence/R4G-O4/exact-test-review-fix.log`. Classification:
+build-only; retained THROUGH-uwph smoke/video are historical and do not
+validate this revised binary. Xbox execution remains unverified.
 ## R4S O1 trace
 
 `x64/uwp-host/harness/surface-trace.tsv` records the unsupported ntdll.so
@@ -1651,6 +1772,46 @@ Video /workspace/x64-run/videos/B10-O1.mp4 (30 seconds) shows the routed
 installer blocker, not a running Steam client. No commits or remotes touched.
 
 Literal last installer log line: `44367.703:0030:0034:trace:module:MODULE_InitDLL (00006FFFFFC20000,PROCESS_DETACH,0000000000000001) - RETURN 1`.
+## B09 O1 — fake proc snapshots (2026-10-25)
+
+The provider now supplies self status/stat/auxv, meminfo, fd links and fd/task
+directory snapshots from uwph's descriptor, mapping and thread registries.
+Own numeric PID status/stat and task-stat paths are supported. Unknown proc
+paths fail closed. Memory budgets are 1024 MiB by default or 5120 MiB with
+UWPH_MEM_BUDGET_MB=5120; other values fail meminfo with EINVAL. Residency and
+CPU counters are unknown (zero), and this is not full Linux proc fidelity.
+Tests exercise Wine's process.c fill_vm_counters, system.c meminfo and
+thread.c get_thread_times parsing, binary auxv termination, descriptor links,
+thread lifecycle and mapping accounting with host procfs hidden.
+
+`make -C x64/uwp-host test` exits 0; complete output is
+/workspace/x64-run/lanes/B09/O1-make-test.log. Linux provider tests run THROUGH
+uwph; Windows backend unit tests run under stock Wine, not on Xbox.
+
+Exact acceptance reproduction (from /workspace/wt/B09):
+`DISPLAY=:2 WINEPREFIX=$PWD/x64/uwp-host/harness/out/wine-o4/prefix EXTRA_RW=$PWD /workspace/xbox-readiness/tests/uwp_run.sh noproc "$PWD/x64/uwp-host/harness" -- ./run-wine.sh`.
+Output: /workspace/x64-run/lanes/B09/O1-exact-noproc.log.
+Both routed hellos exit 0 THROUGH launcher -> Wine's own private W^X loader
+-> shim -> uwph. The command nevertheless exits 1: both stock controls exit
+1 with `wine: could not load ntdll.so: (null)` and the unchanged verifier
+reports `BLOCKED: control-hello_k32: nonzero exit`. This is not an exact-test PASS.
+
+Openat proof: harness/out/wine-o4/run-ZmdWtgjx/routed-hello.exec and
+routed-hello_k32.exec contain `strace -f -e trace=execve,openat` output;
+neither contains a /proc path. Fresh noproc probe traces are
+harness/out/b09-probes/fs_probe.strace and thread_probe.strace, collected
+with `strace -f -e openat`; neither contains a /proc path. Their logs report
+`SUMMARY fs_probe pass=7 fail=0` and `SUMMARY thread_probe pass=10 fail=0`,
+both exit 0 THROUGH the same launcher/loader/shim/uwph route. The thread
+probe's sysinfo memory value remains host-derived; the requested fake
+meminfo budget is tested separately and does not claim sysinfo coverage.
+
+All these routed processes see empty tmpfs /proc. The separately prestarted
+stock Linux wineserver remains outside the namespace and outside these
+traces. Therefore no global no-host-proc claim or concession removal is made;
+the shared readiness STATUS row is not upgraded. Xbox remains untested.
+Video: /workspace/x64-run/videos/B09-O1.mp4 (24.2 seconds, Xvfb).
+
 
 ## B06
 
@@ -2094,6 +2255,27 @@ Video /workspace/x64-run/videos/B20-O2.mp4 (60 s, Xvfb :122): routed client
 run 2, the 32-bit Steam updater window under uwph. Run 1 (installer + crypt32
 failure) is kept as /workspace/x64-run/lanes/B20/B20-O2-run1.mp4.
 
+## B13
+
+O2 (2026-10-25): blocked by the incomplete O1 download. The exact
+prerequisite check reports:
+
+```text
+ls: cannot access '/workspace/steam-owned/games/hades/x64/Hades.exe': No such file or directory
+find /workspace/steam-owned/games/hades -iname 'Hades*.exe': no matches
+stock Wine baseline: HADES reached=not-started (missing Hades.exe)
+THROUGH-uwph attempt: HADES reached=not-started (missing Hades.exe)
+```
+
+Stock Wine is installed (`wine-10.0 (Debian 10.0~repack-6)`), but neither
+requested game run could start. O1's result records an incomplete download
+stopped by its 20 GB free-space guard; existing partial content is unverified.
+O2 does not authorize repeating O1. No 90 s stock/DXVK/lavapipe baseline,
+no routed launcher/Wine-loader/uwph execution, and no Xbox-device proof occurred.
+The status lines above describe prerequisite failures, not runtime stages.
+The exact O2 test is **BLOCKED**: both status lines are recorded here, but
+`/workspace/x64-run/videos/B13-O2a.mp4` and `B13-O2b.mp4` are absent because
+there was no game to capture. No placeholder videos were generated.
 
 ## B24 O1 — fresh RWX caller investigation (blocked)
 
@@ -2426,6 +2608,78 @@ path stat/lstat/access answer directories from mapped-path metadata
 keep the handle-based fstat, and access W_OK still honours read-only mounts.
 Tests now cover registry/main-handle hit and miss on every backend plus
 access/stat/lstat of a newly created directory.
+
+## B08
+
+O1 implements every remaining numbered import in `harness/surface-trace.tsv`:
+priorities 51–64. **There are 14, not 15**: the numbered import trace ends at
+64 after B07's priority 50. No untraced fifteenth symbol or inline-syscall
+site was substituted. The literal 15-import requirement needs another traced
+entry or an explicit scope adjustment; the remaining 14 and the >=10 THROUGH
+increase are implemented and verified.
+
+| Import | Win32/UWP backend and Linux boundary |
+| --- | --- |
+| prctl | Virtual per-thread SET_NAME/GET_NAME; other operations counted ENOSYS. Linux native prctl. |
+| pthread_key_create | Existing per-thread key/destructor registry; Linux native key ABI. |
+| pthread_mutex_init | Existing private mutex; Linux shim preserves native mutex objects. |
+| pthread_mutexattr_destroy | Private attribute lifecycle; Linux native attr ABI. |
+| pthread_mutexattr_init | Private normal-mutex default; Linux native attr ABI. |
+| pthread_mutexattr_settype | Existing private recursive/normal type; Linux native attr ABI. |
+| pthread_setspecific | Private thread-local values; Linux native key ABI. |
+| secure_getenv | App-local environment (no privileged-execution mode on UWP); Linux native secure_getenv, preserving libc secure-mode filtering. |
+| sigaction | Existing cooperative in-process action table; Linux native sigaction. No new UWP synchronous exception hook or alternate-stack delivery. |
+| sigaltstack | Query/disable supported; enabling an alternate execution stack returns counted ENOSYS. Linux native registration/query. |
+| socket | Existing in-process Unix stream endpoints; INET remains counted ENOSYS on UWP. Linux Wine-fd mode uses native socket. |
+| socketpair | Existing private Unix stream pair; Linux Wine-fd mode uses native socketpair. |
+| syscall | Existing typed UWP dispatch for gettid/futex/tgkill/tkill/arch_prctl/utimensat; unknown numbers counted ENOSYS. Linux public typed dispatch calls native libc for known arities; Linux-only shim adapter preserves the native register-slot ABI. No raw guest instruction interception. |
+| vsnprintf | Host CRT formatting with a separate counter from snprintf; Linux resolves past the shim to prevent recursive interposition. |
+
+Each has a counter and shim export; the binding inventory now requires all
+71 exports and all 64 trace counters. Public API signatures are unchanged.
+Native pthread mutex/attribute adapters keep Wine objects compatible with
+uninterposed libc companion calls. Linux x86-64 tail thunks preserve opaque
+TLS pointers and native syscall/prctl register arguments without speculative
+C va_arg extraction. Tests cover all 14 symbols on stub, Win32/UWP and Linux,
+including recursive mutex lifecycle, native mutex ABI companion calls, TLS
+set/clear, signal query/set/restore, alternate-stack ENOSYS, Unix socketpair
+payload, invalid domains/signals/syscalls, thread-name roundtrip, environment
+lookup and formatter truncation/sizing.
+
+Exact test `make -C x64/uwp-host test && make -C x64/uwp-host/harness windows-smoke-test`
+passes (exit 0): stub smoke 55/0, Win32 smoke 566/0, traced stub 174/0,
+Win32/UWP 189/0, Linux passthrough 206/0 (64 symbols each); separate desktop
+Windows smoke 569/0. Full output:
+`/workspace/x64-run/lanes/B08/B08-O1.exact.log`.
+
+Live evidence: `harness/out/wine-o4/run-b08-HKv5v2xG/`. All four control/routed
+PE cases exit 0. Both routed PEs go through this checkout's launcher -> Wine's
+own private W^X loader -> real ntdll bindings -> shim -> uwph. The new
+`harness/verify_b08.py` checks all 64 real ntdll bindings, successful PE output,
+clean stock controls, single-process counters and both the >=10 new-entry
+hits and >=10 absolute report increase. Both reports rise from B07's accepted
+49 to 60 (+11); 13 of the 14 new symbols have live hits. Current old-entry
+hits are 47 (startup-dependent dup/fork are unhit); execv and socketpair are
+also bound-unhit. Socketpair has direct cross-backend regression coverage;
+no PE execution hit is claimed. Surface output:
+`/workspace/x64-run/lanes/B08/B08-O1.surface.log`.
+
+The unchanged broader `verify_wine.py` still fails its all-symbols-hit gate;
+no existing gate or verifier was relaxed. The first two cold stock-control
+attempts printed hello but hit the existing 12-second strace process-tree
+cap. The final evidence explicitly starts desktop services with stock Wine
+as SETUP ONLY before measuring all four cases; the setup has no uwph report
+and contributes no surface counts. This avoids counting fixture startup as
+compatibility evidence. Full final collection output:
+`/workspace/x64-run/lanes/B08/B08-O1.proof3.log`.
+
+Classification: Linux off-device THROUGH-uwph PE evidence; separate stock
+Wine launcher controls and stock Linux wineserver infrastructure. Windows
+checks run uwph Windows code under stock Wine; APP-header UWP archive is
+build/test evidence, not Xbox-device execution. Video uses a free Xvfb display
+and ffmpeg: `/workspace/x64-run/videos/B08-O1.mp4` (12-second labelled replay
+of the saved PE evidence and exact-test summaries). No remotes,
+commits, credentials, game/client modifications or out-of-scope mechanisms.
 ## B28 O2
 
 Status: BLOCKED for an in-process desktop prototype; source investigation and
