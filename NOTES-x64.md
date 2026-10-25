@@ -2220,3 +2220,31 @@ Exact O2 command passed, exit 0; complete output:
 60/63/70 traced, Windows futex 500 passed, all zero failures).
 These remain Linux THROUGH-uwph client/probe proofs, with separate stock-Wine
 Windows smoke; no Xbox-device claim, Steam login, or client modification.
+
+## B29 O1
+
+**BLOCKED, exact test exit 2.** `make clean` now removes the whole
+`x64/on-device/out` directory (it used to keep payload, kit, certs and objects).
+From that clean directory `make package` passed. `make offline-smoke` then
+failed at the combo rung: `STAGE combo hello+hello_k32-nofork,noproc,wx FAIL: exit=1`.
+The cause is `x64/uwp-host/harness/verify_acceptance.py:17`
+(`assert set(traces) == set(selected)`). After B06, the shim report lists 35
+traced names, but the gate's selection has 20. Reproduced 3/3 by running
+`out/payload/combo/run` directly. This is the gate change lane B914 O1 is
+making. Per the B29 safety rule, the gate was not edited here. Once B914
+merges, rebase and rerun the exact test unchanged.
+
+`pack.sh --kit` now also writes `out/SHA256SUMS`, next to `out/kit.zip`.
+It covers `kit.zip` plus every extracted member under `out/kit/`, including
+the kit's own inner `SHA256SUMS`. Supplementary, not the exact test: a
+separate `make -C x64/on-device kit` built
+`/workspace/wt/B29/x64/on-device/out/kit.zip` (228,056,394 bytes, 959
+members, the same file list as `out/kit/`). `(cd x64/on-device/out &&
+sha256sum -c SHA256SUMS)` gave 960/960 OK, exit 0. Top level of the zip:
+`KIT-NOTES.txt README.md SHA256SUMS kit-manifest.txt ladder payload/ probes/
+test-cert.cer test-cert.pfx`. `make -C x64/uwp-host test` exit 0 (566 smoke;
+99/103/120 traced, 35 symbols; zero failures). The kit build and the checksum
+check are build-only. In the offline ladder, stage a ran THROUGH the public uwph
+Linux backend. No Xbox, UWP activation or device claim. Video:
+`/workspace/x64-run/videos/B29-O1.mp4` (51 s, free Xvfb display, shows the
+failing exact-test run).

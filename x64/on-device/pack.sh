@@ -159,6 +159,13 @@ try:
     shutil.rmtree(out / 'kit', ignore_errors=True)
     kit.rename(out / 'kit')
     archive.replace(out / 'kit.zip')
+    # Sidecar verifies the archive and every extracted member, including the
+    # kit's own checksum manifest, from the package output directory.
+    sidecar_files = [out / 'kit.zip'] + sorted(
+        p for p in (out / 'kit').rglob('*') if p.is_file())
+    (out / 'SHA256SUMS').write_text(''.join(
+        f'{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.relative_to(out).as_posix()}\n'
+        for p in sidecar_files))
     Path('kit-manifest.txt').write_text(manifest)
     print((out / 'kit.zip').resolve(), flush=True)
 finally:
