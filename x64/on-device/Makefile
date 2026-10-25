@@ -6,7 +6,7 @@ CFLAGS := -O2 -std=c11 -Wall -Wextra -Werror
 all: smoke-exe
 
 # Loose layout fallback; no SDK packer or device activation is implied.
-package: smoke-exe $(OUT)/rungs.exe $(OUT)/probe_d3d12.exe combo-binaries
+package: smoke-exe $(OUT)/rungs.exe $(OUT)/child_probe.exe $(OUT)/probe_d3d12.exe combo-binaries
 	./pack.sh
 
 # B60: signed .appx on Linux (makemsix + osslsigncode), then offline checks.
@@ -37,7 +37,7 @@ clean:
 	rm -rf $(OUT)
 
 # Hosted Linux diagnostic; device activation remains separate.
-ladder: $(OUT)/ladder $(OUT)/rungs.exe $(OUT)/probe_d3d12.exe
+ladder: $(OUT)/ladder $(OUT)/rungs.exe $(OUT)/child_probe.exe $(OUT)/probe_d3d12.exe
 
 $(OUT)/ladder: ladder.py Makefile
 	mkdir -p $(OUT)
@@ -53,7 +53,7 @@ $(OUT)/probe_d3d12.exe: ../graphics/probe_d3d12.c Makefile
 offline-smoke: ladder
 	./offline-smoke.sh
 
-$(OUT)/rungs.exe: rungs.c input/mapping.c input/mapping.h input/probe.inc Makefile
+$(OUT)/rungs.exe: rungs.c lifecycle.inc pick-folder.inc input/mapping.c input/mapping.h input/probe.inc Makefile
 	mkdir -p $(OUT)
 	$(CC_WIN) $(CFLAGS) -Wno-missing-field-initializers -m64 -mconsole -static -o $@ $< input/mapping.c $(UWPH_OBJS) $(OUT)/readiness/unixside.o $(OUT)/readiness/smoke.o $(READINESS_OBJS) -lws2_32 -lbcrypt -lsynchronization -lwindowsapp -lole32 -lruntimeobject -luuid -ldxguid -lm
 
@@ -100,3 +100,7 @@ combo-binaries:
 	$(CC_WIN) -O1 -nostdlib -e entry -o $(OUT)/combo-guests/hello_k32.exe ../pe/tests/hello_k32.c -lkernel32
 	$(CC_WIN) -O1 -o $(OUT)/combo-guests/hello.exe ../pe/tests/hello.c
 	$(MAKE) -C ../uwp-host/harness out/libuwph_wine_shim.so out/run_via_wine prebuilt-prefix
+
+$(OUT)/child_probe.exe: child_probe.c Makefile
+	mkdir -p $(OUT)
+	$(CC_WIN) $(CFLAGS) -m64 -mconsole -municode -static -o $@ $<

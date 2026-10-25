@@ -34,7 +34,7 @@ test "$(openssl x509 -inform DER -in out/test-cert.cer -noout -subject -nameopt 
 
 mkdir -p "$stage/payload/Assets"
 test -s out/probe_d3d12.exe
-cp AppxManifest.xml out/smoke.exe out/rungs.exe "$stage/payload/"
+cp AppxManifest.xml out/smoke.exe out/rungs.exe out/child_probe.exe "$stage/payload/"
 # Standalone D3D12 diagnostic built here from x64/graphics/probe_d3d12.c.
 cp out/probe_d3d12.exe "$stage/payload/"
 # Hosted combo assets: keep Linux runtime separate from the native UWP entry.
