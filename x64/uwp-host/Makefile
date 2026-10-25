@@ -15,15 +15,15 @@ CFLAGS_COMMON := -O2 -g -std=gnu11 -Wall -Wextra -Werror -Wno-unused-parameter -
 
 CC_LINUX ?= gcc
 CC_WIN   ?= x86_64-w64-mingw32-gcc
-WINE     ?= wine64
+WINE     ?= $(shell command -v wine64 2>/dev/null || printf /usr/lib/wine/wine64)
 # WINAPI_FAMILY_APP = 2; Windows 10 2004 headers level
 WIN_DEFS := -DWINAPI_FAMILY=2 -D_WIN32_WINNT=0x0A00 -DNTDDI_VERSION=0x0A000008
 
 LIN_OBJS := $(SRCS:src/%.c=$(OUT)/linux/%.o)
 WIN_OBJS := $(SRCS:src/%.c=$(OUT)/win/%.o)
 
-all: $(OUT)/linux/libuwph.a $(OUT)/linux/smoke $(OUT)/linux/abi_check \
-     $(OUT)/win/libuwph.a $(OUT)/win/smoke.exe check
+all: $(OUT)/linux/libuwph.a $(OUT)/linux/smoke $(OUT)/linux/abi_check $(OUT)/linux/traced \
+     $(OUT)/win/libuwph.a $(OUT)/win/smoke.exe $(OUT)/win/traced.exe check
 
 $(OUT)/linux/%.o: src/%.c $(HDRS)
 	@mkdir -p $(@D)
@@ -57,6 +57,14 @@ $(OUT)/win/smoke.exe: tests/smoke.c $(OUT)/win/unixside.o $(OUT)/win/libuwph.a
 	$(CC_WIN) $(CFLAGS_COMMON) $(WIN_DEFS) -Isrc -o $@ tests/smoke.c $(OUT)/win/unixside.o \
 	    $(OUT)/win/libuwph.a -lbcrypt -lsynchronization -lwindowsapp
 
+# O2 traced set: each O1-priority symbol through its uwph entry + counter
+$(OUT)/linux/traced: tests/traced.c $(OUT)/linux/libuwph.a
+	$(CC_LINUX) $(CFLAGS_COMMON) -pthread -o $@ tests/traced.c $(OUT)/linux/libuwph.a
+
+$(OUT)/win/traced.exe: tests/traced.c $(OUT)/win/libuwph.a
+	$(CC_WIN) $(CFLAGS_COMMON) $(WIN_DEFS) -o $@ tests/traced.c \
+	    $(OUT)/win/libuwph.a -lbcrypt -lsynchronization -lwindowsapp
+
 # Bounded real Wine 10.0 inventory / binding diagnostic only. Unsupported imports
 # remain visible and block full-coverage claims; this does not run a PE.
 check: $(OUT)/linux/libuwph.a $(OUT)/win/libuwph.a
@@ -64,8 +72,11 @@ check: $(OUT)/linux/libuwph.a $(OUT)/win/libuwph.a
 
 test: all
 	$(OUT)/linux/abi_check
-	$(OUT)/linux/smoke
-	WINEDEBUG=-all $(WINE) $(OUT)/win/smoke.exe
+	$(OUT)/linux/smoke "$(CURDIR)/tests"
+	WINEDEBUG=-all $(WINE) $(OUT)/win/smoke.exe "Z:$(subst /,\,$(CURDIR)/tests)"
+	$(OUT)/linux/traced "$(CURDIR)/tests"
+	WINEDEBUG=-all $(WINE) $(OUT)/win/traced.exe "Z:$(subst /,\,$(CURDIR)/tests)"
+	$(MAKE) -C harness traced-test
 
 clean:
 	rm -rf $(OUT)

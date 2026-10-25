@@ -20,3 +20,7 @@ int uwph_linux_nanosleep(const struct uwph_timespec *req, struct uwph_timespec *
 int uwph_linux_gettid(void);
 long uwph_linux_futex(int *uaddr, int op, int val, const struct uwph_timespec *timeout,
                          int *uaddr2, int val3);
+
+void *uwph_linux_symbol(const char *name);
+int uwph_linux_fcntl(int fd, int cmd, long arg);
+uwph_ssize_t uwph_linux_writev(int fd, const struct uwph_iovec *iov, int cnt);

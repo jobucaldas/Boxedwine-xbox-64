@@ -133,12 +133,20 @@ UWPH_API int uwph_dup2(int fd, int newfd)
 
 UWPH_API int uwph_fcntl(int fd, int cmd, ...)
 {
+    uwph_trace_hit(UWPH_TRACE_FCNTL);
     va_list ap;
-    long arg;
+    intptr_t arg = 0;
     int ret = 0;
-    va_start(ap, cmd);
-    arg = va_arg(ap, long);
-    va_end(ap);
+    if (cmd != UWPH_F_GETFD && cmd != UWPH_F_GETFL) {
+        va_start(ap, cmd);
+        if (cmd == UWPH_F_GETLK || cmd == UWPH_F_SETLK || cmd == UWPH_F_SETLKW)
+            arg = (intptr_t)va_arg(ap, void *);
+        else arg = va_arg(ap, int);
+        va_end(ap);
+    }
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    return uwph_linux_fcntl(fd, cmd, arg);
+#endif
     switch (cmd) {
     case UWPH_F_DUPFD:         return dup_from(fd, (int)arg, 0);
     case UWPH_F_DUPFD_CLOEXEC: return dup_from(fd, (int)arg, 1);
@@ -203,6 +211,7 @@ UWPH_API uwph_ssize_t uwph_read(int fd, void *buf, size_t len)
 
 UWPH_API uwph_ssize_t uwph_write(int fd, const void *buf, size_t len)
 {
+    uwph_trace_hit(UWPH_TRACE_WRITE);
 #ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
     return uwph_linux_write(fd, buf, len);
 #else
@@ -229,6 +238,10 @@ UWPH_API uwph_ssize_t uwph_write(int fd, const void *buf, size_t len)
 
 UWPH_API uwph_ssize_t uwph_writev(int fd, const struct uwph_iovec *iov, int cnt)
 {
+    uwph_trace_hit(UWPH_TRACE_WRITEV);
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    return uwph_linux_writev(fd, iov, cnt);
+#endif
     uwph_ssize_t total = 0;
     for (int i = 0; i < cnt; i++) {
         uwph_ssize_t r = uwph_write(fd, iov[i].iov_base, iov[i].iov_len);

@@ -43,7 +43,7 @@ def verify(run):
                 print(f'{name}: stock Wine / our launcher only; no uwph report')
                 continue
             lines = report.read_text().splitlines()
-            totals, modules, classes, pids = {}, {}, {}, []
+            totals, modules, classes, pids, traced = {}, {}, {}, [], {}
             for line in lines:
                 fields = line.split()
                 if fields[0] == 'pid':
@@ -57,6 +57,10 @@ def verify(run):
                     key = (str(pathlib.Path(bytes.fromhex(module).decode()).resolve()), op)
                     assert key not in modules
                     modules[key] = (int(calls), int(backend))
+                elif fields[0] == 'trace':
+                    _, symbol, count = fields
+                    assert symbol not in traced
+                    traced[symbol] = int(count)
                 elif fields[0] == 'classification':
                     assert not classes
                     classes = dict(part.split('=') for part in fields[1:])
@@ -80,7 +84,15 @@ def verify(run):
                 assert bindings and all(f'to {shim} [0]' in line for line in bindings), f'{op}: wrong ntdll binding'
             print(f'{name}: ntdll={ntdll} pid={pids[0]} backend=' + ','.join(
                 f'{op}:{modules[(str(ntdll), op)][1]}' for op in selected) + ' bypass=0 (selected surface only)')
-    print('Remaining bypasses: 160 unsupported imports, 33 retained libc/internal imports, libc syscall(), two inline syscall sites; see surface.tsv/direct-syscalls.tsv.')
+            # O2 traced set: process-wide uwph entry counts (not ntdll-attributed).
+            policy = [line.split('\t') for line in (run / 'surface.tsv').read_text().splitlines()[1:]]
+            o2 = sorted(row[0] for row in policy if row[1] == 'routed')
+            o2 = [s for s in o2 if s not in selected]
+            assert set(traced) == set(o2), f'trace rows {sorted(traced)} != routed O2 set {o2}'
+            print(f'{name}: O2 traced uwph entries ' + ','.join(f'{s}:{traced[s]}' for s in o2))
+            assert all(traced[s] > 0 for s in o2), f'{name}: O2 traced symbol with zero uwph entries'
+    classes = [line.split('\t')[1] for line in (run / 'surface.tsv').read_text().splitlines()[1:]]
+    print(f"Remaining bypasses: {classes.count('unsupported')} unsupported imports, {classes.count('libc internal')} retained libc/internal imports, libc syscall(), two inline syscall sites; see surface.tsv/direct-syscalls.tsv.")
     print('Separate stock Linux wineserver: NOT routed; NOT in-process Xbox/UWP evidence.')
     if blockers:
         raise AssertionError('; '.join(blockers))

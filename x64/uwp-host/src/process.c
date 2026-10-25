@@ -16,7 +16,15 @@ UWPH_API uwph_pid_t uwph_getpid(void)
 #endif
 }
 
-UWPH_API uwph_uid_t uwph_getuid(void) { return UWPH_UID; }
+UWPH_API uwph_uid_t uwph_getuid(void)
+{
+    uwph_trace_hit(UWPH_TRACE_GETUID);
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    UWPH_NATIVE(uwph_uid_t, "getuid", (void));
+    UWPH_NATIVE_RETURN(fn());
+#endif
+    return UWPH_UID;
+}
 
 UWPH_API struct uwph_passwd *uwph_getpwuid(uwph_uid_t uid)
 {
@@ -155,6 +163,12 @@ static int env_find(const char *name, size_t n)
 
 UWPH_API char *uwph_getenv(const char *name)
 {
+    uwph_trace_hit(UWPH_TRACE_GETENV);
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    UWPH_NATIVE(char *, "getenv", (const char *));
+    UWPH_NATIVE_RETURN(fn(name));
+#endif
+
     char *r = NULL;
     int i;
     uwph_lock(&env_lock);
@@ -184,6 +198,11 @@ static int env_put(char *entry, size_t namelen, int overwrite)
 
 UWPH_API int uwph_setenv(const char *name, const char *val, int overwrite)
 {
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    /* Same native table as the passthrough getenv (uwph_environ is not it). */
+    UWPH_NATIVE(int, "setenv", (const char *, const char *, int));
+    UWPH_NATIVE_RETURN(fn(name, val, overwrite));
+#endif
     size_t nl = strlen(name);
     char *e;
     if (!nl || strchr(name, '=')) return UWPH_FAIL(UWPH_EINVAL);
@@ -194,6 +213,10 @@ UWPH_API int uwph_setenv(const char *name, const char *val, int overwrite)
 
 UWPH_API int uwph_putenv(char *s)
 {
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    UWPH_NATIVE(int, "putenv", (char *));
+    UWPH_NATIVE_RETURN(fn(s));
+#endif
     char *eq = strchr(s, '=');
     if (!eq) return uwph_unsetenv(s);
     return env_put(s, (size_t)(eq - s), 1);
@@ -201,6 +224,10 @@ UWPH_API int uwph_putenv(char *s)
 
 UWPH_API int uwph_unsetenv(const char *name)
 {
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    UWPH_NATIVE(int, "unsetenv", (const char *));
+    UWPH_NATIVE_RETURN(fn(name));
+#endif
     int i;
     uwph_lock(&env_lock);
     if ((i = env_find(name, strlen(name))) >= 0)

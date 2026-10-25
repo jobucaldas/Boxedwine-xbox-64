@@ -1,5 +1,6 @@
 #define _GNU_SOURCE
 #include "counters.h"
+#include "uwph/uwph.h"
 #include <stdatomic.h>
 #include <pthread.h>
 #include <dlfcn.h>
@@ -59,8 +60,9 @@ void uwph_harness_backend_entry(int op)
 }
 /* Explicit snapshot API plus _exit hook: destructor is only a final convenience.
  * Report path is trusted harness configuration, never forwarded to uwph.
- * Hex module names avoid JSON escaping ambiguity. No interposed stdio symbols:
- * snprintf formats memory only; all report I/O uses raw syscalls. */
+ * Hex module names avoid JSON escaping ambiguity. snprintf formats memory only
+ * (its own O2 trace hits are included in the trace rows); all report I/O uses
+ * raw syscalls. */
 void uwph_shim_report(void)
 {
     int saved=errno;
@@ -95,6 +97,8 @@ void uwph_shim_report(void)
         for(int o=0;o<C_COUNT;o++)
             LINE("module %s %s %lu %lu\n",hex,names[o],modules[i].calls[o],modules[i].backend[o]);
     }
+    for(int t=0;t<UWPH_TRACE_COUNT;t++)
+        LINE("trace %s %llu\n",uwph_trace_name(t),(unsigned long long)uwph_trace_count(t));
     LINE("classification recursion=%lu unattributed=%lu module_overflow=%lu instrumentation_raw_io=1\n",
          atomic_load(&recursion),atomic_load(&unattributed),atomic_load(&overflow));
     pthread_mutex_unlock(&lock);

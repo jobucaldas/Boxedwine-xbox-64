@@ -314,6 +314,7 @@ static int stat_path(const char *path, struct uwph_stat *st)
 }
 
 UWPH_API int uwph_stat(const char *path, struct uwph_stat *st)  {
+    uwph_trace_hit(UWPH_TRACE_STAT);
 #ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
     return uwph_linux_stat(path, st);
 #else
@@ -382,6 +383,12 @@ FS_STUB(int, inotify_rm_watch, (int fd, int wd), (void)fd, (void)wd)
 
 UWPH_API char *uwph_realpath(const char *path, char *resolved)
 {
+    uwph_trace_hit(UWPH_TRACE_REALPATH);
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    UWPH_NATIVE(char *, "realpath", (const char *, char *));
+    UWPH_NATIVE_RETURN(fn(path, resolved));
+#endif
+
     char abs[1024];
     if (uwph_fs_abspath(path, abs, sizeof(abs)) < 0) return NULL;
     if (!resolved && !(resolved = malloc(strlen(abs) + 1))) return UWPH_FAILP(UWPH_ENOMEM);

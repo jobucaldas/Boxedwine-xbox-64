@@ -135,3 +135,12 @@ long uwph_linux_futex(int *uaddr, int op, int val, const struct uwph_timespec *t
     if(cmd != UWPH_FUTEX_WAIT && cmd != UWPH_FUTEX_WAKE) { uwph_errno=UWPH_ENOSYS; return -1; }
     return result(raw(SYS_futex,PTR(uaddr),op,val,PTR(timeout),PTR(uaddr2),val3));
 }
+uwph_ssize_t uwph_linux_writev(int fd, const struct uwph_iovec *iov, int cnt) { return fdcall(SYS_writev,fd,PTR(iov),cnt,0); }
+int uwph_linux_fcntl(int fd, int cmd, long arg)
+{
+#ifndef UWPH_HARNESS_NATIVE_FDS
+    /* A duplicated native fd would escape the private slot namespace. */
+    if (cmd == UWPH_F_DUPFD || cmd == UWPH_F_DUPFD_CLOEXEC) { uwph_errno=UWPH_EINVAL; return -1; }
+#endif
+    return fdcall(SYS_fcntl,fd,cmd,arg,0);
+}

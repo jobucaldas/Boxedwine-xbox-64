@@ -11,7 +11,7 @@ __environ	libc internal	retained host libc/runtime dependency; may contain hidde
 __errno_location	libc internal	retained host libc/runtime dependency; may contain hidden host calls; not UWP support
 __getdelim	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 __gmon_start__	libc internal	retained host libc/runtime dependency; may contain hidden host calls; not UWP support
-__isoc23_fscanf	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
+__isoc23_fscanf	routed	R4S-O2 traced set: ntdll relocation -> shim -> counted uwph entry -> Linux passthrough; Win32 backend covered by tests/traced.c; Win32 scanner is a bounded integer/%s/%c/%n subset (others ENOSYS)
 __isoc23_sscanf	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 __isoc23_strtol	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 _dl_find_object	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
@@ -20,7 +20,7 @@ _setjmp	unsupported	no exported O2 shim wrapper; retained Linux dependency; bloc
 abort	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 access	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 asctime	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
-asprintf	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
+asprintf	routed	R4S-O2 traced set: ntdll relocation -> shim -> counted uwph entry -> Linux passthrough; Win32 backend covered by tests/traced.c
 calloc	libc internal	retained host libc/runtime dependency; may contain hidden host calls; not UWP support
 chdir	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 clock_getres	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
@@ -44,13 +44,13 @@ execvp	unsupported	no exported O2 shim wrapper; retained Linux dependency; block
 exit	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 fchdir	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 fchmod	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
-fclose	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
-fcntl	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
+fclose	routed	R4S-O2 traced set: ntdll relocation -> shim -> counted uwph entry -> Linux passthrough; Win32 backend covered by tests/traced.c; Linux keeps the native FILE ABI
+fcntl	routed	R4S-O2 traced set: ntdll relocation -> shim -> counted uwph entry -> Linux passthrough; Win32 backend covered by tests/traced.c; harness native-fd mode only; F_DUPFD refused for private slots
 fdopen	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
-feof	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
+feof	routed	R4S-O2 traced set: ntdll relocation -> shim -> counted uwph entry -> Linux passthrough; Win32 backend covered by tests/traced.c; Linux keeps the native FILE ABI
 fgets	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 fgetxattr	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
-fopen	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
+fopen	routed	R4S-O2 traced set: ntdll relocation -> shim -> counted uwph entry -> Linux passthrough; Win32 backend covered by tests/traced.c; Linux keeps the native FILE ABI
 fork	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 fprintf	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 fputs	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
@@ -67,7 +67,7 @@ futimens	unsupported	no exported O2 shim wrapper; retained Linux dependency; blo
 fwrite	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 getauxval	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 getcwd	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
-getenv	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
+getenv	routed	R4S-O2 traced set: ntdll relocation -> shim -> counted uwph entry -> Linux passthrough; Win32 backend covered by tests/traced.c
 getifaddrs	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 getmntent	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 getpeername	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
@@ -79,7 +79,7 @@ getrusage	unsupported	no exported O2 shim wrapper; retained Linux dependency; bl
 getsockname	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 getsockopt	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 gettimeofday	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
-getuid	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
+getuid	routed	R4S-O2 traced set: ntdll relocation -> shim -> counted uwph entry -> Linux passthrough; Win32 backend covered by tests/traced.c
 getxattr	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 gmtime	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 ioctl	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
@@ -123,18 +123,18 @@ pthread_cond_broadcast	unsupported	no exported O2 shim wrapper; retained Linux d
 pthread_cond_wait	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 pthread_create	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 pthread_exit	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
-pthread_getspecific	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
+pthread_getspecific	routed	R4S-O2 traced set: ntdll relocation -> shim -> counted uwph entry -> Linux passthrough; Win32 backend covered by tests/traced.c; Linux keeps native TLS keys
 pthread_join	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 pthread_key_create	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 pthread_mutex_init	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
-pthread_mutex_lock	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
-pthread_mutex_unlock	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
+pthread_mutex_lock	routed	R4S-O2 traced set: ntdll relocation -> shim -> counted uwph entry -> Linux passthrough; Win32 backend covered by tests/traced.c; Linux keeps the native pthread_mutex_t ABI
+pthread_mutex_unlock	routed	R4S-O2 traced set: ntdll relocation -> shim -> counted uwph entry -> Linux passthrough; Win32 backend covered by tests/traced.c; Linux keeps the native pthread_mutex_t ABI
 pthread_mutexattr_destroy	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 pthread_mutexattr_init	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 pthread_mutexattr_settype	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 pthread_self	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 pthread_setspecific	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
-pthread_sigmask	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
+pthread_sigmask	routed	R4S-O2 traced set: ntdll relocation -> shim -> counted uwph entry -> Linux passthrough; Win32 backend covered by tests/traced.c
 putenv	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 puts	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 pwrite	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
@@ -142,7 +142,7 @@ qsort	libc internal	retained host libc/runtime dependency; may contain hidden ho
 read	routed	O2 selected wrapper; relocation diagnostic only; native-fd bypasses for read/close/file mmap; no full operation compatibility claim
 readdir	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 realloc	libc internal	retained host libc/runtime dependency; may contain hidden host calls; not UWP support
-realpath	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
+realpath	routed	R4S-O2 traced set: ntdll relocation -> shim -> counted uwph entry -> Linux passthrough; Win32 backend covered by tests/traced.c
 recvmsg	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 remove	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 sched_getcpu	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
@@ -152,19 +152,19 @@ select	unsupported	no exported O2 shim wrapper; retained Linux dependency; block
 send	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 sendmsg	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 setbuf	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
-setlocale	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
+setlocale	routed	R4S-O2 traced set: ntdll relocation -> shim -> counted uwph entry -> Linux passthrough; Win32 backend covered by tests/traced.c; Linux category numbering mapped to the CRT
 setrlimit	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 setsid	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 setsockopt	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 sigaction	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
-sigaddset	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
+sigaddset	routed	R4S-O2 traced set: ntdll relocation -> shim -> counted uwph entry -> Linux passthrough; Win32 backend covered by tests/traced.c
 sigaltstack	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 sigemptyset	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 signal	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
-snprintf	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
+snprintf	routed	R4S-O2 traced set: ntdll relocation -> shim -> counted uwph entry -> Linux passthrough; Win32 backend covered by tests/traced.c
 socket	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 socketpair	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
-stat	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
+stat	routed	R4S-O2 traced set: ntdll relocation -> shim -> counted uwph entry -> Linux passthrough; Win32 backend covered by tests/traced.c
 stderr	libc internal	retained host libc/runtime dependency; may contain hidden host calls; not UWP support
 stdout	libc internal	retained host libc/runtime dependency; may contain hidden host calls; not UWP support
 stpcpy	libc internal	retained host libc/runtime dependency; may contain hidden host calls; not UWP support
@@ -187,7 +187,7 @@ symlink	unsupported	no exported O2 shim wrapper; retained Linux dependency; bloc
 syscall	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 sysconf	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 sysinfo	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
-time	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
+time	routed	R4S-O2 traced set: ntdll relocation -> shim -> counted uwph entry -> Linux passthrough; Win32 backend covered by tests/traced.c
 times	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 umask	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 uname	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
@@ -196,5 +196,5 @@ usleep	unsupported	no exported O2 shim wrapper; retained Linux dependency; block
 vfprintf	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 vsnprintf	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 waitpid	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
-write	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
-writev	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
+write	routed	R4S-O2 traced set: ntdll relocation -> shim -> counted uwph entry -> Linux passthrough; Win32 backend covered by tests/traced.c; harness native-fd mode only
+writev	routed	R4S-O2 traced set: ntdll relocation -> shim -> counted uwph entry -> Linux passthrough; Win32 backend covered by tests/traced.c; harness native-fd mode only

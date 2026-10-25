@@ -49,9 +49,9 @@ of execution on this Linux box, not Xbox Dev Mode validation.
 
 Run `make -C x64/uwp-host/harness shim-test`. The target uses LD_PRELOAD only
 for its two owned, dynamically linked ELF probe processes. Its version script
-exports exactly open/read/close/mmap/munmap, _exit, and the explicit
-uwph_shim_report instrumentation function. There is no generic syscall wrapper,
-RTLD_NEXT resolver, constructor, process-wide trapping, or Wine loader change.
+exported exactly open/read/close/mmap/munmap, _exit, and the explicit
+uwph_shim_report instrumentation function (R4S O2 below adds the traced set).
+There is no generic syscall wrapper, process-wide trapping, or Wine loader change.
 The five SysV prototypes are explicitly adapted to the existing uwph APIs;
 compile-time checks cover the selected scalar/flag ABI. No struct-bearing libc
 symbols are exported. open consumes a mode only for O_CREAT or full O_TMPFILE.
@@ -336,3 +336,40 @@ stock Wine is separate evidence. Linux libc, raw/inline syscalls, Linux TLS and
 signals, initialized-prefix setup and separate unrouted wineserver remain
 stand-in dependencies; there is no full UWP or Xbox acceptance claim. No
 DONE-R4H is written because the required no-wineboot gate remains unresolved.
+
+## R4S O2: traced set (O1 top 20)
+
+`shim.map` now also exports the 20 most-hit unsupported imports from
+`surface-trace.tsv`: snprintf, fopen, __isoc23_fscanf, fclose,
+pthread_getspecific, pthread_sigmask, feof, stat, write, pthread_mutex_lock,
+pthread_mutex_unlock, writev, getenv, asprintf, sigaddset, fcntl, setlocale,
+time, getuid, realpath. Each shim entry calls its public uwph entry, which bumps
+a per-symbol atomic counter (`uwph/trace.h`; no logging on the counted path).
+`check_surface.sh` takes the routed set from `shim.map` and requires the trace
+counter names to match it; surface.tsv now has routed=25, unsupported=140.
+
+Linux passthrough backend: stat/write/writev/fcntl/time use the raw-syscall
+adapters. Native FILE, pthread key, pthread_mutex_t, sigset, locale, env,
+getuid and realpath semantics stay with host libc, resolved once with
+`dlsym(RTLD_NEXT)` (missing symbol aborts; nothing is emulated silently). This
+keeps the native ABI for companion calls that are still not interposed (fgets,
+setenv in Wine, ...). The passthrough `uwph_setenv/putenv/unsetenv` use the same
+native table as `uwph_getenv`. In private-slot mode write/writev/fcntl accept only
+owned descriptors and fcntl F_DUPFD* is refused (a dup would leak a native fd).
+Only the separately built Wine shim (native-fd mode) accepts arbitrary fds.
+
+Win32/UWP backend: same public entries over existing uwph objects: CRT
+vsnprintf and setlocale (UWPH_LC_* Linux numbering mapped to CRT constants; no
+CRT LC_MESSAGES, so only C/POSIX is accepted for it), uwph FILE over
+CreateFile2-backed fds with a bounded integer/%s/%c/%n scanner (floating
+point and %[ fail with ENOSYS), uwph env table, keys, mutexes, signal masks,
+fixed uid 1000, path-normalizing realpath (no symlinks).
+
+`tests/traced.c` covers every symbol on all three builds (Linux stub, Win32
+under wine64, Linux passthrough via `make -C harness traced-test`). It checks
+behavior and that every counter moved. All three run from `make test`. The
+shim report now has `trace <symbol> <count>` rows. `verify_wine.py`
+requires every traced counter to be nonzero in routed hello/hello_k32 runs.
+Those counts are process-wide uwph entries, not ntdll-attributed like the five
+O2 selected families. The overall wine-test gate stays BLOCKED by the existing
+wineboot attempt, as it is in the stock control runs.

@@ -702,3 +702,22 @@ Exact test after routed hello trace:
 `test -s x64/uwp-host/harness/surface-trace.tsv && wc -l x64/uwp-host/harness/surface-trace.tsv`
 prints `67 x64/uwp-host/harness/surface-trace.tsv` (header, 64 hit imports,
 two explicitly unhit direct sites).
+
+## R4S O2 traced set
+
+The O1 top 20 (snprintf … realpath, see the O1 list above) are implemented
+behind public uwph entries with per-symbol counters (`uwph/trace.h`) on all
+backends and exported by the harness shim; surface.tsv routed 5 -> 25,
+unsupported 160 -> 140. Linux passthrough uses raw syscalls for
+stat/write/writev/fcntl/time and host libc via RTLD_NEXT for the native-ABI
+objects (FILE, pthread keys/mutexes, sigset, locale, env). Win32/UWP uses
+existing uwph objects plus CRT vsnprintf/setlocale; its fscanf is a bounded
+integer/string scanner. `tests/traced.c` (run three times by `make test`: stub,
+Win32 under wine64, passthrough) checks each symbol and its counter.
+
+THROUGH: routed hello and hello_k32 via run_via_wine -> Wine's own loader ->
+ntdll.so -> shim -> uwph complete with every traced counter nonzero (e.g.
+hello: fopen 223, __isoc23_fscanf 222, pthread_mutex_lock 1855, write 295).
+Counts are process-wide uwph entries. The wine-test gate is still BLOCKED by
+the pre-existing wineboot attempt (same in stock control). Linux-host evidence
+only; no Xbox/UWP device acceptance. Video: /workspace/x64-run/videos/R4S-O2.mp4.
