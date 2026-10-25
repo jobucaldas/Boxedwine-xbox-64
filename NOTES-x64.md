@@ -2525,3 +2525,78 @@ reports the conservative log-proven `gfx-init` stage (D3D11 device created);
 manual inspection of `out/megabonk/screen.png` during the same run confirmed
 the rendered MEGABONK title, PLAY, SETTINGS and EXIT menu. Gameplay was not
 tested. No credentials were read, no remotes accessed, no commit created.
+
+## B33 O1
+
+Spawn inventory and explorer dependency evidence for the constrained Megabonk run follow below.
+
+The added metric counts only `trace:process:NtCreateUserProcess` entry records
+with image/cmdline fields, preserving Wine's quoted escaping in `spawn:` lines.
+Classification is case-insensitive on the decoded `C:\windows\` image prefix;
+the pre-existing CreateProcessInternalW diagnostic-line metric is retained.
+
+Explorer feature inventory (source paths below are relative to `/tmp/wine-src`).
+NEEDED means the observed failing path requires it; UNKNOWN means the early
+failure/debug channels cannot establish whether the guest will use it later.
+Absence of a trace is not evidence of NOT-NEEDED.
+
+| Explorer feature | Status | Evidence and limit |
+| --- | --- | --- |
+| Desktop window | NEEDED | `dlls/win32u/winstation.c:775,855-883`: get_desktop_window attempts explorer, then forces a bare server desktop after failure. `programs/explorer/desktop.c:1270-1272` creates the normal desktop. |
+| Display GUID / graphics driver and desktop message pump | NEEDED | `dlls/win32u/driver.c:953-975` sends WM_NULL, reads `__wine_display_device_guid`, opens its registry key and queries GraphicsDriver. `dlls/win32u/defwnd.c:2962-2986` sets the GUID from desktop creation data; `programs/explorer/desktop.c:1249,1272,1327-1331` supplies the GUID and message loop. Observed nodrv_CreateWindow failure ties this path to the guest. |
+| Message window / HWND_MESSAGE parent | UNKNOWN | `programs/explorer/desktop.c:1276-1277` creates it; `dlls/win32u/winstation.c:874-883` also obtains msg_window from the forced server fallback. Existing process/loaddll/err channels do not establish guest message-only window use. |
+| Clipboard | UNKNOWN | `programs/explorer/desktop.c:680,1286-1287` defines/starts clipboard_thread. No clipboard API tracing enabled; explorer never starts, so no evidence of guest clipboard use. |
+| Display-mode registry | UNKNOWN | `programs/explorer/desktop.c:1090-1130,1290` persists current modes via EnumDisplaySettingsExW/ChangeDisplaySettingsExW. GraphicsDriver registry lookup above is distinct; this run does not establish guest consumption of stored display modes. |
+| Systray | UNKNOWN | `programs/explorer/desktop.c:1293` initializes it; no guest Shell_NotifyIcon evidence in these channels before the graphics failure. |
+| Appbar | UNKNOWN | `programs/explorer/desktop.c:1291` initializes it; no guest SHAppBarMessage evidence in these channels. |
+| Shell DDE | UNKNOWN | `programs/explorer/desktop.c:1296-1300` loads shell32 ordinal 188 / ShellDDEInit. Loading shell32 alone does not establish guest DDE use. |
+
+No optional explorer feature is declared NOT-NEEDED from this early failed run.
+
+Run evidence: `x64/uwp-host/harness/out/megabonk/run-xNTMqtSN/wine.log`
+(line numbers below), console `/tmp/b33.log`, filtered inventory/service evidence
+`/tmp/b33-spawn-service-evidence.log`. One Megabonk run, private Xvfb allocated
+with `-displayfd`; video `/workspace/x64-run/videos/B33-O1.mp4` (9.4 seconds,
+diagnostic Xvfb capture including live harness output; no rendered game claimed).
+
+| Attempt | Image and command line (Windows paths) | Classification | Caller | Runtime evidence |
+| --- | --- | --- | --- | --- |
+| 1 | `C:\windows\system32\explorer.exe`; `"C:\windows\system32\explorer.exe" /desktop` | wine-internal | `/tmp/wine-src/dlls/win32u/winstation.c:860-863`, get_desktop_window | wine.log:48 entry, :49 failure c0000017 |
+| 2 | `Z:\workspace\steam-owned\games\megabonk\UnityCrashHandler64.exe`; `"Z:\workspace\steam-owned\games\megabonk\UnityCrashHandler64.exe" --attach 32 140737474269184` | guest | guest (Unity crash handler launch; guest binary source/callsite unavailable) | wine.log:57 command, :59 handle-list diagnostic for the same call, :60 NT entry |
+
+Both NT trace entries originate at `/tmp/wine-src/dlls/ntdll/unix/process.c:785`;
+this is the common trace site, not the initiating caller. The retained
+`CreateProcess attempts: 2` counts two diagnostics from the single guest call;
+the new metric independently reports **2 (wine-internal: 1, guest: 1)**.
+The main Megabonk image is loaded by our launcher and is not an NT spawn attempt.
+Desktop/driver runtime evidence: wine.log:49 and :107-108 report explorer failure
+and no graphics driver, supporting the NEEDED rows above. No successful desktop
+GUID/property read is claimed.
+
+On-demand service inventory command:
+`grep -nEi 'StartService|services\.exe|rpcss|plugplay|winedevice|combase:RoGetActivationFactory' wine.log`.
+Only matches: :103 semi-stub RoGetActivationFactory for
+`Windows.System.DispatcherQueue`, and :104 failed to find its library.
+There are no StartService/services.exe/rpcss/plugplay/winedevice matches and no
+additional NT spawn entries. `/tmp/wine-src/dlls/combase/roapi.c:146-190` resolves
+the activation DLL in-process; the missing DLL is not itself a logged service
+spawn. These channels do not trace every service API; later service demand
+remains UNKNOWN because the guest stops at early graphics initialization.
+
+Exact requested test executed with DISPLAY set to the private Xvfb:
+`make -C x64/uwp-host test && K_TIMEOUT=45 x64/uwp-host/harness/run-megabonk.sh 2>&1 | tee /tmp/b33.log; grep -E '^NtCreateUserProcess attempts: 2 \(wine-internal: 1, guest: 1\)' /tmp/b33.log && grep -c '^spawn: ' /tmp/b33.log && grep -q '## B33 O1' NOTES-x64.md`.
+Make completed successfully (including 172 passed, 0 failed / 50 traced symbols
+and 7 in-process verifier checks passed). Final grep output:
+
+```text
+NtCreateUserProcess attempts: 2 (wine-internal: 1, guest: 1)
+2
+```
+
+Grep chain exit 0; harness reports exit=1 and MEGABONK reached=unityplayer.
+Proof is THROUGH-uwph: uwp_run.sh(nofork,wx,noproc) -> our launcher -> Wine's own
+W^X loader -> shim -> uwph, with Wine server hosted in-process. Installed stock
+Wine ran only the explicitly labelled packaging-time prefix preparation;
+it is not the game acceptance proof. Linux only; Xbox untested. The generated
+surface-trace.tsv refresh was restored to its original content after the run;
+no enforcement gates or constraints changed. O2 was not implemented.

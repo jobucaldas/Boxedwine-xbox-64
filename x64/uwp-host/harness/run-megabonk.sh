@@ -108,6 +108,27 @@ else
     echo "uwph reports: none (no process reached the shim _exit hook)"
 fi
 echo "CreateProcess attempts: $(grep -c 'CreateProcessInternalW' "$log" || true)"
+# Count the actual NT entry trace, not CreateProcessInternalW diagnostic lines.
+# Keep Wine's quoted/escaped image and command line intact in the inventory.
+python3 - "$log" <<'PYSPAWN'
+import re
+import sys
+
+quoted = r'L"(?:\\.|[^"\\])*"'
+pattern = re.compile(r':trace:process:NtCreateUserProcess .*? image (' + quoted
+                     + r') cmdline (' + quoted + r') parent ')
+attempts = []
+with open(sys.argv[1], encoding="utf-8", errors="replace") as stream:
+    for line in stream:
+        match = pattern.search(line)
+        if match:
+            attempts.append(match.groups())
+internal = sum(image[2:-1].replace("\\\\", "\\").lower().startswith("c:\\windows\\")
+               for image, _ in attempts)
+print(f"NtCreateUserProcess attempts: {len(attempts)} (wine-internal: {internal}, guest: {len(attempts) - internal})")
+for image, cmdline in attempts:
+    print(f"spawn: {image} {cmdline}")
+PYSPAWN
 grep -m5 'err:\|Operation not permitted' "$log" || true
 tail -n 3 "$player" | sed 's/^/player: /'
 echo "evidence: $run (wine.log, player.log, shot-*.png)"
