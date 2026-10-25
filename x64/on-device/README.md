@@ -177,3 +177,58 @@ ABI references: [Microsoft SDK gaming IDs](https://github.com/microsoft/win32met
 and [MemoryManager ABI](https://github.com/microsoft/win32metadata/blob/main/generation/WinSDK/RecompiledIdlHeaders/winrt/windows.system.h).
 
 Activation API reference: [IFrameworkView.Load](https://learn.microsoft.com/en-us/uwp/api/windows.applicationmodel.core.iframeworkview.load).
+
+## Troubleshooting
+
+1. Before retrying, copy the complete error text and numeric code (HRESULT or
+   Win32 error), including all detail lines. Record the run time, console OS
+   version, selected tile, and App/Game setting. Keep partial logs before the
+   next launch overwrites them. These are likely causes, not console diagnoses.
+2. In Device Portal, open **File Explorer**, select the installed Boxedwine app,
+   then open **LocalState**. Paths below are relative to that app's data folder;
+   `LocalState/ladder-native.log` is the native console log.
+   `LocalState/ladder.log` belongs to the hosted ladder and is present only if
+   that evidence was explicitly placed there; the console app does not create it.
+3. Use the matching row below. If a named diagnostic page or download is absent
+   on your Device Portal version, record that fact and the page title you see.
+   Do not change capabilities or bypass installation checks to clear an error.
+
+| Symptom | What to copy back (exact file or Device Portal page) | Likely cause |
+| --- | --- | --- |
+| 1. Install says certificate is not trusted | **Home > My games & apps > Add**: full failed-install details and error code; record which public `.cer` was selected. | Test certificate is not trusted by the console, or signing certificate and manifest Publisher do not match. The portal HTTPS certificate is separate from package signing. |
+| 2. Install reports invalid manifest/schema | **Home > My games & apps > Add**: full error, element/attribute name and line number if shown; also copy the PC MakeAppx output and `out/payload/AppxManifest.xml`. | Manifest element, capability, namespace or target OS schema is unsupported or invalid. |
+| 3. Install reports wrong architecture | **Home > My games & apps > Add**: full error code and package identity/architecture shown there; include `out/payload/AppxManifest.xml`. | Wrong package was selected or package/dependency architecture is incompatible with x64. |
+| 4. Install reports a missing dependency | **Home > My games & apps > Add**: full details including dependency name, publisher, minimum version and architecture. | Wrong/stale package or an unavailable framework dependency; this kit currently expects no dependency packages. |
+| 5. App launches then exits | `LocalState/ladder-native.log` (even partial); **Home > My games & apps**, selected app: exit/status details; Device Portal **Debug > Crash dumps** and **ETW** output if available, including the original HRESULT/errno diagnostics. | Activation or LocalState/log creation failed, a native API failed, or the process crashed. No log can mean failure before probes started. |
+| 6. Black screen | `LocalState/ladder-native.log`, especially n1–n3; Device Portal **ETW** capture if available; note whether the window appeared and whether the expected blue clear ever appeared. | Device/swap-chain creation or Present failed, or the app exited before drawing. A black screen alone does not identify the failed stage. |
+| 7. `ladder.log` missing | **File Explorer > Boxedwine app > LocalState**: directory listing and `LocalState/ladder-native.log` if present; if both are absent, copy selected-app status and **ETW** activation diagnostics. | Hosted `ladder.log` is not produced by the console app; wrong app data folder, activation failure or native log creation failure may explain a missing native log. |
+| 8. App vs Game mode seems unchanged | `LocalState/ladder-native.log` saved separately after each run as `ladder-App.log` and `ladder-Game.log`, including n5; **Home > My games & apps**, selected app details: capture the app type shown; also record Dev Home **View details > App type**. | Mode was set on a different tile, only the new-app default was changed, or the app was not stopped and relaunched. The normal and Big file opt-in entries need separate settings. |
+| 9. Out-of-memory or exit during memory probe | Partial `LocalState/ladder-native.log`, including n5 starting note, reported limit and last successful allocation; Device Portal **Performance > Memory** reading at failure and **Debug > Crash dumps** if available. | The selected mode's memory budget or commit limit was reached; the OS may terminate the process before a final log line. Commit acceptance does not measure physical residency. |
+| 10. >2 GB file fails or n7 is SKIP | `LocalState/ladder-native.log`, including activation EntryPoint/opt-in and n7 bytes, size and error codes; **File Explorer > Boxedwine app > LocalState** listing; record available storage reported by Device Portal if shown. | Normal tile intentionally skips n7; opt-in activation may not have arrived, free space may be insufficient, or file I/O failed. The probe uses 2304 MiB and deletes `LocalState/big-file.bin` on close. |
+
+## How to send results back
+
+1. Before each relaunch, download the following through Device Portal **File
+   Explorer > Boxedwine app > LocalState**. Keep one folder per run, named by
+   date, tile and App/Game mode:
+   - `LocalState/ladder-native.log` — required when created; save the normal
+     tile's copies as `ladder-App.log` and `ladder-Game.log`, and use separate
+     run folders for the Big file opt-in tile.
+   - `LocalState/ladder.log` — only if hosted ladder evidence was placed here;
+     otherwise report “not produced by console app”. For a Linux hosted run,
+     collect it from the LocalState directory chosen by `--local-state` instead.
+   - A directory listing of `LocalState` if an expected log is missing. Report
+     absent files explicitly. `big-file.bin` is temporary and is not a required
+     download; the n7 result in `ladder-native.log` is the evidence to send.
+2. Download any app crash dump from Device Portal **Debug > Crash dumps** and
+   save the relevant **ETW** capture if those facilities are available. Copy
+   full install errors from **Home > My games & apps > Add**, or the selected
+   app's exit/status details. Preserve numeric codes exactly, without paraphrase.
+3. Send a short run note with console model, OS version, package identity,
+   tile, App/Game setting, run time, visible result and audible result. Include
+   MakeAppx/SignTool output for packaging failures and the public manifest when
+   relevant. Label console evidence separately from hosted/off-device results;
+   a missing file or SKIP is not a PASS.
+4. Review the files before sharing. Omit credentials, tokens, private keys
+   (`.pfx`), `LocalState/private/`, and owned game payloads. Review diagnostic
+   captures/dumps for private data; send only the relevant reviewed evidence.
