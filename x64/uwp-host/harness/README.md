@@ -49,9 +49,9 @@ of execution on this Linux box, not Xbox Dev Mode validation.
 
 Run `make -C x64/uwp-host/harness shim-test`. The target uses LD_PRELOAD only
 for its two owned, dynamically linked ELF probe processes. Its version script
-exports exactly open/read/close/mmap/munmap, _exit, and the explicit
-uwph_shim_report instrumentation function. There is no generic syscall wrapper,
-RTLD_NEXT resolver, constructor, process-wide trapping, or Wine loader change.
+exported exactly open/read/close/mmap/munmap, _exit, and the explicit
+uwph_shim_report instrumentation function (R4S O2 below adds the traced set).
+There is no generic syscall wrapper, process-wide trapping, or Wine loader change.
 The five SysV prototypes are explicitly adapted to the existing uwph APIs;
 compile-time checks cover the selected scalar/flag ABI. No struct-bearing libc
 symbols are exported. open consumes a mode only for O_CREAT or full O_TMPFILE.
@@ -342,6 +342,68 @@ signals, initialized-prefix setup and separate unrouted wineserver remain
 stand-in dependencies; there is no full UWP or Xbox acceptance claim. No
 DONE-R4H is written because the required no-wineboot gate remains unresolved.
 
+## R4S O2: traced set (O1 top 20)
+
+`shim.map` now also exports the 20 most-hit unsupported imports from
+`surface-trace.tsv`: snprintf, fopen, __isoc23_fscanf, fclose,
+pthread_getspecific, pthread_sigmask, feof, stat, write, pthread_mutex_lock,
+pthread_mutex_unlock, writev, getenv, asprintf, sigaddset, fcntl, setlocale,
+time, getuid, realpath. Each shim entry calls its public uwph entry, which bumps
+a per-symbol atomic counter (`uwph/trace.h`; no logging on the counted path).
+`check_surface.sh` takes the routed set from `shim.map` and requires the trace
+counter names to match it; surface.tsv now has routed=25, unsupported=140.
+
+Linux passthrough backend: stat/write/writev/fcntl/time use the raw-syscall
+adapters. Native FILE, pthread key, pthread_mutex_t, sigset, locale, env,
+getuid and realpath semantics stay with host libc, resolved once with
+`dlsym(RTLD_NEXT)` (missing symbol aborts; nothing is emulated silently). This
+keeps the native ABI for companion calls that are still not interposed (fgets,
+setenv in Wine, ...). The passthrough `uwph_setenv/putenv/unsetenv` use the same
+native table as `uwph_getenv`. In private-slot mode write/writev/fcntl accept only
+owned descriptors and fcntl F_DUPFD* is refused (a dup would leak a native fd).
+Only the separately built Wine shim (native-fd mode) accepts arbitrary fds.
+
+Win32/UWP backend: same public entries over existing uwph objects: CRT
+vsnprintf and setlocale (UWPH_LC_* Linux numbering mapped to CRT constants; no
+CRT LC_MESSAGES, so only C/POSIX is accepted for it), uwph FILE over
+CreateFile2-backed fds with a bounded integer/%s/%c/%n scanner (floating
+point and %[ fail with ENOSYS), uwph env table, keys, mutexes, signal masks,
+fixed uid 1000, path-normalizing realpath (no symlinks).
+
+`tests/traced.c` covers every symbol on all three builds (Linux stub, Win32
+under wine64, Linux passthrough via `make -C harness traced-test`). It checks
+behavior and that every counter moved. All three run from `make test`. The
+shim report now has `trace <symbol> <count>` rows. `verify_wine.py`
+requires every traced counter to be nonzero in routed hello/hello_k32 runs.
+Those counts are process-wide uwph entries, not ntdll-attributed like the five
+O2 selected families. The overall wine-test gate stays BLOCKED by the existing
+wineboot attempt, as it is in the stock control runs.
+
+## R4S O4 acceptance
+
+`make acceptance-test` runs both owned hellos through this harness's launcher,
+Wine's own loader, and the native-fd uwph shim under
+`/workspace/xbox-readiness/tests/uwp_run.sh nofork,noproc,wx`. The default includes
+wx because the installed jail supports it. An initialized explicit fixture is
+required, as in O3. A separate stock Linux wineserver remains outside the jail.
+No Xbox device acceptance is implied.
+
+The original strict noproc verifier still requires positive ntdll counts for
+open/read/close/mmap/munmap with zero bypass/recursion/unattributed/overflow.
+The added verifier requires all capped O1 priorities 1–20 to have positive uwph
+entry counters and real ntdll relocation bindings to the shim. These trace
+counters are process-wide, not per-caller counts; binding evidence establishes
+ntdll routing. Remaining O1 imports and direct syscalls remain excluded.
+
+O4 outcome: BLOCKED. Available wx seccomp causes hello_k32 exit 13 with
+`wine: failed to load start.exe: c000000d`. `UWPH_CONSTRAINTS=nofork,noproc
+./run-acceptance.sh` passes both hellos and all 20 traced entries as a diagnostic;
+that override does not satisfy the default wx gate. Full `make -C
+x64/uwp-host test` passes (Windows unit tests run under stock Wine, separately
+from the routed Linux guest proof). External status surface/noproc rows are in
+`/workspace/xbox-readiness/STATUS.md`; logs in
+`/workspace/x64-run/lanes/R4S/O4-*.log`; free-Xvfb/ffmpeg video in
+`/workspace/x64-run/videos/R4S-O4.mp4` (4.6 seconds).
 ## R4X O2: uwph_protect and W^X PE image mapping
 
 `uwph_protect(addr, len, prot)` (include/uwph/mem.h) is the strict W^X
@@ -361,8 +423,9 @@ mode now runs the W^X ntdll.so below; with stock ntdll it would exit 13.
 `prepare-wine-wx.sh` builds a private `out/wine-wx/` tree: upstream Wine 10.0
 (`/tmp/wine-src`) + the Debian 10.0~repack-6 Unix-ntdll patches (install paths,
 server tmpdir, two virtual.c fixes, regenerated protocol version 1) +
-`wine-image-wx.patch`. Only ntdll.so is rebuilt; wine64 is copied and every
-other file is a symlink to the installed Debian Wine. The patch keeps Wine's own
+`wine-image-wx.patch`. R4X rebuilt only ntdll.so; B18 also rebuilds PE ntdll.dll
+for missing-import stubs (see below). wine64 is copied; other DLLs link to the
+installed Debian Wine. The patch keeps Wine's own
 loader algorithm and changes only the protection order: image pages are mapped
 RW (copy-on-write), sections are read and relocated, then each section gets its
 final R/RW/RX via mprotect. The view keeps EXEC as its allowed maximum
@@ -386,3 +449,52 @@ selects the stock Debian ntdll as a control; under `--wx` that exits 13.
 | Windows uwph_protect | Build-only (mingw APP headers); no VirtualProtectFromApp run |
 | Separate wineserver | Stock Linux wineserver64 (unshimmed), as in R4H O4 |
 | wine-test (R4H O4 gate) | Routed = W^X ntdll.so + shim -> uwph, both PEs exit 0; controls = stock Wine; still BLOCKED only by wineboot attempts |
+
+Per-run prefix hygiene: `run-wine.sh` and the built `out/run_hello` install
+exit/signal cleanup before copying prefixes with `cp -a`. Real `dosdevices/z:`
+directories are refused. By default the prefix is removed and logs/reports/exits
+are retained in a sibling `evidence-*` directory; `KEEP_RUN=1` retains `run-*`
+including its prefix for debugging. `./check-hygiene.sh` runs one routed hello
+and checks that no new `run-*` or real `dosdevices/z:` directory remains in `out/`.
+
+## B18: remaining W^X inventory and missing-import stubs
+
+`prepare-wine-wx.sh` now builds both Unix ntdll.so and PE ntdll.dll. The
+additional `wine-loader-stub-wx.patch` changes Wine's `allocate_stub`: allocate
+one RW region for each missing-import stub, fill it, protect it RX, flush the
+instruction cache, then publish its address. A published stub's page is never
+reopened for writes when a later import needs a stub. The original stub-count
+limit remains; failure returns Wine's existing failure sentinel. The allocation
+cost increases to at least one page per stub (only for unresolved imports).
+Other PE DLLs remain symlinks to the installed Debian Wine distribution.
+
+The shim logs `UWPH_RWX pid=... op=... caller=<module>+<offset>` immediately for
+RWX requests, including those rejected before any syscall. Pair this with
+`strace -f -e trace=mmap,mprotect`; `-k --status=failed` attributes denied native
+syscalls without unwinding every successful mapping. Do not infer zero requests
+from zero syscall hits alone. Neither diagnostic changes the refusal policy.
+
+Run the focused missing-import probe with
+`make -C x64/uwp-host/harness stub-test`. This uses the same initialized isolated
+prefix, explicit stock Linux wineserver, private `WINE_LOADER`, shim `LD_PRELOAD`,
+launcher `out/run_via_wine`, and `uwpjail --wx` used for hello.
+It imports two nonexistent `version.dll` exports and checks that both generated
+addresses have PAGE_EXECUTE_READ protection and separate allocation bases. It
+never invokes the missing functions. See NOTES-x64.md `## B18` for recorded
+commands, counts, console reachability, and limitations.
+
+## B27: isolated nofork acceptance
+
+`run-isolated.sh CMD...` runs one acceptance command under
+`unshare -Urpf --mount-proc` (unprivileged), so other lanes' wineservers on the
+same box are invisible. After CMD returns, still inside the namespace, it runs
+the unchanged check `pgrep -x wineserver64 || pgrep -f '/wineserver64'`; pass is
+empty output. Logs land in the staged run dir (`out/inproc-staged.txt`, or
+`$UWPH_ISOLATED_RUN`): `isolated.ns` (gating), `isolated.host` (host-wide pgrep,
+informational only), `isolated.status`, `isolated.cmd`. It never relaxes uwpjail
+`--nofork`, the seccomp filter, or any verifier.
+
+    make -C x64/uwp-host/harness wine-test-inproc-build
+    UWPH_INPROC_SERVER=1 x64/uwp-host/harness/run-isolated.sh \
+      /workspace/xbox-readiness/tests/uwp_run.sh nofork "$PWD/x64/uwp-host/harness" \
+      -- ./run-wine.sh --inproc-server --no-build

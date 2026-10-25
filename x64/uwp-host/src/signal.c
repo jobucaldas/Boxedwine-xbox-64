@@ -8,9 +8,24 @@ static struct uwph_sigaction actions[UWPH_NSIG];
 static uwph_lock_t sig_lock = UWPH_LOCK_INIT;
 
 /* ---- sigset ---- */
-UWPH_API int uwph_sigemptyset(uwph_sigset_t *s) { memset(s, 0, sizeof(*s)); return 0; }
+UWPH_API int uwph_sigemptyset(uwph_sigset_t *s)
+{
+    uwph_trace_hit(UWPH_TRACE_SIGEMPTYSET);
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    UWPH_NATIVE(int, "sigemptyset", (uwph_sigset_t *));
+    UWPH_NATIVE_RETURN(fn(s));
+#endif
+    memset(s, 0, sizeof(*s));
+    return 0;
+}
 UWPH_API int uwph_sigaddset(uwph_sigset_t *s, int sig)
 {
+    uwph_trace_hit(UWPH_TRACE_SIGADDSET);
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    UWPH_NATIVE(int, "sigaddset", (uwph_sigset_t *, int));
+    UWPH_NATIVE_RETURN(fn(s, sig));
+#endif
+
     if (sig <= 0 || sig >= UWPH_NSIG) return UWPH_FAIL(UWPH_EINVAL);
     s->val[(sig - 1) / 64] |= (uint64_t)1 << ((sig - 1) % 64);
     return 0;
@@ -44,6 +59,12 @@ UWPH_API void *uwph_signal(int sig, void *handler)
 
 UWPH_API int uwph_pthread_sigmask(int how, const uwph_sigset_t *set, uwph_sigset_t *old)
 {
+    uwph_trace_hit(UWPH_TRACE_PTHREAD_SIGMASK);
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    UWPH_NATIVE(int, "pthread_sigmask", (int, const uwph_sigset_t *, uwph_sigset_t *));
+    UWPH_NATIVE_RETURN(fn(how, set, old));
+#endif
+
     struct uwph_thread *t = uwph_thread_current();
     if (old) *old = t->sigmask;
     if (!set) return 0;

@@ -1,0 +1,13 @@
+47950.112:0020:0024:err:environ:run_wineboot failed to start wineboot c0000135
+47950.309:0020:0024:trace:process:NtCreateUserProcess L"\\??\\C:\\windows\\system32\\conhost.exe" pid 0030 tid 0034 handles 0x40/0x44
+47953.364:0038:003c:err:environ:init_peb starting L"C:\\Program Files (x86)\\Steam\\Steam.exe" in experimental wow64 mode
+47953.368:0020:0024:trace:process:NtCreateUserProcess L"\\??\\C:\\Program Files (x86)\\Steam\\Steam.exe" pid 0038 tid 003c handles 0x68/0x6c
+47956.360:0038:003c:trace:process:NtCreateUserProcess L"\\??\\C:\\windows\\system32\\explorer.exe" pid 0040 tid 0044 handles 0x6c/0x70
+47958.860:0040:0044:err:ole:start_rpcss flags 0x1, load_path 0000000000000000, dll_characteristics 0000000000000000, name 00007FFFFE2FE7A0, base 00007FFFFE2FE798.
+47958.882:0038:003c:warn:module:get_builtin_unix_funcs failed to load "/usr/lib/i386-linux-gnu/wine/x86_64-unix/winex11.so": /usr/lib/i386-linux-gnu/wine/x86_64-unix/winex11.so: cannot open shared object file: No such file or directory
+47958.962:0038:003c:warn:module:get_builtin_unix_funcs failed to load "/usr/lib/i386-linux-gnu/wine/x86_64-unix/winex11.so": /usr/lib/i386-linux-gnu/wine/x86_64-unix/winex11.so: cannot open shared object file: No such file or directory
+47959.019:0038:003c:warn:module:get_builtin_unix_funcs failed to load "/usr/lib/i386-linux-gnu/wine/x86_64-unix/bcrypt.so": /usr/lib/i386-linux-gnu/wine/x86_64-unix/bcrypt.so: cannot open shared object file: No such file or directory
+47959.024:0038:003c:warn:module:get_builtin_unix_funcs failed to load "/usr/lib/i386-linux-gnu/wine/x86_64-unix/crypt32.so": /usr/lib/i386-linux-gnu/wine/x86_64-unix/crypt32.so: cannot open shared object file: No such file or directory
+47959.024:0038:003c:err:module:loader_init "CRYPT32.dll" failed to initialize, aborting
+47959.024:0038:003c:err:module:loader_init Initializing dlls for L"C:\\Program Files (x86)\\Steam\\Steam.exe" failed, status c0000142
+47960.077:0040:0044:err:ole:start_rpcss Failed to open service manager

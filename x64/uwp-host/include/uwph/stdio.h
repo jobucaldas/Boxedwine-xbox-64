@@ -38,6 +38,14 @@ UWPH_API int    uwph_fscanf(uwph_FILE *f, const char *fmt, ...);
 UWPH_API void   uwph_perror(const char *s);
 UWPH_API char  *uwph_strerror(int err);           /* Linux errno numbering */
 
+UWPH_API int uwph_vsnprintf(char *buf, size_t size, const char *fmt, va_list ap);
+UWPH_API int uwph_vasprintf(char **buf, const char *fmt, va_list ap);
+UWPH_API int uwph_snprintf(char *buf, size_t size, const char *fmt, ...);
+UWPH_API int uwph_asprintf(char **buf, const char *fmt, ...);
+/* UWPH_LC_* (Linux) categories; unknown categories fail with EINVAL. */
+UWPH_API char *uwph_setlocale(int category, const char *locale);
+UWPH_API int uwph_vfscanf(uwph_FILE *f, const char *fmt, va_list ap);
+
 /* misc libc entry points with host meaning */
 struct uwph_mntent;
 UWPH_API struct uwph_mntent *uwph_getmntent(uwph_FILE *f);

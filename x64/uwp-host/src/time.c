@@ -109,6 +109,7 @@ UWPH_API int uwph_gettimeofday(struct uwph_timeval *tv, void *tz)
 
 UWPH_API uwph_time_t uwph_time(uwph_time_t *t)
 {
+    uwph_trace_hit(UWPH_TRACE_TIME);
     struct uwph_timespec ts;
     if (uwph_clock_gettime(UWPH_CLOCK_REALTIME, &ts) < 0) return -1;
     if (t) *t = ts.tv_sec;
