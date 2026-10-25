@@ -1428,3 +1428,27 @@ Video /workspace/x64-run/videos/B10-O1.mp4 (30 seconds) shows the routed
 installer blocker, not a running Steam client. No commits or remotes touched.
 
 Literal last installer log line: `44367.703:0030:0034:trace:module:MODULE_InitDLL (00006FFFFFC20000,PROCESS_DETACH,0000000000000001) - RETURN 1`.
+
+## B19 O1
+
+ROOT CAUSE: Genuine protocol-number mismatch: hosted Wine server is compiled with upstream SERVER_PROTOCOL_VERSION 855; installed Debian ntdll expects 1. The client does not read 1 from the socket.
+
+/tmp/wine-src/include/wine/server_protocol.h:6778 defines 855; /tmp/wine-src/VERSION is Wine version 10.0. dpkg -s wine64 reports Source: wine, Version: 10.0~repack-6. Installed ntdll strings line 4604 is version mismatch %d/%d.
+
+Wine dlls/ntdll/unix/server.c:1583 calls receive_fd(&version). receive_fd at lines 935-970 receives sizeof(obj_handle_t) bytes with recvmsg and extracts the SCM_RIGHTS fd. server_init_process:1593-1599 compares the received version against SERVER_PROTOCOL_VERSION and prints received-version / compiled-client-version, in that order. Wine server/thread.c:313 sends SERVER_PROTOCOL_VERSION alongside the first request fd.
+
+Installed ntdll disassembly: 0x38784 loads received version into esi; 0x38788 compares esi with literal 1; 0x3878b branches to mismatch at 0x39442. 0x39452 loads literal 1 into edx (second numeric printf argument), 0x39457 selects format at 0x6d258, 0x39460 calls the error routine. Thus 1 is a compiled constant, not erroneous received data.
+
+Fresh control-hello: WINEDEBUG=+server, UWPH_INPROC_SERVER=1, LD_PRELOAD=B19/out/libuwph_inproc_server.so, isolated copy of R4W prebuilt-prefix, B19 run_via_wine -> /usr/lib/wine/wine64 -> Wine own loader. Exit 1, server-ready marker and version mismatch 855/1. strace thread 556809 sendmsg and client 556808 recvmsg both carry W\3\0\0 (hex 57 03 00 00 = 855), with SCM_RIGHTS for the same request pipe. No separate wineserver exec appears. Protocol fails before ordinary request/server debug traffic. Logs retained as control-hello.log, control-hello.strace, control-hello.exit.
+
+nm -D --defined-only captured for libuwph_wine_shim.so (shim.nm), libuwph_inproc_server.so (hosted.nm), installed ntdll.so (ntdll.nm). Overlapping global symbols with ntdll: shim (none); hosted (none). See overlaps.txt. This evidence does not support symbol interposition as the cause.
+
+Existing harness/prepare-wine-wx.sh explicitly documents Debian repack regeneration with make_requests restarting SERVER_PROTOCOL_VERSION at 1; its private loader source in R4W also defines 1. Package version alone cannot prove protocol identity; installed machine code and live wire bytes prove this mismatch.
+
+Scope: THROUGH x64/uwp-host hosted server + our launcher + Wine own loader; stock Debian ntdll client control, not stock Wine alone. No routed uwph syscall-backend or Xbox/UWP acceptance claim. No runtime fixes, protocol bypasses, verifier changes, commits, or remote operations.
+
+Evidence directory: `x64/uwp-host/harness/out/b19-o1/` (ignored build output). Video: `/workspace/x64-run/videos/B19-O1.mp4` (terminal evidence replay).
+
+Independent re-verification (second pass): fresh rerun in out/b19-o1/rerun/ (same path: our run_via_wine launcher -> /usr/lib/wine/wine64 -> Wine's own loader, LD_PRELOAD libuwph_inproc_server.so, WINEDEBUG=+server, WINESERVER=/bin/false) again exits 1 with "version mismatch 855/1"; hosted server thread sendmsg carries W\3\0\0 (855); 0 wineserver execs. Overlap recomputed with comm over nm -D --defined-only global symbols: shim/ntdll none, hosted/ntdll none.
+Stock-Wine control (NOT uwph, out/b19-o1/stock-control/): installed Debian /usr/lib/wine/wineserver64 sends iov "\1\0\0\0" (protocol 1) with the request fd, and hello.exe runs to completion (rc=0). So Debian 10.0~repack-6 server and client both use protocol 1; /tmp/wine-src (upstream 10.0 headers, 855) is the odd one out.
+Implication for O2 (not done here): build the hosted server against a server_protocol.h regenerated the Debian way (perl tools/make_requests, as prepare-wine-wx.sh already does -> 1), or from the exact Debian source tree. Never patch the version check.
