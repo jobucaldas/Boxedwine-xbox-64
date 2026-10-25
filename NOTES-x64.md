@@ -2295,3 +2295,33 @@ Exact O2 command passed, exit 0; complete output:
 60/63/70 traced, Windows futex 500 passed, all zero failures).
 These remain Linux THROUGH-uwph client/probe proofs, with separate stock-Wine
 Windows smoke; no Xbox-device claim, Steam login, or client modification.
+
+
+B31 O1: added `x64/uwp-host/harness/run-battery.sh [CONSTRAINTS...]`.
+Default battery runs all six readiness probes for nofork, net, cpu6, noproc,
+appfs, wx and nofork,noproc,wx through run_via_wine -> Wine's own PE loader
+-> LD_PRELOAD shim -> uwph, using the acceptance fixture and explicit stock
+Linux wineserver outside the jail. Each stdout row has four TSV fields:
+constraints, probe, exit, report_traced_count. Missing/zero trace evidence,
+nonzero exit or probe SUMMARY failures fail the run. Per-run logs/reports
+are retained under harness/out/battery/run.*; diagnostics mark PASS/FAIL.
+The fixture lock descriptor is closed in children so the persistent server
+cannot retain it. Temporary report storage remains writable under appfs
+and noproc, without changing constraint gates or probes.
+
+Final exact battery command exited 0, 42/42 PASS, all guest exits 0 and all
+trace counts positive. Full TSV: /workspace/x64-run/lanes/B31/battery-exact.tsv;
+diagnostics: /workspace/x64-run/lanes/B31/battery-exact.log; reports/logs:
+/workspace/wt/B31/x64/uwp-host/harness/out/battery/run.bR1Z3vOb/.
+An initial exploratory run had noproc/thread_probe exit 124, traced 0,
+FAIL (empty log: harness/out/battery/noproc-thread_probe.log); 41/42 passed.
+This intermittent timeout is retained as a finding, not masked or retried
+inside the runner. It did not reproduce in the final full exact run.
+An initial concurrent Windows smoke failed to acquire the owned fixture;
+sequential rerun of `make -C x64/uwp-host test && bash
+x64/uwp-host/harness/run-windows-smoke.sh` exited 0. Full output:
+/workspace/x64-run/lanes/B31/host-smoke-exact.log; Windows futex 500 passed,
+0 failed. Battery proof is Linux THROUGH launcher/uwph; Windows smoke runs
+uwph Windows code hosted by stock Wine, not the Unix launcher. Build/static
+checks are not Xbox-device proof. Video: /workspace/x64-run/videos/B31-O1.mp4
+(45 seconds, free Xvfb display, live battery TSV; no Encom).
