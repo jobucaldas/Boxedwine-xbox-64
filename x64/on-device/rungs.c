@@ -775,13 +775,92 @@ static HRESULT STDMETHODCALLTYPE obj_iids(void *This, ULONG *n, IID **iids)
 static HRESULT STDMETHODCALLTYPE obj_name(void *This, HSTRING *s) { (void)This; *s = NULL; return S_OK; }
 static HRESULT STDMETHODCALLTYPE obj_trust(void *This, TrustLevel *t) { (void)This; *t = BaseTrust; return S_OK; }
 
+/* SystemNavigationManager ABI, checked against Microsoft's windows-rs
+ * Windows/UI/Core metadata projection. EventHandler<T> inherits IUnknown,
+ * not IInspectable; WinRT Boolean is one byte. */
+static const GUID IID_ISystemNavigationManagerStatics_ =
+    {0xdc52b5ce, 0xbee0, 0x4305, {0x8c, 0x54, 0x68, 0x22, 0x8e, 0xd6, 0x83, 0xb5}};
+static const GUID IID_BackRequestedHandler_ =
+    {0x1373d28e, 0xca72, 0x53d3, {0xa4, 0x5a, 0xaa, 0xc9, 0xda, 0x76, 0xae, 0x65}};
+typedef struct back_args_t {
+    struct {
+        IInspectableVtblX base;
+        HRESULT (STDMETHODCALLTYPE *get_Handled)(void *, BOOLEAN *);
+        HRESULT (STDMETHODCALLTYPE *put_Handled)(void *, BOOLEAN);
+    } *lpVtbl;
+} back_args_t;
+typedef struct navigation_t {
+    struct {
+        IInspectableVtblX base;
+        HRESULT (STDMETHODCALLTYPE *add_BackRequested)(void *, void *, INT64 *);
+        HRESULT (STDMETHODCALLTYPE *remove_BackRequested)(void *, INT64);
+    } *lpVtbl;
+} navigation_t;
+typedef struct navigation_statics_t {
+    struct {
+        IInspectableVtblX base;
+        HRESULT (STDMETHODCALLTYPE *GetForCurrentView)(void *, navigation_t **);
+    } *lpVtbl;
+} navigation_statics_t;
+static navigation_t *g_navigation;
+static INT64 g_back_token;
+static HRESULT g_back_registration_hr = S_OK;
+static HRESULT STDMETHODCALLTYPE back_qi(void *This, REFIID iid, void **out)
+{
+    if (!out) return E_POINTER;
+    *out = NULL;
+    if (!IsEqualIID(iid, &IID_IUnknown) &&
+        !IsEqualIID(iid, &IID_IAgileObject_) &&
+        !IsEqualIID(iid, &IID_BackRequestedHandler_)) return E_NOINTERFACE;
+    *out = This; /* Static singleton, alive until process exit. */
+    return S_OK;
+}
+static HRESULT STDMETHODCALLTYPE back_invoke(void *This, void *sender, back_args_t *args)
+{
+    (void)This;
+    (void)sender;
+    if (!args) return E_POINTER;
+    HRESULT hr = args->lpVtbl->put_Handled(args, TRUE);
+    if (SUCCEEDED(hr)) out_line("back-requested handled");
+    else note("BackRequested put_Handled hr=0x%08lx", hx(hr));
+    return hr;
+}
+static struct {
+    HRESULT (STDMETHODCALLTYPE *QueryInterface)(void *, REFIID, void **);
+    ULONG (STDMETHODCALLTYPE *AddRef)(void *);
+    ULONG (STDMETHODCALLTYPE *Release)(void *);
+    HRESULT (STDMETHODCALLTYPE *Invoke)(void *, void *, back_args_t *);
+} back_vtbl = {back_qi, obj_addref, obj_release, back_invoke};
+static struct { void *lpVtbl; } g_back_handler = {&back_vtbl};
+
+static HRESULT register_back_requested(void)
+{
+    static const WCHAR name[] = L"Windows.UI.Core.SystemNavigationManager";
+    HSTRING cls = NULL;
+    navigation_statics_t *stat = NULL;
+    navigation_t *manager = NULL;
+    HRESULT hr = WindowsCreateString(name, (UINT32)wcslen(name), &cls);
+    if (SUCCEEDED(hr)) hr = RoGetActivationFactory(cls, &IID_ISystemNavigationManagerStatics_, (void **)&stat);
+    if (SUCCEEDED(hr)) hr = stat->lpVtbl->GetForCurrentView(stat, &manager);
+    if (SUCCEEDED(hr)) hr = manager->lpVtbl->add_BackRequested(manager, &g_back_handler, &g_back_token);
+    if (SUCCEEDED(hr)) g_navigation = manager;
+    else {
+        if (manager) manager->lpVtbl->base.Release(manager);
+        note("BackRequested registration hr=0x%08lx", hx(hr));
+    }
+    if (stat) stat->lpVtbl->base.Release(stat);
+    if (cls) WindowsDeleteString(cls);
+    return hr;
+}
+
 static HRESULT STDMETHODCALLTYPE view_init(void *This, void *app_view) { (void)This; (void)app_view; return S_OK; }
 static HRESULT STDMETHODCALLTYPE view_set_window(void *This, void *window)
 {
     (void)This;
     g_window = window;
     g_window->lpVtbl->base.AddRef(g_window);
-    return S_OK;
+    g_back_registration_hr = register_back_requested();
+    return g_back_registration_hr;
 }
 /* Load receives the manifest EntryPoint, including for Dev Home activation.
  * A separate explicitly named tile provides opt-in without desktop argv. */
@@ -804,13 +883,22 @@ static HRESULT STDMETHODCALLTYPE view_run(void *This)
     g_window->lpVtbl->get_Dispatcher(g_window, (void **)&g_dispatcher);
     pump();
     run_all((IUnknown *)g_window);
-    if (g_log) fclose(g_log);
-    g_log = NULL;
+    /* Keep the log open for BackRequested events while idle. */
     /* Keep the window (and the n3 colour) up until the user leaves the app. */
     if (g_dispatcher) g_dispatcher->lpVtbl->ProcessEvents(g_dispatcher, 2);
     return S_OK;
 }
-static HRESULT STDMETHODCALLTYPE view_uninit(void *This) { (void)This; return S_OK; }
+static HRESULT STDMETHODCALLTYPE view_uninit(void *This)
+{
+    (void)This;
+    if (g_navigation) {
+        HRESULT hr = g_navigation->lpVtbl->remove_BackRequested(g_navigation, g_back_token);
+        if (FAILED(hr)) note("BackRequested removal hr=0x%08lx", hx(hr));
+        g_navigation->lpVtbl->base.Release(g_navigation);
+        g_navigation = NULL;
+    }
+    return S_OK;
+}
 
 static HRESULT STDMETHODCALLTYPE source_create(void *This, view_t **out);
 static struct {
@@ -915,6 +1003,12 @@ int main(int argc, char **argv)
         HRESULT hr = WindowsCreateString(name, (UINT32)wcslen(name), &cls);
         if (SUCCEEDED(hr)) hr = RoGetActivationFactory(cls, &IID_ICoreApplication_, (void **)&app);
         if (SUCCEEDED(hr)) hr = app->lpVtbl->Run(app, &g_source);
+        if (FAILED(g_back_registration_hr)) {
+            if (app) app->lpVtbl->base.Release(app);
+            if (cls) WindowsDeleteString(cls);
+            if (g_log) fclose(g_log);
+            return (int)g_back_registration_hr; /* Platform refusal: stop, no fallback. */
+        }
         if (FAILED(hr)) {
             g_device = 0;
             note("CoreApplication.Run hr=0x%08lx; running rungs without a CoreWindow", hx(hr));

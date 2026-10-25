@@ -149,6 +149,10 @@ shown above.
 app from Dev Home: the **Boxedwine Dev Mode** tile (EntryPoint `Boxedwine.App`,
 executable `rungs.exe`). It activates a real CoreWindow and writes
 `ApplicationData.Current.LocalFolder/ladder-native.log`, flushing each stage.
+The B button no longer exits: the view handles
+[SystemNavigationManager.BackRequested](https://learn.microsoft.com/en-us/uwp/api/windows.ui.core.systemnavigationmanager)
+and sets `Handled=TRUE`, logging `back-requested handled` for each event.
+Use the Home/guide button to leave. This behavior still needs console validation.
 Save this file separately as `ladder-App.log` and `ladder-Game.log` before
 relaunching; the native log is overwritten each run. Keep hosted a–h evidence
 separately; these native probes do not prove the Wine compatibility runtime.
