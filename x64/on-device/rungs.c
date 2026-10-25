@@ -80,18 +80,33 @@ static void stage(const char *id, const char *name, const char *status, const ch
 /* Readiness PE sources linked into this PE: no child process or custom loader. */
 static void state_path(WCHAR *dst, size_t n, const WCHAR *leaf);
 int readiness_thread_main(void);
+int readiness_seh_main(void);
+int readiness_fs_main(const WCHAR *root);
+int readiness_net_main(void);
 int readiness_uwph_main(int argc, char **argv);
 static void readiness_rungs(void)
 {
-    stage("p1", "seh_probe", "SKIP", "source requires AddVectoredExceptionHandler, absent from app API set; no desktop fallback");
+    if (!g_device || !g_packaged || !g_local_state) {
+        stage("p1", "seh_probe", "SKIP", "requires verified Xbox UWP activation and LocalState");
+    } else {
+        int rc = readiness_seh_main();
+        stage("p1", "seh_probe", rc ? "FAIL" : "PASS", "native frame SEH AV/divide/ud2/breakpoint/software + 10000 AV + stack; exit=%d; LIMIT: no VEH/guard-page/concurrent checks", rc);
+    }
     if (!g_device || !g_packaged || !g_local_state) {
         stage("p2", "thread_probe", "SKIP", "requires verified Xbox UWP activation and LocalState; no off-device execution");
     } else {
         int rc = readiness_thread_main();
         stage("p2", "thread_probe", rc ? "FAIL" : "PASS", "in-process native PE probe exit=%d; native Windows APIs, no Wine", rc);
     }
-    stage("p3", "fs_probe", "SKIP", "source uses SHGetFolderPathA/CreateFileA and desktop mappings; app-safe port required");
-    stage("p4", "net_probe", "SKIP", "original probe includes Steam directory/CM WebSocket tests; Steam probes excluded by O1");
+    if (!g_device || !g_packaged || !g_local_state) {
+        stage("p3", "fs_probe", "SKIP", "requires verified Xbox UWP activation and LocalState");
+        stage("p4", "net_probe", "SKIP", "requires verified Xbox UWP activation and LocalState");
+    } else {
+        int rc = readiness_fs_main(g_state);
+        stage("p3", "fs_probe", rc ? "FAIL" : "PASS", "native LocalState save/read/case/mapping/persistence/delete/free-space; exit=%d; LIMIT: no desktop known-folder redirection", rc);
+        rc = readiness_net_main();
+        stage("p4", "net_probe", rc ? "FAIL" : "PASS", "native bounded same-process TCP bind/connect/accept/payload; exit=%d; LIMIT: no external DNS/TLS/WebSocket or fixed-port checks; no Steam requests", rc);
+    }
     stage("p5", "jit_probe", "SKIP", "original uses VirtualProtect/VirtualAlloc and RWX dual mappings; full app-safe VirtualProtectFromApp rebuild pending; original PE never executed");
     if (!g_device || !g_packaged || !g_local_state) {
         stage("p6", "uwph-self-test", "SKIP", "requires verified Xbox UWP activation and LocalState; THROUGH-uwph self-test linked, console unverified");

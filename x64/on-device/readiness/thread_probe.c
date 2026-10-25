@@ -1,56 +1,102 @@
-/* Threading/sync/time primitives (Unity, Steamworks, DXVK worker threads). On UWP, wineserver
- * must live in-process, so every wait below is a server round trip that becomes an in-process call. */
+/* Bounded native threading port. Shared state has static lifetime even if a
+ * timed-out OS worker has not exited; no stack argument outlives this call. */
 #include "common.h"
-#include <process.h>
-static CRITICAL_SECTION cs; static SRWLOCK srw = SRWLOCK_INIT; static CONDITION_VARIABLE cv = CONDITION_VARIABLE_INIT;
-static volatile LONG counter, counter2, ready; static DWORD tls; static HANDLE ev;
+static CRITICAL_SECTION cs;
+static SRWLOCK srw = SRWLOCK_INIT;
+static CONDITION_VARIABLE cv = CONDITION_VARIABLE_INIT;
+static volatile LONG counter, counter2, stop;
+static DWORD tls;
+static HANDLE ev, ping[2];
 static DWORD WINAPI worker(void *arg)
 {
-    TlsSetValue(tls, arg);
-    for (int i = 0; i < 10000; i++) { EnterCriticalSection(&cs); counter++; LeaveCriticalSection(&cs); }
-    for (int i = 0; i < 10000; i++) { AcquireSRWLockExclusive(&srw); counter2++; ReleaseSRWLockExclusive(&srw); }
-    InterlockedIncrement(&ready); WaitForSingleObject(ev, INFINITE);
-    return TlsGetValue(tls) == arg ? 0 : 1;
+    if (!TlsSetValue(tls, arg)) return 1;
+    for (int i = 0; i < 10000 && !InterlockedCompareExchange(&stop, 0, 0); i++) {
+        EnterCriticalSection(&cs); counter++; LeaveCriticalSection(&cs);
+        AcquireSRWLockExclusive(&srw); counter2++; ReleaseSRWLockExclusive(&srw);
+    }
+    return WaitForSingleObject(ev, 5000) == WAIT_OBJECT_0 && TlsGetValue(tls) == arg ? 0 : 1;
 }
-static DWORD WINAPI pingpong(void *p) { HANDLE *e = p; for (int i = 0; i < 2000; i++) { WaitForSingleObject(e[0], INFINITE); SetEvent(e[1]); } return 0; }
+static DWORD WINAPI pingpong(void *arg)
+{
+    (void)arg;
+    for (int i = 0; i < 2000 && !InterlockedCompareExchange(&stop, 0, 0); i++) {
+        if (WaitForSingleObject(ping[0], 2000) != WAIT_OBJECT_0 || !SetEvent(ping[1])) return 1;
+    }
+    return 0;
+}
 int main(void)
 {
-    InitializeCriticalSection(&cs); tls = TlsAlloc(); ev = CreateEventA(NULL, TRUE, FALSE, NULL);
-    enum { N = 64 }; HANDLE h[N]; int made = 0;
-    for (int i = 0; i < N; i++) if ((h[i] = CreateThread(NULL, 0, worker, (void *)(INT_PTR)(i + 1), 0, NULL))) made++;
-    CHECK("create 64 threads", made == N, "%d", made);
-    while (ready < made) Sleep(1);
-    SetEvent(ev);
-    DWORD w1 = WaitForMultipleObjects(N, h, TRUE, 30000);
-    CHECK("WaitForMultipleObjects(64, all)", w1 == WAIT_OBJECT_0, "ret=%lu", w1);
-    int tlsok = 1; for (int i = 0; i < N; i++) { DWORD c; GetExitCodeThread(h[i], &c); if (c) tlsok = 0; }
-    CHECK("per-thread TLS isolation", tlsok, "ok=%d", tlsok);
-    CHECK("CS + SRW counters exact", counter == N * 10000 && counter2 == N * 10000, "%ld %ld", counter, counter2);
-    HANDLE e[2] = { CreateEventA(NULL, FALSE, FALSE, NULL), CreateEventA(NULL, FALSE, FALSE, NULL) };
-    HANDLE t = CreateThread(NULL, 0, pingpong, e, 0, NULL);
-    LARGE_INTEGER f, a, b; QueryPerformanceFrequency(&f); QueryPerformanceCounter(&a);
-    for (int i = 0; i < 2000; i++) { SetEvent(e[0]); WaitForSingleObject(e[1], INFINITE); }
-    QueryPerformanceCounter(&b); WaitForSingleObject(t, 5000);
-    double us = (b.QuadPart - a.QuadPart) * 1e6 / f.QuadPart / 2000;
-    CHECK("event ping-pong (wineserver round trip)", 1, "%.1f us/round trip", us);
-    printf("METRIC event_roundtrip_us=%.1f\n", us);
-    QueryPerformanceCounter(&a); Sleep(16); QueryPerformanceCounter(&b);
-    double ms = (b.QuadPart - a.QuadPart) * 1e3 / f.QuadPart;
-    CHECK("Sleep(16) accuracy (frame pacing)", ms >= 15 && ms < 25, "%.2f ms", ms);
-    HANDLE wt = CreateWaitableTimerExW(NULL, NULL, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS);
-    CHECK("high-resolution waitable timer", wt != NULL, "h=%p err=%lu", wt, wt ? 0 : GetLastError());
-    HANDLE mx = CreateMutexA(NULL, FALSE, "Local\\uwp_probe_mutex");
-    CHECK("named mutex (Local\\)", mx != NULL, "err=%lu", mx ? 0 : GetLastError());
-    HANDLE sem = CreateSemaphoreA(NULL, 0, 10, NULL); ReleaseSemaphore(sem, 3, NULL);
-    CHECK("semaphore", WaitForSingleObject(sem, 0) == WAIT_OBJECT_0, "ok");
+    enum { N = 64 }; HANDLE threads[N]; int made = 0, live = 0;
+    InitializeCriticalSection(&cs);
+    tls = TlsAlloc(); ev = CreateEventExW(NULL, NULL, CREATE_EVENT_MANUAL_RESET, EVENT_ALL_ACCESS);
+    CHECK("TLS and release event creation", tls != TLS_OUT_OF_INDEXES && ev, "tls=%lu event=%p err=%lu", tls, ev, GetLastError());
+    if (tls == TLS_OUT_OF_INDEXES || !ev) goto cleanup;
+    for (int i = 0; i < N; i++) {
+        HANDLE h = CreateThread(NULL, 0, worker, (void *)(INT_PTR)(i+1), 0, NULL);
+        if (!h) break;
+        threads[made++] = h;
+    }
+    CHECK("create 64 threads", made == N, "made=%d err=%lu", made, GetLastError());
+    BOOL released = SetEvent(ev);
+    DWORD w = made ? WaitForMultipleObjects(made, threads, TRUE, 10000) : WAIT_FAILED;
+    CHECK("bounded worker completion", released && made == N && w == WAIT_OBJECT_0, "wait=%lu", w);
+    InterlockedExchange(&stop, 1);
+    int tlsok = made == N;
+    for (int i = 0; i < made; i++) {
+        DWORD code = 1;
+        if (WaitForSingleObject(threads[i], 0) != WAIT_OBJECT_0) { live++; tlsok = 0; }
+        else if (!GetExitCodeThread(threads[i], &code) || code) tlsok = 0;
+        CloseHandle(threads[i]);
+    }
+    CHECK("per-thread TLS isolation", tlsok, "ok=%d live=%d", tlsok, live);
+    CHECK("CS + SRW counters exact", !live && counter == N*10000 && counter2 == N*10000, "%ld %ld", counter, counter2);
+    if (live) goto cleanup;
+    InterlockedExchange(&stop, 0);
+    ping[0] = CreateEventExW(NULL, NULL, 0, EVENT_ALL_ACCESS);
+    ping[1] = CreateEventExW(NULL, NULL, 0, EVENT_ALL_ACCESS);
+    HANDLE t = ping[0] && ping[1] ? CreateThread(NULL, 0, pingpong, NULL, 0, NULL) : NULL;
+    CHECK("ping-pong event/thread creation", t != NULL, "thread=%p err=%lu", t, GetLastError());
+    int rounds = 0;
+    ULONGLONG deadline = GetTickCount64() + 10000;
+    if (t) {
+        for (; rounds < 2000 && GetTickCount64() < deadline; rounds++)
+            if (!SetEvent(ping[0]) || WaitForSingleObject(ping[1], 2000) != WAIT_OBJECT_0) break;
+        InterlockedExchange(&stop, 1); SetEvent(ping[0]);
+        w = WaitForSingleObject(t, 2500);
+        DWORD code = 1;
+        int ok = w == WAIT_OBJECT_0 && GetExitCodeThread(t, &code) && code == 0;
+        CHECK("bounded event ping-pong", rounds == 2000 && ok, "rounds=%d wait=%lu exit=%lu", rounds, w, code);
+        if (w != WAIT_OBJECT_0) live++;
+        CloseHandle(t);
+    }
+    LARGE_INTEGER freq, before, after;
+    QueryPerformanceFrequency(&freq); QueryPerformanceCounter(&before);
+    Sleep(16); QueryPerformanceCounter(&after);
+    double ms = (after.QuadPart - before.QuadPart) * 1e3 / freq.QuadPart;
+    CHECK("Sleep(16) frame pacing", ms >= 15 && ms < 25, "ms=%.2f", ms);
+    HANDLE timer = CreateWaitableTimerExW(NULL, NULL, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS);
+    CHECK("high-resolution waitable timer", timer != NULL, "err=%lu", GetLastError());
+    if (timer) CloseHandle(timer);
+    HANDLE mutex = CreateMutexExW(NULL, L"Local\\uwp_probe_mutex", 0, MUTEX_ALL_ACCESS);
+    CHECK("named Local mutex", mutex != NULL, "err=%lu", GetLastError());
+    if (mutex) CloseHandle(mutex);
     AcquireSRWLockExclusive(&srw);
-    SleepConditionVariableSRW(&cv, &srw, 1, 0);
-    DWORD cv_error = GetLastError();
+    BOOL cvok = SleepConditionVariableSRW(&cv, &srw, 1, 0);
+    DWORD error = GetLastError();
     ReleaseSRWLockExclusive(&srw);
-    CHECK("condition variable timeout", cv_error == ERROR_TIMEOUT, "ok");
-    SYSTEM_INFO si; GetSystemInfo(&si);
-    INFO("logical processors visible: %lu (Xbox Game mode: 4 exclusive + 2 shared)", si.dwNumberOfProcessors);
-    MEMORYSTATUSEX ms2 = { sizeof ms2 }; GlobalMemoryStatusEx(&ms2);
-    INFO("physical mem visible: %llu MB (Xbox Game mode budget: 5120 MB)", ms2.ullTotalPhys >> 20);
+    CHECK("condition variable timeout", !cvok && error == ERROR_TIMEOUT, "err=%lu", error);
+    HANDLE sem = CreateSemaphoreExW(NULL, 0, 10, NULL, 0, SEMAPHORE_ALL_ACCESS);
+    CHECK("semaphore release/wait", sem && ReleaseSemaphore(sem, 3, NULL) && WaitForSingleObject(sem, 0) == WAIT_OBJECT_0, "handle=%p", sem);
+    if (sem) CloseHandle(sem);
+cleanup:
+    /* A non-responsive worker retains only its own static shared resources.
+     * Never terminate a thread or destroy synchronization objects beneath it. */
+    if (!live) {
+        if (ping[0]) CloseHandle(ping[0]);
+        if (ping[1]) CloseHandle(ping[1]);
+        if (ev) CloseHandle(ev);
+        if (tls != TLS_OUT_OF_INDEXES) TlsFree(tls);
+        DeleteCriticalSection(&cs);
+    } else INFO("worker timeout: static synchronization resources retained until process exit");
     SUMMARY("thread_probe");
 }

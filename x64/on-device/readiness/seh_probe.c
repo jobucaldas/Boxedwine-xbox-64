@@ -1,46 +1,51 @@
-/* Structured exceptions games/runtimes rely on. On Linux Wine these arrive as POSIX signals
- * (SIGSEGV/SIGFPE/SIGILL/SIGTRAP); on a UWP host they would arrive as native Windows exceptions. */
+/* App-container port: frame-based SEH, no vectored handler or desktop API.
+ * MinGW __try1 emits the documented x64 scope table for __C_specific_handler. */
 #include "common.h"
-static volatile LONG hits; static DWORD last_code;
-static LONG CALLBACK veh(EXCEPTION_POINTERS *e)
+#include <excpt.h>
+static volatile LONG hits;
+static volatile DWORD last_code;
+LONG seh_filter(EXCEPTION_POINTERS *e, void *frame)
 {
-    last_code = e->ExceptionRecord->ExceptionCode; InterlockedIncrement(&hits);
-    if (last_code == EXCEPTION_ACCESS_VIOLATION || last_code == EXCEPTION_INT_DIVIDE_BY_ZERO || last_code == EXCEPTION_ILLEGAL_INSTRUCTION || last_code == EXCEPTION_PRIV_INSTRUCTION) {
-        e->ContextRecord->Rip += 2;   /* every probe fault below is a 2-byte instruction */
+    (void)frame;
+    DWORD code = e->ExceptionRecord->ExceptionCode;
+    if (code == EXCEPTION_ACCESS_VIOLATION || code == EXCEPTION_INT_DIVIDE_BY_ZERO ||
+        code == EXCEPTION_ILLEGAL_INSTRUCTION || code == EXCEPTION_BREAKPOINT || code == 0xE0000001) {
+        last_code = code;
+        InterlockedIncrement(&hits);
+        if (code != 0xE0000001)
+            e->ContextRecord->Rip = (DWORD64)e->ExceptionRecord->ExceptionAddress +
+                                   (code == EXCEPTION_BREAKPOINT ? 1 : 2);
         return EXCEPTION_CONTINUE_EXECUTION;
     }
-    if (last_code == EXCEPTION_BREAKPOINT) { e->ContextRecord->Rip += 1; return EXCEPTION_CONTINUE_EXECUTION; }
-    if (last_code == EXCEPTION_GUARD_PAGE || last_code == 0xE0000001) return EXCEPTION_CONTINUE_EXECUTION;
     return EXCEPTION_CONTINUE_SEARCH;
 }
-static DWORD WINAPI thr(void *p) { for (int i = 0; i < 100; i++) __asm__ volatile("xor %%eax,%%eax; movl (%%rax), %%eax" ::: "eax", "rax"); return 0; }
+/* Keep all switch arms inside the assembler scope labels. */
+__attribute__((noinline, optimize("O0"))) static void fault(int kind)
+{
+    __try1(seh_filter)
+    switch (kind) {
+    case 0: __asm__ volatile("xor %%eax,%%eax; movl (%%rax),%%eax" ::: "rax", "memory"); break;
+    case 1: __asm__ volatile("xor %%ecx,%%ecx; mov $1,%%eax; cltd; idivl %%ecx" ::: "eax", "ecx", "edx"); break;
+    case 2: __asm__ volatile("ud2"); break;
+    case 3: __asm__ volatile("int3"); break;
+    default: RaiseException(0xE0000001, 0, 0, NULL); break;
+    }
+    __except1
+}
 int main(void)
 {
-    AddVectoredExceptionHandler(1, veh);
-    hits = 0; __asm__ volatile("xor %%eax,%%eax; movl (%%rax), %%eax" ::: "eax", "rax");  /* 8b 00 = 2 bytes; handler adds 3? */
-    CHECK("access violation -> VEH", hits == 1 && last_code == EXCEPTION_ACCESS_VIOLATION, "hits=%ld code=%08lx", hits, last_code);
-    hits = 0; __asm__ volatile("xor %%ecx,%%ecx; mov $1,%%eax; cltd; idivl %%ecx" ::: "eax", "ecx", "edx");
-    CHECK("int divide by zero -> VEH", hits == 1 && last_code == EXCEPTION_INT_DIVIDE_BY_ZERO, "hits=%ld code=%08lx", hits, last_code);
-    hits = 0; __asm__ volatile("ud2");
-    CHECK("ud2 -> illegal instruction", hits == 1 && last_code == EXCEPTION_ILLEGAL_INSTRUCTION, "hits=%ld code=%08lx", hits, last_code);
-    hits = 0; __asm__ volatile("int3");
-    CHECK("int3 -> breakpoint", hits == 1 && last_code == EXCEPTION_BREAKPOINT, "hits=%ld code=%08lx", hits, last_code);
-    hits = 0; RaiseException(0xE0000001, 0, 0, NULL);
-    CHECK("RaiseException software", hits == 1 && last_code == 0xE0000001, "hits=%ld", hits);
-    DWORD old; char *g = VirtualAlloc(NULL, 8192, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-    VirtualProtect(g, 4096, PAGE_READWRITE | PAGE_GUARD, &old);
-    hits = 0; volatile char c = g[0]; (void)c;
-    CHECK("guard page -> STATUS_GUARD_PAGE once", hits == 1 && last_code == EXCEPTION_GUARD_PAGE, "hits=%ld code=%08lx", hits, last_code);
-    /* 10k faults: cost of exception round trip (Mono/IL2CPP null checks, GC write barriers) */
-    LARGE_INTEGER f, a, b; QueryPerformanceFrequency(&f); QueryPerformanceCounter(&a);
-    hits = 0; for (int i = 0; i < 10000; i++) __asm__ volatile("xor %%eax,%%eax; movl (%%rax), %%eax" ::: "eax", "rax");
-    QueryPerformanceCounter(&b);
-    CHECK("10000 AV round trips", hits == 10000, "%.2f us/fault", (b.QuadPart - a.QuadPart) * 1e6 / f.QuadPart / 10000);
-    hits = 0; HANDLE h[4]; for (int i = 0; i < 4; i++) h[i] = CreateThread(NULL, 0, thr, NULL, 0, NULL);
-    WaitForMultipleObjects(4, h, TRUE, 10000);
-    CHECK("faults on 4 threads concurrently", hits == 400, "hits=%ld", hits);
-    /* deep recursion -> stack overflow is recoverable only with guard pages; just probe stack commit */
-    volatile char big[512 * 1024]; big[0] = 1; big[sizeof big - 1] = 2;
-    CHECK("512KB stack probe (guard-page growth)", big[0] == 1, "ok");
+    const DWORD codes[] = {EXCEPTION_ACCESS_VIOLATION, EXCEPTION_INT_DIVIDE_BY_ZERO,
+        EXCEPTION_ILLEGAL_INSTRUCTION, EXCEPTION_BREAKPOINT, 0xE0000001};
+    for (int i = 0; i < 5; ++i) {
+        hits = 0; last_code = 0; fault(i);
+        CHECK("frame SEH exception and resume", hits == 1 && last_code == codes[i],
+              "kind=%d hits=%ld code=%08lx", i, hits, last_code);
+    }
+    hits = 0;
+    for (int i = 0; i < 10000; ++i) fault(0);
+    CHECK("10000 AV round trips", hits == 10000, "hits=%ld", hits);
+    volatile char big[512 * 1024]; big[0] = 1; big[sizeof(big)-1] = 2;
+    CHECK("512KB stack growth", big[0] == 1 && big[sizeof(big)-1] == 2, "ok");
+    INFO("LIMIT: frame SEH replaces VEH; guard-page and concurrent VEH checks are not covered");
     SUMMARY("seh_probe");
 }
