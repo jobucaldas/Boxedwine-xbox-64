@@ -13,10 +13,14 @@ set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 MIN=$(cd "$HERE/.." && pwd)
 EVID= MODE= SELFTEST= GAME= WAIT=360 GAME_SECS=60
+PIN="$HERE/PIN.txt"
+CHECK=
 APPID=3405340
 GAME_SRC=/workspace/steam-owned/games/megabonk
 while (($#)); do
     case $1 in
+        --pin) PIN=$2; shift ;;
+        --check-pin) CHECK=1 ;;
         --stock) MODE=stock ;;
         --uwph) MODE=uwph ;;
         --selftest) SELFTEST=1 ;;
@@ -28,6 +32,10 @@ while (($#)); do
     esac
     shift
 done
+if [[ $CHECK == 1 ]]; then
+    exec bash "$HERE/check-pin.sh" "$PIN" "$EVID"
+fi
+[[ $PIN == "$HERE/PIN.txt" ]] || { echo "alternate pins require --check-pin" >&2; exit 2; }
 [[ ( $MODE == stock || $MODE == uwph ) && -n $EVID && $WAIT =~ ^[0-9]+$ && $GAME_SECS =~ ^[0-9]+$ ]] || exit 2
 [[ -z $GAME || -z $SELFTEST ]] || exit 2
 VIDEO=/workspace/x64-run/videos/B72-O${SELFTEST:+1}${SELFTEST:-2}.mp4

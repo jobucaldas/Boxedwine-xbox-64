@@ -3114,3 +3114,29 @@ manifest file-count/byte verification could not run without the download.
 Classification: host filesystem/download preflight only (build-only category);
 neither THROUGH-uwph nor stock Wine ran. No runtime proof or video was produced.
 O2 was not attempted (outside this assignment).
+
+## B78 O1
+
+Added a second pin for Valve build 1745623383; PIN.txt remains build 1792618285.
+The published OSW manifest and Valve bins_win32 archive agree on package SHA2
+ d455a298fe9d17a9222685f4268c66004df164d6f7242803e38303bb0c7dfefc.
+The verified archive yields steamclient64 SHA256
+40a45d285dd23d9e54b0b6a58dc62cdcbeaf7cad5e9e57c799e4af797bd4f895.
+fetch-pin.sh verifies manifest version/package/size/SHA2 and DLL hash, and extracts
+only steamclient64.dll, tier0_s64.dll and vstdlib_s64.dll unmodified into
+steamhost/out/client-1745623383/. Pin-specific builds avoid stale compiled pins.
+run.sh --pin FILE --check-pin uses a credential-free uwph runner with a fresh
+prefix, asserting no loginusers.vdf before guest launch. Alternate pins are
+limited to check-only for O1. No login, credential reader, or slot call is run.
+
+Evidence: /workspace/x64-run/lanes/B78/o1 and o1-default. THROUGH-uwph
+(wx,noproc -> our run_via_wine -> private W^X Wine loader -> uwph shim), stock
+Wine setup/services outside jail, external wineserver; no console proof.
+Old pin: pin=ok, client_build=1745623383, iface_pin=match, rc=0.
+Default: pin=ok, client_build=1792618285, iface_pin=mismatch, rc=6.
+Both temporary prefixes were deleted. Video /workspace/x64-run/videos/B78-O1.mp4
+is 4.7 seconds on a free Xvfb display.
+The exact compound test exits 1 only because its final literal leak scan matches
+its own pattern in the driver-owned ORDERS.md, B78-O1.prompt and session JSONL.
+Those files were left intact. This is a test-input collision, not a credential
+finding; the separate scan of x64/steam-min is clean.

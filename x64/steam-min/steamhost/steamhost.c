@@ -195,7 +195,7 @@ int main(int argc, char **argv) {
             puts("activeprocess_pid_is_self=0");
             return 6;
         }
-        puts("iface_pin=ok");
+        puts("iface_pin=match");
         if (check) return 0;
     }
     CreateDirectoryA(logging_dir, NULL);
