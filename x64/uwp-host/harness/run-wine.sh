@@ -3,6 +3,21 @@
 # the private W^X ntdll.so from prepare-wine-wx.sh (R4X O2), because the shim
 # refuses WRITE|EXEC and stock ntdll maps PE images RWX.
 set -euo pipefail
+# B50 O3: arbitrary owned guest, same launcher/private W^X loader/shim route.
+# Caller builds the artifacts and prepares the prefix outside the jail.
+if [[ ${1:-} == --guest ]]; then
+    shift
+    [[ $# -ge 1 && -n ${WINEPREFIX:-} && -n ${UWPH_GUEST_RW:-} && -n ${UWPH_REPORT:-} ]] || {
+        echo '--guest requires a PE, WINEPREFIX, UWPH_GUEST_RW and UWPH_REPORT' >&2; exit 2;
+    }
+    harness=$(cd "$(dirname "$0")" && pwd)
+    guest_cwd=$PWD
+    unset UWPH_INPROC_SERVER UWPH_INPROC_OWNER LD_PRELOAD
+    export EXTRA_RW=$UWPH_GUEST_RW
+    exec /workspace/xbox-readiness/tests/uwp_run.sh wx,noproc /workspace -- \
+        bash -c 'cd "$1"; shift; exec env LD_PRELOAD="$1/out/libuwph_wine_shim.so" WINE_LOADER="$1/out/wine-wx/lib/wine/wine64" UWPH_REPORT_PID=1 "$1/out/run_via_wine" "${@:2}"' \
+        bash "$guest_cwd" "$harness" "$@"
+fi
 # Packaging has already copied the prefix and evidence outside the nofork jail.
 # Rewrite this invocation into the existing single-guest path using builtins.
 if [[ ( $# == 2 || $# == 4 ) && ( ${1:-}:${2:-} == --inproc-server:--no-build || ${1:-}:${2:-} == --no-build:--inproc-server ) ]]; then

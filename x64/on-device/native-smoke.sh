@@ -18,7 +18,7 @@ WINEPREFIX=$prefix WINEDEBUG=-all WINEDLLOVERRIDES='mscoree,mshtml=' \
     --local-state "Z:$(realpath out/native-localstate)" \
     >out/native-smoke.log 2>out/native-smoke.err
 cat out/native-smoke.err out/native-smoke.log
-count=$(grep -cE '^STAGE n[1-7]' out/native-smoke.log)
+count=$(grep -cE '^STAGE n[1-7] ' out/native-smoke.log)
 test "$count" -eq 7
-! grep -qE '^STAGE n[1-7] .* PASS:' out/native-smoke.log
+! grep -qE '^STAGE n[1-7] [^ ]+ PASS:' out/native-smoke.log
 echo 'O5 desktop collection complete; no Xbox PASS claimed.'

@@ -1,0 +1,191 @@
+--- a/include/ntuser.h
++++ b/include/ntuser.h
+@@ -78,6 +78,8 @@
+     NtUserDragDropDrag,
+     NtUserDragDropDrop,
+     NtUserDragDropPost,
++    /* in-process desktop thread (opt-in, WINE_INPROC_DESKTOP=1) */
++    NtUserStartInprocDesktop,
+     NtUserCallCount
+ };
+ 
+--- a/dlls/win32u/ntuser_private.h
++++ b/dlls/win32u/ntuser_private.h
+@@ -122,6 +122,7 @@
+     BOOL                          clipping_cursor;        /* thread is currently clipping */
+     DWORD                         clipping_reset;         /* time when clipping was last reset */
+     struct session_thread_data   *session_data;           /* shared session thread data */
++    BOOL                          inproc_desktop_start;   /* in the in-process desktop callback */
+ };
+ 
+ C_ASSERT( sizeof(struct user_thread_info) <= sizeof(((TEB *)0)->Win32ClientInfo) );
+--- a/dlls/win32u/winstation.c
++++ b/dlls/win32u/winstation.c
+@@ -25,6 +25,8 @@
+ #include <assert.h>
+ #include <stdarg.h>
+ #include <stddef.h>
++#include <stdlib.h>
++#include <string.h>
+ 
+ #include <pthread.h>
+ 
+@@ -772,6 +774,54 @@
+ static inline TEB64 *NtCurrentTeb64(void) { return (TEB64 *)NtCurrentTeb()->GdiBatchCount; }
+ #endif
+ 
++/* WINE_INPROC_DESKTOP=1 in the process environment, read exactly once. */
++static pthread_once_t inproc_desktop_once = PTHREAD_ONCE_INIT;
++static BOOL inproc_desktop_enabled;
++
++static void init_inproc_desktop(void)
++{
++    const char *env = getenv( "WINE_INPROC_DESKTOP" );
++    inproc_desktop_enabled = env && !strcmp( env, "1" );
++}
++
++static BOOL use_inproc_desktop(void)
++{
++    pthread_once( &inproc_desktop_once, init_inproc_desktop );
++    return inproc_desktop_enabled;
++}
++
++/* start the desktop as a thread of this process, then query it like the explorer path */
++static void start_inproc_desktop( struct ntuser_thread_info *thread_info )
++{
++    struct user_thread_info *info = get_user_thread_info();
++    void *ret_ptr;
++    ULONG ret_len;
++    NTSTATUS status;
++
++    /* loading the desktop DLL may look up the desktop again on this thread */
++    if (info->inproc_desktop_start) return;
++    info->inproc_desktop_start = TRUE;
++    /* concurrent first callers all wait inside uwp_desktop_start for the one owner */
++    status = KeUserModeCallback( NtUserStartInprocDesktop, NULL, 0, &ret_ptr, &ret_len );
++    info->inproc_desktop_start = FALSE;
++    /* the desktop thread itself, before its desktop window exists: forcing would
++     * create a bare server desktop in place of the real one */
++    if (status == STATUS_POSSIBLE_DEADLOCK) return;
++    if (status) ERR_(win)( "failed to start in-process desktop %x\n", status );
++    else TRACE_(win)( "started in-process desktop\n" );
++
++    SERVER_START_REQ( get_desktop_window )
++    {
++        req->force = 1;
++        if (!wine_server_call( req ))
++        {
++            thread_info->top_window = reply->top_window;
++            thread_info->msg_window = reply->msg_window;
++        }
++    }
++    SERVER_END_REQ;
++}
++
+ HWND get_desktop_window(void)
+ {
+     static const WCHAR wine_service_station_name[] =
+@@ -800,7 +850,9 @@
+     }
+     SERVER_END_REQ;
+ 
+-    if (!thread_info->top_window)
++    if (!thread_info->top_window && use_inproc_desktop())
++        start_inproc_desktop( thread_info );
++    else if (!thread_info->top_window)
+     {
+         static const WCHAR appnameW[] = {'\\','?','?','\\','C',':','\\','w','i','n','d','o','w','s',
+             '\\','s','y','s','t','e','m','3','2','\\','e','x','p','l','o','r','e','r','.','e','x','e',0};
+--- a/dlls/user32/user_main.c
++++ b/dlls/user32/user_main.c
+@@ -199,6 +199,30 @@
+     return STATUS_SUCCESS;
+ }
+ 
++/* Start the desktop as a thread of this process instead of an explorer process. */
++static NTSTATUS WINAPI User32StartInprocDesktop( void *args, ULONG size )
++{
++    NTSTATUS (WINAPI *start)( DWORD );
++    HMODULE module;
++    NTSTATUS status;
++
++    if (!(module = LoadLibraryW( L"uwpdesktop.dll" )))
++    {
++        ERR( "failed to load uwpdesktop.dll, error %lu\n", GetLastError() );
++        return STATUS_DLL_NOT_FOUND;
++    }
++    if (!(start = (void *)GetProcAddress( module, "uwp_desktop_start" )))
++    {
++        ERR( "uwp_desktop_start not found in uwpdesktop.dll\n" );
++        return STATUS_ENTRYPOINT_NOT_FOUND;
++    }
++    status = start( 10000 );
++    /* The desktop thread's own early lookups are expected to bail out. */
++    if (status && status != STATUS_POSSIBLE_DEADLOCK)
++        ERR( "failed to start in-process desktop, status %#lx\n", status );
++    return status;
++}
++
+ static KERNEL_CALLBACK_PROC kernel_callback_table[NtUserCallCount] =
+ {
+     User32CallDispatchCallback,
+@@ -226,6 +250,7 @@
+     User32DragDropDrag,
+     User32DragDropDrop,
+     User32DragDropPost,
++    User32StartInprocDesktop,
+ };
+ 
+ 
+--- a/dlls/wow64win/user.c
++++ b/dlls/wow64win/user.c
+@@ -1459,6 +1459,11 @@
+     return dispatch_callback( NtUserDragDropLeave, arg, size );
+ }
+ 
++static NTSTATUS WINAPI wow64_NtUserStartInprocDesktop( void *arg, ULONG size )
++{
++    return dispatch_callback( NtUserStartInprocDesktop, arg, size );
++}
++
+ static NTSTATUS WINAPI wow64_NtUserDragDropDrag( void *arg, ULONG size )
+ {
+     const struct drag_drop_drag_params *params = arg;
+@@ -1533,6 +1538,7 @@
+     wow64_NtUserDragDropDrag,
+     wow64_NtUserDragDropDrop,
+     wow64_NtUserDragDropPost,
++    wow64_NtUserStartInprocDesktop,
+ };
+ 
+ C_ASSERT( ARRAYSIZE(user_callbacks) == NtUserCallCount );
+--- a/programs/explorer/desktop.c
++++ b/programs/explorer/desktop.c
+@@ -1367,11 +1367,16 @@
+ 
+ static LONG desktop_owner;
+ static HANDLE desktop_ready;
++static LONG desktop_tid;
+ 
+ static DWORD WINAPI desktop_thread( void *arg )
+ {
+     WCHAR options[] = L"";
+-    NTSTATUS status = desktop_run( options, arg );
++    NTSTATUS status;
++
++    /* Published before any user32 call, so early lookups are recognized. */
++    InterlockedExchange( &desktop_tid, GetCurrentThreadId() );
++    status = desktop_run( options, arg );
+     if (status)
+     {
+         desktop_status = status;
+@@ -1387,6 +1392,9 @@
+     HANDLE thread;
+     DWORD wait;
+ 
++    /* The desktop thread cannot wait for its own readiness. */
++    if (InterlockedCompareExchange( &desktop_tid, 0, 0 ) == GetCurrentThreadId())
++        return STATUS_POSSIBLE_DEADLOCK;
+     if (!InterlockedCompareExchange( &desktop_owner, 1, 0 ))
+     {
+         desktop_status = STATUS_UNSUCCESSFUL;
