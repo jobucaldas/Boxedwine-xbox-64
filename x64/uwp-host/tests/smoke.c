@@ -557,6 +557,11 @@ static void test_inet(void)
         uwph_getsockname(listener, addr, &len) == 0 && a.port != 0 && uwph_listen(listener, 1) == 0;
     client = uwph_socket(UWPH_AF_INET, UWPH_SOCK_STREAM, 0);
     ok = ok && client >= 0 && uwph_connect(client, addr, sizeof(a)) == 0;
+    CHECK(ok && uwph_accept(listener, addr, NULL) == -1 && uwph_errno == UWPH_EFAULT,
+          "inet_accept_missing_len EFAULT preserves pending connection");
+    /* A bad address pair must not consume the queued connection. */
+    CHECK(uwph_fcntl(listener, UWPH_F_SETFL, UWPH_O_NONBLOCK) == 0,
+          "inet_accept_retry_nonblocking");
     peer = ok ? uwph_accept(listener, NULL, NULL) : -1;
     ok = ok && peer >= 0 && uwph_send(client, "echo", 4, 0) == 4;
     pollfd = (struct uwph_pollfd){peer, UWPH_POLLIN, 0};
@@ -587,6 +592,9 @@ static void test_inet(void)
     ok = uwph_bind(udp, addr, sizeof(a)) == 0 && uwph_getsockname(udp, addr, &len) == 0 &&
         uwph_sendto(sender, "udp", 3, 0, addr, len) == 3;
     pollfd = (struct uwph_pollfd){udp, UWPH_POLLIN, 0};
+    CHECK(ok && uwph_poll(&pollfd, 1, 1000) == 1 &&
+          uwph_recvfrom(udp, b, sizeof(b), 0, addr, NULL) == -1 && uwph_errno == UWPH_EFAULT,
+          "inet_recvfrom_missing_len EFAULT preserves queued datagram");
     ok = ok && uwph_poll(&pollfd, 1, 1000) == 1 && uwph_recvfrom(udp, b, sizeof(b), 0, addr, &len) == 3 &&
         uwph_sendto(udp, b, 3, 0, addr, len) == 3 && uwph_recv(sender, b, sizeof(b), 0) == 3 && !memcmp(b, "udp", 3);
     CHECK(ok, "inet_udp_echo %s", ok ? "PASS" : "FAIL");

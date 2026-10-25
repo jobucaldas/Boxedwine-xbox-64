@@ -216,6 +216,9 @@ int uwph_inet_call(int fd, int op, void *buf, size_t size, int flags,
     if ((op == INET_GETSOCKNAME || op == INET_GETPEERNAME) && (!addr || !len)) {
         uwph_errno = UWPH_EFAULT; goto done;
     }
+    if ((op == INET_ACCEPT || op == INET_RECVFROM) && addr && !len) {
+        uwph_errno = UWPH_EFAULT; goto done;
+    }
     memset(&storage, 0, sizeof(storage));
     if (op == INET_BIND || op == INET_CONNECT || op == INET_SENDTO) {
         if (!addr || !len || (*len != 16 && *len != 28) ||

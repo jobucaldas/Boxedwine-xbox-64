@@ -1,11 +1,6 @@
 #!/usr/bin/env python3
 """B50 O2: seed Valve's Steam client login state in the steam-min prefix.
 
-B53 O2 extension: --launcher-token-out stages a platform/account/SteamID/token
-input for the native launcher (exclusive create, mode 600, gitignored out/).
-This mode does not seed a Valve client cache and prints no account/token data.
-The caller must delete the staging file after use.
-
 The ONLY reader of the SteamClient refresh token (/workspace/steam-qr/tokens-client.json).
 Writes, all chmod 600, all under the gitignored out/ prefix:
   Steam/config/loginusers.vdf          (account remembered, AllowAutoLogin)
@@ -56,27 +51,7 @@ def main():
     ap.add_argument("--token", default="/workspace/steam-qr/tokens-client.json")
     ap.add_argument("--helper", default=os.path.join(HERE, "out", "bin", "dpapi_protect.exe"))
     ap.add_argument("--wine", default=os.environ.get("WINE", "wine"))
-    ap.add_argument("--launcher-token-out", help="stage private native-launcher input under out/, then exit")
     a = ap.parse_args()
-    if a.launcher_token_out:
-        target = os.path.realpath(a.launcher_token_out)
-        private_out = os.path.realpath(os.path.join(HERE, "out"))
-        if os.path.commonpath([private_out, target]) != private_out:
-            raise SystemExit("seed-login: launcher input must be under gitignored out/")
-        os.umask(0o077)
-        with open(a.token, encoding="utf-8") as source:
-            tok = json.load(source)
-        fields = [tok.get("platform", ""), tok.get("account_name", ""),
-                  tok.get("steamid", ""), tok.get("refresh_token", "")]
-        if fields[0] != "SteamClient" or not fields[2].isdigit() or any(
-                not isinstance(v, str) or not v or any(c in v for c in "\r\n\0") for v in fields):
-            raise SystemExit("seed-login: invalid SteamClient token fields")
-        os.makedirs(private_out, exist_ok=True)
-        fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as dest:
-            dest.write("\n".join(fields) + "\n")
-        print("launcher input staged (private)")
-        return 0
 
     prefix = os.path.abspath(a.prefix)
     private_out = os.path.realpath(os.path.join(HERE, "out"))
