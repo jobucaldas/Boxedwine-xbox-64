@@ -78,7 +78,9 @@ hypervisor or code-signing bypass. Use documented capabilities only.
 ## Manifest and capabilities (O1)
 
 `AppxManifest.xml` targets Windows.Xbox/x64 and declares `codeGeneration`
-(base foundation capability), `internetClient`, `privateNetworkClientServer`
+(base foundation capability), `internetClient`, `internetClientServer`,
+`privateNetworkClientServer`, and uap `removableStorage` (with a `.bwlog`
+file-type association on the main app),
 and restricted `expandedResources` next to `codeGeneration`. `expandedResources`
 is deprecated and Store-rejected; this manifest is for dev sideload only.
 Declaring a capability doesn't prove it's available on a given console OS.
@@ -159,7 +161,9 @@ separately; these native probes do not prove the Wine compatibility runtime.
 
 - n1: D3D11 hardware HRESULT, feature level, adapter and WARP fallback result.
 - n2: D3D12 creation at FL 11_0, reported feature level and shader model.
-- n3: real CoreWindow, BGRA8 FLIP_DISCARD, two buffers, #0078D7 clear,
+- n3: real CoreWindow, BGRA8 FLIP_DISCARD (one FLIP_SEQUENTIAL retry on failure, both HRESULTs logged), two buffers, #0078D7 clear,
+  HDMI current-mode raw pixel size when available, otherwise CoreWindow bounds;
+  cap Series S at 2560x1440 and Series X/X devkit at 3840x2160 using n6 model IDs,
   120 vsynced Presents with average/max frame milliseconds.
 - n4: xaudio2_9.dll XAudio2Create and a one-second 440 Hz sine, consumed sample
   count; WASAPI ActivateAudioInterfaceAsync export availability. Listen on device;
@@ -222,7 +226,7 @@ Activation API reference: [IFrameworkView.Load](https://learn.microsoft.com/en-u
 | Symptom | What to copy back (exact file or Device Portal page) | Likely cause |
 | --- | --- | --- |
 | 1. Install says certificate is not trusted | **Home > My games & apps > Add**: full failed-install details and error code; record which public `.cer` was selected. | Test certificate is not trusted by the console, or signing certificate and manifest Publisher do not match. The portal HTTPS certificate is separate from package signing. |
-| 2. Install reports invalid manifest/schema | **Home > My games & apps > Add**: full error, element/attribute name and line number if shown; also copy the PC MakeAppx output and `out/payload/AppxManifest.xml`. | Manifest element, capability, namespace or target OS schema is unsupported or invalid. |
+| 2. Install reports invalid manifest/schema | **Home > My games & apps > Add**: full error, element/attribute name and line number if shown; also copy the PC MakeAppx output and `out/payload/AppxManifest.xml`. | Manifest element, capability, namespace or target OS schema is unsupported or invalid. The kit keeps documented `Windows.Xbox`; if installation reports schema/device-family errors, the working-app family is `Windows.Universal` with `MinVersion="10.0.0.0"`. |
 | 3. Install reports wrong architecture | **Home > My games & apps > Add**: full error code and package identity/architecture shown there; include `out/payload/AppxManifest.xml`. | Wrong package was selected or package/dependency architecture is incompatible with x64. |
 | 4. Install reports a missing dependency | **Home > My games & apps > Add**: full details including dependency name, publisher, minimum version and architecture. | Wrong/stale package or an unavailable framework dependency; this kit currently expects no dependency packages. |
 | 5. App launches then exits | `LocalState/ladder-native.log` (even partial); **Home > My games & apps**, selected app: exit/status details; Device Portal **Debug > Crash dumps** and **ETW** output if available, including the original HRESULT/errno diagnostics. | Activation or LocalState/log creation failed, a native API failed, or the process crashed. No log can mean failure before probes started. |

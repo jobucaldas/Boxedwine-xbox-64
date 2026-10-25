@@ -8,7 +8,7 @@
 int main(void)
 {
     puts("Boxedwine on-device skeleton: x64 Windows build OK");
-    puts("Manifest: codeGeneration, internetClient, privateNetworkClientServer");
+    puts("Manifest: codeGeneration, internetClient, internetClientServer, privateNetworkClientServer, removableStorage");
     puts("Game/Title memory: configure Game in Developer Home; budget unverified.");
     puts("Status: build-only; UWP activation and Wine loader integration pending.");
     return 0;

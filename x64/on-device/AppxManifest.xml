@@ -21,6 +21,13 @@
       <uap:VisualElements DisplayName="Boxedwine Dev Mode" Description="In-process Wine runtime skeleton"
                           BackgroundColor="transparent" Square150x150Logo="Assets/Logo.png"
                           Square44x44Logo="Assets/SmallLogo.png" />
+      <Extensions>
+        <uap:Extension Category="windows.fileTypeAssociation">
+          <uap:FileTypeAssociation Name="bwlog">
+            <uap:SupportedFileTypes><uap:FileType>.bwlog</uap:FileType></uap:SupportedFileTypes>
+          </uap:FileTypeAssociation>
+        </uap:Extension>
+      </Extensions>
     </Application>
     <!-- Explicit destructive-storage opt-in; Load receives this EntryPoint. -->
     <Application Id="BigFile" Executable="rungs.exe" EntryPoint="Boxedwine.BigFile">
@@ -31,8 +38,11 @@
   </Applications>
   <Capabilities>
     <Capability Name="internetClient" />
+    <Capability Name="internetClientServer" />
     <Capability Name="privateNetworkClientServer" />
     <Capability Name="codeGeneration" />
+    <!-- Needs the .bwlog fileTypeAssociation on App. -->
+    <uap:Capability Name="removableStorage" />
     <!-- Dev sideload only: deprecated and Store-rejected. -->
     <rescap:Capability Name="expandedResources"/>
   </Capabilities>
