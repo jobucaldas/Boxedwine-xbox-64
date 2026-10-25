@@ -1328,6 +1328,45 @@ runtime proof and no stock Wine execution in O3. Recording
 `/workspace/x64-run/videos/R4W-O3.mp4` shows the blocked exact test only.
 No runtime code was changed, no commits created and no remotes accessed.
 
+## B15
+
+O1 reviewer fixes: SIGTERM/SIGHUP now run cleanup, including Wine helpers
+that start new sessions (identified by this lane's private prefix). Those
+helpers are also sampled. An exited private wineserver aborts before client
+launch instead of allowing an uncounted existing server. Runs retain separate
+timestamped evidence, including a copy of their summary. elapsed_s, max_gap_s
+and cadence expose delays rather than guaranteeing an exact 120-second bound.
+
+Exact test `bash x64/tools/memfoot.sh && column -t x64/tools/memfoot.tsv`
+exited 0. hello peak 17.79 MiB and hello_k32 peak 17.84 MiB fit both budgets.
+Megabonk aggregate peak RSS 1489.55 MiB, estimated commit 1949.60 MiB:
+exceeds 1024 MiB App, fits 5120 MiB Game. The actual game observation was
+120.254 seconds / 121 samples, maximum gap 1.123 seconds (cadence ok).
+Both hello stages exited 0 with two samples, one transient read error each;
+their sampled peaks are mostly wineserver because the clients are short-lived.
+Megabonk timed out as intended with no read errors. Steam skipped: B10 trace
+is absent. No credentials or tokens accessed.
+
+THROUGH our launcher -> Wine's own private W^X loader -> selected uwph shim
+calls/Linux backend; separate stock wineserver and private-prefix helpers
+included. Not stock-only, build-only or on-device UWP proof. Linux commit is
+an estimate from accountable smaps mapping Size, not Windows/UWP commit.
+RSS uses smaps_rollup. Shared RSS may double count; sampled peaks are lower
+bounds. No optimization or gameplay/authentication success claimed.
+
+Top three individual sampled RSS consumers (maxima are not summed):
+
+- Megabonk.exe (stage Megabonk, PID 685215): 1363.31 MiB.
+- explorer.exe (stage Megabonk, PID 685254): 84.63 MiB.
+- UnityCrashHandl (stage Megabonk, PID 685290): 26.26 MiB.
+
+Matching raw samples, logs, routing counters, top.tsv and summary.tsv:
+`/workspace/wt/B15/x64/uwp-host/harness/out/memfoot/20261025T063410.895220Z-685138`. Summary: `x64/tools/memfoot.tsv`.
+SIGTERM and SIGHUP interruption tests passed with no remaining private-prefix
+processes; an existing-server test failed before client launch as expected.
+The latter test has its own evidence directory and did not overwrite this run.
+Video `/workspace/x64-run/videos/B15-O1.mp4`: free Xvfb via -displayfd,
+55-second partial view of the measurement. No commits or remote operations.
 ## B18
 
 O1 (2026-10-25): remaining RWX inventory after R4X. Linux/off-device proof is
@@ -1612,6 +1651,123 @@ Video /workspace/x64-run/videos/B10-O1.mp4 (30 seconds) shows the routed
 installer blocker, not a running Steam client. No commits or remotes touched.
 
 Literal last installer log line: `44367.703:0030:0034:trace:module:MODULE_InitDLL (00006FFFFFC20000,PROCESS_DETACH,0000000000000001) - RETURN 1`.
+
+## B06
+
+O1 adds the next 15 unsupported traced imports after R4S's top 20, in trace
+priority order. All use existing public uwph signatures; each now has its own
+counter and shim export. Linux uses native libc passthrough, except descriptor
+operations use the existing raw-syscall/owned-slot adapter. UWP uses existing
+private objects and documented host APIs; no process creation or optional
+restricted API was added.
+
+| Symbol | Win32/UWP status |
+| --- | --- |
+| sendmsg | In-process Unix socket queue, iovecs and descriptor passing |
+| fstat | File metadata through GetFileInformationByHandleEx; private object metadata |
+| putenv | Private environment table, shares getenv |
+| recvmsg | In-process Unix socket queue and descriptor passing |
+| setsockopt | Existing in-process Unix endpoint subset; options have no kernel effect; Internet sockets remain unsupported |
+| chdir | Virtual cwd for mount paths and in-process socket directories |
+| dladdr | Static registered Unix-library ranges/symbols; no arbitrary module discovery |
+| execv | Counted ENOSYS: no documented UWP arbitrary process replacement equivalent |
+| getrlimit | Virtual NOFILE, STACK, AS, DATA queries; no host limit control |
+| isatty | Private descriptor kind; EBADF/ENOTTY for invalid/non-console descriptors |
+| pipe2 | In-process byte channels with descriptor flags; Linux raw pipe2 preserves private ownership |
+| setbuf | Existing unbuffered private FILE implementation; Linux native FILE passthrough |
+| setrlimit | Bounded virtual NOFILE; invalid soft/hard ordering rejected; other host resources counted ENOSYS |
+| sigemptyset | Clears private Linux-compatible signal set |
+| sysconf | Virtual limits plus GetSystemInfo/GlobalMemoryStatusEx for supported system queries |
+
+`tests/traced.c` covers every added entry and counter in stub, Linux passthrough
+and Win32/UWP builds, including socket payload exchange, pipe bytes/CLOEXEC,
+FILE use after setbuf, error handling and unsupported limit/process operations.
+Exact test `make -C x64/uwp-host test && make -C x64/uwp-host/harness windows-smoke-test`
+passes. The Windows full smoke reports 569 passed, 0 failed; its desktop-only
+exception test artifact remains separate from the UWP archive.
+
+Surface policy routed imports increase 26 -> 41. Actual launcher -> Wine's own
+private W^X loader -> ntdll -> shim -> uwph evidence increases traced THROUGH
+entries 20 -> 34 (+14) for each of hello_k32 and hello. execv is bound but unhit
+in these successful runs; its direct tests exercise missing-path Linux failure
+and UWP ENOSYS. `harness/verify_b06.py` checks real ntdll bindings, single-process
+counter evidence, successful PE output and the >=10 delta, writing per-PE
+surface reports. Evidence: `harness/out/wine-o4/run-oD5gMon0/`.
+The broader existing `wine-test` verifier still fails its all-routed-symbols-hit
+condition because execv has zero hits; it has not been weakened. Stock controls
+run through our launcher without uwph. A separate stock Linux wineserver is
+retained; none of this is Xbox device or complete UWP compatibility evidence.
+Video: `/workspace/x64-run/videos/B06-O1.mp4` (private free Xvfb display, 10.67s).
+Exact recorded output: `/workspace/x64-run/v2/B06/O1-record.log`.
+
+B06 reviewer fix: Linux socket dispatch now selects the descriptor domain
+explicitly through the separately compiled backend adapter. Direct owned-slot
+Linux calls preserve private Unix endpoints for sendmsg/recvmsg/setsockopt and
+close; Wine's native-fd backend uses libc consistently for socket/socketpair,
+bind/listen/connect/accept, shutdown, message calls, options and name queries.
+The public API is unchanged. The socketpair regression now creates and closes
+both endpoints through uwph on every backend; additional Linux coverage tests
+socket/connect/accept producers, payload exchange, options, names and EOF.
+
+Fresh exact test after the fix: exit 0; direct Linux traced tests 120 passed,
+0 failed; Windows full smoke 569 passed, 0 failed. Full output:
+`/workspace/x64-run/lanes/B06/B06-O1.exact.log`.
+Fresh launcher/Wine-loader evidence: `harness/out/wine-o4/run-F8PMFjl7/`;
+`verify_b06.py` passes both PEs at THROUGH-uwph 20 -> 34 (+14).
+The unchanged broader verifier still rejects execv's zero hit count.
+This is Linux off-device THROUGH-uwph evidence, with separate stock Wine
+controls/wineserver and desktop Windows smoke; the UWP archive is built,
+not executed on an Xbox. Updated video records the test output and fresh
+surface verification on a free Xvfb display (10 seconds).
+## B12
+
+O1 reran the owned Megabonk executable with `UWPH_CONSTRAINTS=nofork,wx,noproc
+MEGABONK_TIMEOUT=45 x64/uwp-host/harness/run-megabonk.sh` on a free Xvfb
+allocated with `-displayfd`. Exact output: `MEGABONK reached=unityplayer`;
+game exit=1, harness exit=0 (the harness reports the reached stage). The
+45-second ceiling was not reached. `wine.log` confirms
+`uwpjail: seccomp wx=1 nofork=1 (34 insns)`; `uwp_run.sh`'s noproc path
+mounts an empty /proc. All three constraints remained enabled.
+
+B11's order allowed whichever constraints passed and requested the same
+`-force-d3d11 -screen-fullscreen 0` game route. Its worktree has no harness
+and its lane has no B11-O1.result or B11 video at inspection, so there is no
+verified B11 reached-stage baseline to claim an improvement against. B12
+adds the missing runnable harness with mandatory nofork+wx+noproc and records
+20 selected uwph surface-counter rows from this run. GameAssembly.dll loads
+alongside UnityPlayer.dll: this is IL2CPP, so no Mono JIT is needed.
+
+The first errors are blocked wineboot and explorer startup (`c0000017`);
+later RWX anonymous mappings fail with Permission denied (`unix_prot 0x7`).
+The final window diagnostic says the explorer process failed to start.
+Windows.System.DispatcherQueue is also unavailable. No Direct3D initialization,
+first frame, or menu was observed; these logs do not isolate one unique root
+cause. The two CreateProcessInternalW attempts are attempts, not successful
+child processes. No constraint was relaxed to proceed further.
+
+This is off-device THROUGH-uwph: uwp_run.sh -> our launcher -> Wine's own
+private W^X loader -> shim -> Linux uwph backend, with the harness's explicitly
+retained separate stock Linux wineserver outside the jail. It is not an
+in-process server acceptance or Xbox execution proof, nor stock-Wine-only or
+build-only evidence. One shim report records open=10431, read=13511,
+close=14295, mmap=8993, munmap=7984, mprotect=1526.
+
+Evidence: `/workspace/x64-run/lanes/B12/B12-O1.exact.log` and the fresh run is
+`harness/out/megabonk/run-PV5ZZ0fh`. Video:
+`/workspace/x64-run/videos/B12-O1.mp4`, 11.7 seconds, showing the routed run's
+terminal output and failure (no game window). Shell syntax check passed.
+No commit or remote operation was performed.
+
+B12 reviewer fix: removed the multicolour screenshot first-frame predicate and
+logo-based menu promotion. Captures are diagnostic only; automatic reporting
+now stops at gfx-init until actual game presentation can be established.
+This conservatively prevents blank clients, borders, error windows or
+unpresented surfaces from being reported as a rendered game frame. The exact
+45-second test was rerun with all three constraints on a fresh private Xvfb:
+`MEGABONK reached=unityplayer`, game exit=1, harness exit=0. The startup and
+RWX mapping failures persist. The fresh video is 11.7 seconds. Per-run reports
+and trace.tsv preserve the new counters; the tracked surface table was retained.
+`bash -n` and `git diff --check` passed. No first-frame or menu claim is made.
 
 ## B19 O1
 

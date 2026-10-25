@@ -65,3 +65,23 @@ priority	kind	symbol_or_ntdll_offset	hello_hits	hello_k32_hits	Megabonk_hits	fir
 64	import	vsnprintf	1	1	1	65	hit before clone entry; unsupported Linux dependency
 -	direct-syscall	0x3ad92	0	0	0	-	breakpoint armed; not hit before child gate
 -	direct-syscall	0x3b05d	0	0	0	-	breakpoint armed; not hit before child gate
+-	uwph-trace	__isoc23_fscanf	-	-	193	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=1
+-	uwph-trace	asprintf	-	-	20	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=1
+-	uwph-trace	fclose	-	-	746	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=1
+-	uwph-trace	fcntl	-	-	3808	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=1
+-	uwph-trace	feof	-	-	93	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=1
+-	uwph-trace	fopen	-	-	182	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=1
+-	uwph-trace	getenv	-	-	8934	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=1
+-	uwph-trace	getuid	-	-	4	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=1
+-	uwph-trace	pthread_getspecific	-	-	20670	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=1
+-	uwph-trace	pthread_mutex_lock	-	-	136467	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=1
+-	uwph-trace	pthread_mutex_unlock	-	-	136466	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=1
+-	uwph-trace	pthread_sigmask	-	-	15573	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=1
+-	uwph-trace	realpath	-	-	7	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=1
+-	uwph-trace	setlocale	-	-	5	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=1
+-	uwph-trace	sigaddset	-	-	7	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=1
+-	uwph-trace	snprintf	-	-	432	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=1
+-	uwph-trace	stat	-	-	37794	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=1
+-	uwph-trace	time	-	-	3642	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=1
+-	uwph-trace	write	-	-	5388	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=1
+-	uwph-trace	writev	-	-	1051	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=1
