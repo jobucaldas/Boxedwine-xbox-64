@@ -927,3 +927,30 @@ This is attempted THROUGH-uwph launcher/Wine-loader integration, with no success
 hello or hello_k32 execution proof, no stock-Wine-only acceptance, and no claim
 that the wineboot-free gate is green. Resolving the O7 protocol prerequisite is
 outside this O8 change.
+
+## R4W O9 real nofork jail acceptance — BLOCKED at shell startup
+
+The external `/workspace/xbox-readiness/tests/uwp_run.sh` now honors the
+opt-in `UWPH_INPROC_SERVER=1` by skipping its stock-server concession (including
+its sleep). Default behavior and jail flags/filter are unchanged. The external
+change is retained as `R4W-O9.uwp_run.patch` in the lane evidence directory.
+
+With that environment exported, the exact O9 build succeeds outside the jail.
+The real jail reports `uwpjail: seccomp wx=0 nofork=1 (16 insns)`, then
+`./run-wine.sh: fork: Operation not permitted` and `rc=254`. A separate strace
+confirms the first shell command substitution at `cd "$(dirname "$0")"`
+at run-wine.sh line 4 attempts `clone(... SIGCHLD)` and receives EPERM.
+No new run directory is created; the independent newest-directory verifier is
+therefore on O8's `run-F801pWg2`, and returns 1 with
+`BLOCKED: control-hello_k32: nonzero exit`. This is not fresh guest proof.
+Global `pgrep -f wineserver64` is also nonempty before/after the exact run;
+existing unrelated servers were not terminated. No separate server is spawned
+by the opt-in invocation, as confirmed by the diagnostic exec trace.
+
+Evidence: `/workspace/x64-run/lanes/R4W/R4W-O9.exact.log`,
+`R4W-O9.spawn.trace`, and `/workspace/x64-run/videos/R4W-O9.mp4`
+(4.14 seconds, free Xvfb display). Build-only PASS; attempted THROUGH-uwph
+jail acceptance stops before our launcher/Wine loader. No successful stock-Wine
+or THROUGH-uwph execution claim. No seccomp/verifier changes, commit, or remote
+operation. O9 remains BLOCKED; removing this first shell spawn alone would not
+resolve the harness's subsequent helper spawns or O7's protocol prerequisite.
