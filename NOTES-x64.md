@@ -1212,3 +1212,26 @@ Evidence classification: **build-only and source inspection**, no THROUGH-uwph
 runtime proof and no stock Wine execution in O3. Recording
 `/workspace/x64-run/videos/R4W-O3.mp4` shows the blocked exact test only.
 No runtime code was changed, no commits created and no remotes accessed.
+
+## B11 O1 — Megabonk THROUGH-uwph (Linux only)
+
+`x64/uwp-host/harness/run-megabonk.sh` uses the same launcher, private W^X
+Wine loader and native-fd uwph shim as `run-hello.sh`, with a private copied
+prefix, external stock wineserver, a free Xvfb display and a 120-second guest
+timeout. It records at most 58 seconds to
+`/workspace/x64-run/videos/B11-O1.mp4` and appends measured wrapper/backend
+hits to `x64/uwp-host/harness/surface-trace.tsv`. Counters and diagnostic logs
+are in `harness/out/megabonk/`. Only `--wx` is applied: R4W O3 still marks the
+in-process server blocked; nofork/noproc are not claimed. This is selected-call
+routing on Linux, not an Xbox/UWP device pass or complete syscall coverage.
+
+The owned game ships `GameAssembly.dll` and
+`Megabonk_Data/il2cpp_data/Metadata/global-metadata.dat`: it is IL2CPP, with
+native ahead-of-time code, so no Mono JIT is needed. No Steam/DRM components
+were replaced or modified. The first missing service reported by Unity is
+`SteamAPI_Init() failed`; audio also lacks a host device and falls back to
+silent software output. Neither prevented the observed main menu. The script
+reports the conservative log-proven `gfx-init` stage (D3D11 device created);
+manual inspection of `out/megabonk/screen.png` during the same run confirmed
+the rendered MEGABONK title, PLAY, SETTINGS and EXIT menu. Gameplay was not
+tested. No credentials were read, no remotes accessed, no commit created.
