@@ -1220,7 +1220,17 @@ Wine loader and native-fd uwph shim as `run-hello.sh`, with a private copied
 prefix, external stock wineserver, a free Xvfb display and a 120-second guest
 timeout. It records at most 58 seconds to
 `/workspace/x64-run/videos/B11-O1.mp4` and appends measured wrapper/backend
-hits to `x64/uwp-host/harness/surface-trace.tsv`. Counters and diagnostic logs
+hits to `x64/uwp-host/harness/surface-trace.tsv`.
+The recorder writes a fresh temporary MP4, and the harness waits for its exit,
+requires a nonempty video stream with a finite duration of at most 60 seconds,
+and decodes the full capture before publishing the required video path.
+Recording or validation failures fail the test while preserving the printed
+guest-stage report. A recorder that exits during startup fails the run before
+the guest launches. The run lock fd is not inherited by Xvfb, ffmpeg,
+wineserver or the guest, and cleanup reaps processes left in the private
+prefix (an orphaned explorer.exe/UnityCrashHandler64 previously held the lock
+and made later runs exit silently).
+Counters and diagnostic logs
 are in `harness/out/megabonk/`. Only `--wx` is applied: R4W O3 still marks the
 in-process server blocked; nofork/noproc are not claimed. This is selected-call
 routing on Linux, not an Xbox/UWP device pass or complete syscall coverage.
