@@ -1492,3 +1492,29 @@ were removed, then the successful checks reused the existing prefix. Video
 `/workspace/x64-run/videos/B19-O3.mp4` (3.2 seconds) records the live jail checks
 and explicitly labels the exact verifier output as from the previous run.
 O4's full acceptance command/global process check is not claimed here.
+
+
+## B19 O4 — exact nofork acceptance BLOCKED
+
+Ran the R4W O9 exact command unchanged, with `UWPH_INPROC_SERVER=1`
+exported outside it to skip uwp_run.sh's stock-server concession. Build succeeds;
+real uwpjail prints `seccomp wx=0 nofork=1 (16 insns)`, then run-wine.sh reports
+`fork: Operation not permitted`, rc=254. The exact invocation selects the
+multi-guest orchestration branch, whose first command substitution is
+`cd "$(dirname "$0")"` (line 45). The staged single-guest `--nofork` branch
+from O3 is not selected by that invocation. Further orchestration also needs
+subprocesses, so replacing only dirname would not complete acceptance.
+
+No new run directory was created (runs-before.txt and runs-after.txt identical).
+The requested newest-dir verifier PASS belongs to the prior O3 run-JRpnFEiG,
+not this jailed attempt. O4 did not reach our launcher, Wine's loader, or uwph;
+only the build passed. No fresh guest child_processes=0 proof exists. The global
+wineserver check is also nonempty: six pre-existing PIDs are listed unchanged
+before/after in the log; no other lane's server was stopped.
+
+Evidence: `x64/uwp-host/harness/out/b19-o4/{acceptance.sh,exact-test.txt,
+runs-before.txt,runs-after.txt,xvfb.log,ffmpeg.log}`. Free-display Xvfb recording:
+`/workspace/x64-run/videos/B19-O4.mp4` (5.583333 s, 274208 bytes). The recording
+shows the failed exact test and explicitly labels the old verifier evidence.
+No DONE-R4W.inproc marker was created, because O9 requires all acceptance gates.
+No runtime, verifier, jail, remotes, or prior evidence was changed.
