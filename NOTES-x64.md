@@ -651,3 +651,135 @@ O1 validation is HOST-ONLY model/documentation testing plus the parent
 uwp-host build/surface check. No uwp-host runtime, launcher or stock Wine
 execution is exercised; UI routing evidence and Linux-box video are deferred
 to their respective later orders. See x64/ui/README.md for the exact checks.
+
+## R4W O1 wineboot trigger
+
+Source inspection (2026-10-24): installed Debian wine/wine64/libwine is
+10.0~repack-6; `/tmp/wine-src/VERSION` identifies Wine 10.0. The existing
+source tree lacked programs/wineboot, so that directory was extracted from
+Debian's matching `wine_10.0~repack.orig.tar.xz`. Its SHA256 is
+e87ff2971c9b2e79fc63341f044d7513e66f3c3782b49609746428caa87c6ee6;
+the matching -6 Debian patch archive has SHA256
+2a8343e7da627528a348e591fcf4531a9935512d771f896226b5f375d4898679.
+Neither inspected source file is targeted by that archive's Debian patches.
+Archives and .dsc came from https://deb.debian.org/debian/pool/main/w/wine/.
+
+**Why a copied prefix still starts wineboot:**
+`/tmp/wine-src/dlls/ntdll/unix/env.c:2042` tests `!startup_info_size` in
+`init_startup_info()`, then calls `build_initial_params()` at line 2044.
+That function unconditionally calls `run_wineboot()` at line 1948.
+In `run_wineboot()` (line 1594), the decisive existing-session check is
+`NtCreateEvent()` at line 1615 and `status == STATUS_OBJECT_NAME_EXISTS`
+at line 1616, which jumps to waiting instead of creating a process.
+The named event is `\KernelObjects\__wineboot_event` (lines 1596–1597).
+Without that existing wineserver event, it attempts `wineboot.exe --init`
+via `NtCreateUserProcess()` (lines 1644–1652). Copying prefix files cannot
+copy this live wineserver object. No on-disk prefix stamp is checked before
+this launch attempt; a completed prefix alone does not satisfy zero wineboot
+attempts in a fresh session.
+
+**Separate decision: whether wineboot updates the prefix.**
+`/tmp/wine-src/programs/wineboot/wineboot.c:1921` calls
+`update_wineprefix(update)` for init or explicit update. The function at
+line 1656 gets the prefix directory from `WINECONFIGDIR` (line 1658), opens
+`wine.inf`, and obtains its `st_mtime` (lines 1668–1675). At line 1677,
+`update_timestamp(config_dir, st.st_mtime) || force` decides whether to run
+the INF update. `get_wine_inf_path()` (lines 93–114) selects
+`WINEBUILDDIR/loader/wine.inf` or `WINEDATADIR/wine.inf`.
+
+`update_timestamp()` (lines 118–158) opens
+`<WINECONFIGDIR>/.update-timestamp` read/write (lines 123–129). The stamp is
+a decimal Unix modification time of the selected wine.inf, followed by a
+newline, not a Wine version string. An equal parsed timestamp returns false
+(line 135); the source also recognizes a leading `disable` (line 134).
+Otherwise a successfully written replacement stamp returns true (lines
+138–152); a missing stamp is created on ENOENT (lines 141–144). Allocation,
+open, or write failures can return false, so a skipped update does not itself
+prove a valid prefix. Explicit update forces the update branch. These are
+observations only; no stamp or runtime behavior was changed. Copying a stamp
+with a different wine.inf mtime can cause an INF update, whereas a matching
+stamp only skips that work after wineboot already starts. `system.reg` is
+prefix registry data, not the launch-suppression check described above.
+
+O1 verification: the exact requested grep/ls command exits 0. Its grep scans
+ntdll/*.c, not ntdll/unix/*.c, so the launch decision additionally required
+inspection of unix/env.c. This is source-only diagnosis: no THROUGH-uwph,
+launcher, stock Wine execution, or build was performed. No child Wine
+process was spawned, code/verifiers changed, or runtime proof claimed.
+
+## R4W O2 build-time prebuilt prefix
+
+`make -C x64/uwp-host/harness prebuilt-prefix` calls the opt-in
+`prepare-wine.sh --prebuilt-prefix` packaging path. On this Linux build box it
+runs installed Wine 10.0's `wineboot.exe --init` once for a fresh, isolated
+win64 prefix, waits for its matching stock wineserver to finish flushing the
+registry, checks all three registry files and the Wine-generated stamp, and
+publishes `x64/uwp-host/harness/prebuilt-prefix/`. All real files and directories
+have write bits removed; chmod never follows Wine's host drive symlinks. The
+large generated tree is gitignored. `packaging.json` records the Wine version,
+loader/server hashes, wine.inf hash and mtime. The actual `.update-timestamp`
+contains `1750921248\n`, matching this installation's wine.inf mtime, as O1
+requires; it is not synthesized or replaced with a version string. A lock
+prevents concurrent packagers. Existing packages are checked and reused with
+zero wineboot invocations; changed identities or stamps fail explicitly.
+For a new Wine installation, remove the generated package (restore owner write
+permissions on directories first) and rerun this packaging target.
+
+Runtime integration must explicitly set an absolute `WINEPREFIX`, e.g.
+`WINEPREFIX=/workspace/wt/R4W/x64/uwp-host/harness/prebuilt-prefix` for this
+box. A deployment should bundle the prepared tree and point WINEPREFIX to its
+corresponding deployed location (or an authorized LocalState copy if registry
+writes are needed). This packaging target is never a runtime dependency and
+no runtime script was changed. Linux Wine's host drive symlinks need platform
+path mapping before a UWP deployment. Read-only here means filesystem mode
+bits, not a security boundary. As O1 explains, these disk files do not suppress
+the fresh-session wineboot launch or supply an in-process wineserver: O2 does
+not establish runtime zero-child acceptance.
+
+Validation: the exact O2 make/test command exited 0, creating the read-only
+prefix and matching stamp. Repeating it exited 0 and printed
+`Reused read-only prebuilt-prefix; wineboot invocations this run: 0`.
+`bash -n` and `git diff --check` passed. Evidence classification: **build-only,
+stock Wine packaging**, not THROUGH-uwph or launcher execution. The Xvfb :99
+recording `/workspace/x64-run/videos/R4W-O2.mp4` shows the repeat exact test,
+identity and stamp; it is not runtime proof.
+
+## R4W O3 in-process wineserver — BLOCKED
+
+No in-process server is implemented. Remaining runtime spawn:
+`harness/run-wine.sh` explicitly backgrounds `/usr/lib/wine/wineserver64 -f -p`
+and later invokes that binary with `-k`. Its stock server is outside uwph.
+The current launcher (`x64/pe/launcher/run_via_wine.c`) uses `execv()` to
+replace the process with Wine's loader; a pthread created before that handoff
+would be destroyed. A server must instead be initialized inside the loader
+process, with an explicit ready/error handshake before ntdll connects.
+
+Simply invoking Wine's server main on a pthread is insufficient: matching
+Wine 10.0 source `server/main.c:222–238` installs process-wide signal handlers
+and enters the server loop; `server/request.c:595–666` changes process cwd,
+`:829` registers process atexit cleanup, and `:914` exits the entire process
+on socket timeout. `server/signal.c:270–317` installs additional process-wide
+handlers. Foreground mode avoids the daemon fork at request.c:859, but does
+not isolate these effects from the Wine client in the same process. The
+server also uses cwd-relative operations during operation (fd.c:1904,2047).
+A source-linked server port needs thread-local lifecycle/error handling,
+path-independent socket/registry/file operations and signal ownership shared
+with ntdll; renaming main or wrapping the executable does not provide that.
+The installed server is an executable, not a thread-callable server library;
+no configured Wine source build or embedded server library is available here.
+The socket protocol must remain Wine's own during such a port.
+
+The exact requested O3 test was run. Default make succeeds but only builds
+`out/libuwph.a`; it neither builds nor runs the Wine test. The unchanged
+verifier takes its first argument as an evidence directory, so it reports:
+`Wine uwph verification: BLOCKED: [Errno 2] No such file or directory: '--expect-no-children/identity.json'`.
+The final grep exits 1 with no matches. No child_processes=0,
+wineboot_attempts=0 or PASS was observed. This is a verifier interface
+mismatch, not evidence about guest execution. Per the order, the verifier
+was not modified. Independently, Wine's fresh-session wineboot path remains
+`dlls/ntdll/unix/env.c:1594,1948` (see O1); O2's stamp does not suppress it.
+
+Evidence classification: **build-only and source inspection**, no THROUGH-uwph
+runtime proof and no stock Wine execution in O3. Recording
+`/workspace/x64-run/videos/R4W-O3.mp4` shows the blocked exact test only.
+No runtime code was changed, no commits created and no remotes accessed.
