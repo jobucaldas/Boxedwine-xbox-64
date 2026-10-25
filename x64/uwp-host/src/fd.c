@@ -100,8 +100,12 @@ int uwph_fd_count(void)
 UWPH_API int uwph_close(int fd)
 {
 #ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
-    return uwph_linux_close(fd);
-#else
+    if (uwph_linux_native_fds()) return uwph_linux_close(fd);
+    enum uwph_fd_kind socket_kind;
+    struct uwph_object *socket_obj = uwph_fd_get(fd, &socket_kind, NULL);
+    uwph_obj_unref(socket_obj);
+    if (socket_kind != UWPH_FD_UNIX) return uwph_linux_close(fd);
+#endif
     struct fd_entry old;
     if (fd < 0 || fd >= UWPH_MAX_FDS) return UWPH_FAIL(UWPH_EBADF);
     uwph_lock(&fd_lock);
@@ -111,7 +115,6 @@ UWPH_API int uwph_close(int fd)
     if (old.kind == UWPH_FD_FREE) return UWPH_FAIL(UWPH_EBADF);
     release_entry(old, fd);
     return 0;
-#endif
 }
 
 static int dup_from(int fd, int start, int cloexec)
@@ -127,7 +130,14 @@ static int dup_from(int fd, int start, int cloexec)
     return nfd;
 }
 
-UWPH_API int uwph_dup(int fd) { return dup_from(fd, 0, 0); }
+UWPH_API int uwph_dup(int fd) {
+    uwph_trace_hit(UWPH_TRACE_DUP);
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    return uwph_linux_dup(fd);
+#else
+    return dup_from(fd, 0, 0);
+#endif
+}
 
 UWPH_API int uwph_dup2(int fd, int newfd)
 {
@@ -187,6 +197,11 @@ UWPH_API int uwph_ioctl(int fd, unsigned long req, ...)
 
 UWPH_API int uwph_isatty(int fd)
 {
+    uwph_trace_hit(UWPH_TRACE_ISATTY);
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    return uwph_linux_isatty(fd);
+#endif
+
     enum uwph_fd_kind kind;
     uwph_obj_unref(uwph_fd_get(fd, &kind, NULL));
     if (kind == UWPH_FD_FREE) return uwph_errno = UWPH_EBADF, 0;

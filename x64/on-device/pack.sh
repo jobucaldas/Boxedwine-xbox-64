@@ -32,6 +32,14 @@ test "$(openssl x509 -inform DER -in out/test-cert.cer -noout -subject -nameopt 
 
 mkdir -p "$stage/payload/Assets"
 cp AppxManifest.xml out/smoke.exe out/rungs.exe "$stage/payload/"
+# Hosted combo assets: keep Linux runtime separate from the native UWP entry.
+combo="$stage/payload/combo"
+mkdir -p "$combo"
+cp out/combo-guests/hello.exe out/combo-guests/hello_k32.exe "$combo/"
+cp ../uwp-host/harness/out/run_via_wine ../uwp-host/harness/out/libuwph_wine_shim.so "$combo/"
+cp -a ../uwp-host/harness/out/wine-wx "$combo/"
+cp combo.sh "$combo/run"
+cp ../uwp-host/harness/verify_{noproc,acceptance}.py ../uwp-host/harness/surface{,-trace}.tsv "$combo/"
 # Copy only the optional probe, never modify its source worktree.
 probe=/workspace/wt/R4N/x64/native-gfx/out/probe_native.exe
 if [[ -s "$probe" ]]; then cp "$probe" "$stage/payload/probe_native.exe"; fi
@@ -93,6 +101,8 @@ try:
         'Use README.md for Windows SDK packaging with the existing test cert.\n'
         'test-cert.pfx is a private disposable development key: keep this kit local.\n'
         'ladder is a hosted Python diagnostic, not a console executable.\n'
+        'Combo: set UWPH_COMBO_PREFIX to the prepared B21 test fixture; see README.\n'
+        'Linux combo needs Debian Wine and the readiness wrapper/jail support.\n'
         'Optional probes are diagnostics, not automatically wired console rungs.\n'
         'No LocalState, tokens, Wine prefixes, or game files are included.\n')
     expected = {'test_dcomp.exe': 'f (DirectComposition diagnostic)',
@@ -149,6 +159,13 @@ try:
     shutil.rmtree(out / 'kit', ignore_errors=True)
     kit.rename(out / 'kit')
     archive.replace(out / 'kit.zip')
+    # Sidecar verifies the archive and every extracted member, including the
+    # kit's own checksum manifest, from the package output directory.
+    sidecar_files = [out / 'kit.zip'] + sorted(
+        p for p in (out / 'kit').rglob('*') if p.is_file())
+    (out / 'SHA256SUMS').write_text(''.join(
+        f'{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.relative_to(out).as_posix()}\n'
+        for p in sidecar_files))
     Path('kit-manifest.txt').write_text(manifest)
     print((out / 'kit.zip').resolve(), flush=True)
 finally:

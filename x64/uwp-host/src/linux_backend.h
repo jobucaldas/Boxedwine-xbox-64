@@ -30,3 +30,12 @@ uwph_FILE *uwph_linux_fopen(const char *path, const char *mode);
 uwph_FILE *uwph_linux_fdopen(int fd, const char *mode);
 int uwph_linux_fileno(uwph_FILE *f);
 int uwph_linux_fclose(uwph_FILE *f);
+
+int uwph_linux_isatty(int fd);
+int uwph_linux_pipe2(int fds[2], int flags);
+
+/* Explicit descriptor domain: Wine borrows native fds; direct tests do not. */
+int uwph_linux_native_fds(void);
+
+int uwph_linux_dup(int fd);
+int uwph_linux_fchdir(int fd);

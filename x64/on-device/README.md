@@ -9,14 +9,34 @@ separate build diagnostic. Tomorrow's checklist:
 ## Build the artifacts (Linux)
 
     make -C x64/on-device package        # loose payload + test cert
-    make -C x64/on-device offline-smoke  # package, offline ladder, Wine smoke
+    make -C x64/on-device kit            # package + hosted ladder -> out/kit.zip
+    make -C x64/on-device offline-smoke  # package, offline ladder, kit, Wine smoke
+    bash x64/on-device/check-doc.sh      # this README vs the built kit
 
 - Loose payload: `x64/on-device/out/payload/` (`AppxManifest.xml`, `rungs.exe`, `smoke.exe`, optional `probe_native.exe`,
-  `Assets/*.png`, `PACKAGING-NOTES.txt`)
+  `Assets/*.png`, `PACKAGING-NOTES.txt`, and the hosted Linux `combo/` assets
+  described under "B21 combo rung")
 - Test certificate: `x64/on-device/out/test-cert.cer` (CN=BoxedwineDev,
   matches manifest Publisher)
 - Private test key: `x64/on-device/out/test-cert.pfx` (empty password; this is
   a disposable dev identity. Never put it in the payload or share it.)
+- Kit: `x64/on-device/out/kit.zip`, extracted as `x64/on-device/out/kit/`.
+  Verify it with `cd x64/on-device/out && sha256sum -c SHA256SUMS`; the
+  sidecar `out/SHA256SUMS` covers `kit.zip` and every extracted file. Top level:
+  - `README.md` (this file), `KIT-NOTES.txt` (build-only notes),
+    `kit-manifest.txt` (every file and the rung it serves) and `SHA256SUMS`
+    (in-kit checksums, excluding itself).
+  - `ladder`: the hosted Python ladder (see "Hosted ladder").
+  - `payload/`: the loose payload above. Its `combo/` symlinks to Debian
+    Wine files are stored as regular files in the zip.
+  - `probes/`: optional diagnostic PEs copied from other worktrees' build
+    outputs (`probes/<worktree>/graphics|native-gfx/`). They aren't wired into
+    the console app.
+  - `test-cert.cer` and `test-cert.pfx` (private; never upload the `.pfx`).
+
+`check-doc.sh` checks that every rung, file, flag, make target and step in
+this README and `/workspace/x64-run/ON-DEVICE-TOMORROW.md` exists in the built
+kit, and that every kit entry and rung is documented here. It's build-only.
 
 ## Pack and sign (Windows PC with the Windows SDK)
 
@@ -79,12 +99,13 @@ routing of smoke.exe, UWP activation, or Xbox behaviour.
 ## Hosted ladder (O2)
 
 `make -C x64/on-device ladder && ./x64/on-device/out/ladder --offline` prints
-sixteen STAGE lines (a–h, n0–n7) and overwrites `LocalState/ladder.log`, flushing each
-line. Use `--local-state PATH` to pick another LocalState directory. Each stage
-times out after 20 seconds by default (`--timeout 1..60`). A stage FAIL or SKIP
+twenty-four STAGE lines (a–h, combo, p1–p6, n0–n8) and overwrites `LocalState/ladder.log`, flushing each
+line. Use `--local-state PATH` to pick another LocalState directory. Adapter stages
+time out after 20 seconds by default (`--timeout 1..60`); the offline combo
+has a 60-second bound with 20 seconds per guest. A stage FAIL or SKIP
 doesn't stop the run, and the exit code stays 0. An unwritable log is an error.
-Offline mode runs only stage a, which is the public uwph Linux backend test.
-Stages b–h and n0–n7 stay SKIP. This is a hosted Python tool, so it doesn't run on the
+Offline mode runs stage a (public uwph Linux backend) and the combo rung.
+Stages b–h and n0–n8 stay SKIP. This is a hosted Python tool, so it doesn't run on the
 console.
 
 LocalState layout (Git-ignored):
@@ -125,7 +146,8 @@ shown above.
 
 `make -C x64/on-device ladder package` builds `out/rungs.exe` and the hosted
 `out/ladder`, then rebuilds the loose payload. On console, launch the packaged
-app from Dev Home. It activates a real CoreWindow and writes
+app from Dev Home: the **Boxedwine Dev Mode** tile (EntryPoint `Boxedwine.App`,
+executable `rungs.exe`). It activates a real CoreWindow and writes
 `ApplicationData.Current.LocalFolder/ladder-native.log`, flushing each stage.
 Save this file separately as `ladder-App.log` and `ladder-Game.log` before
 relaunching; the native log is overwritten each run. Keep hosted a–h evidence
@@ -215,21 +237,26 @@ Activation API reference: [IFrameworkView.Load](https://learn.microsoft.com/en-u
      tile's copies as `ladder-App.log` and `ladder-Game.log`, and use separate
      run folders for the Big file opt-in tile.
    - `LocalState/ladder.log` — only if hosted ladder evidence was placed here;
-     otherwise report “not produced by console app”. For a Linux hosted run,
-     collect it from the LocalState directory chosen by `--local-state` instead.
+     otherwise report “not produced by console app”.
    - A directory listing of `LocalState` if an expected log is missing. Report
      absent files explicitly. `big-file.bin` is temporary and is not a required
      download; the n7 result in `ladder-native.log` is the evidence to send.
-2. Download any app crash dump from Device Portal **Debug > Crash dumps** and
+2. If you ran the hosted ladder on Linux, send its `ladder.log` too, labelled
+   off-device. A source-tree run (`out/ladder` or `ladder.py`) writes
+   `x64/on-device/LocalState/ladder.log`, an extracted kit's `ladder` writes
+   `<kit>/LocalState/ladder.log`, and `--local-state DIR` writes
+   `DIR/ladder.log`. Include the terminal output of
+   `make -C x64/on-device offline-smoke` if you ran it.
+3. Download any app crash dump from Device Portal **Debug > Crash dumps** and
    save the relevant **ETW** capture if those facilities are available. Copy
    full install errors from **Home > My games & apps > Add**, or the selected
    app's exit/status details. Preserve numeric codes exactly, without paraphrase.
-3. Send a short run note with console model, OS version, package identity,
+4. Send a short run note with console model, OS version, package identity,
    tile, App/Game setting, run time, visible result and audible result. Include
    MakeAppx/SignTool output for packaging failures and the public manifest when
    relevant. Label console evidence separately from hosted/off-device results;
    a missing file or SKIP is not a PASS.
-4. Review the files before sharing. Omit credentials, tokens, private keys
+5. Review the files before sharing. Omit credentials, tokens, private keys
    (`.pfx`), `LocalState/private/`, and owned game payloads. Review diagnostic
    captures/dumps for private data; send only the relevant reviewed evidence.
 
@@ -271,3 +298,53 @@ checks the four ports plus failures creating the first worker, ping-pong
 worker, release event and either ping-pong event. Injected failures must
 return probe failure without hanging. Production `rungs.exe` contains no
 fault wrappers. These are desktop diagnostics, not UWP/console PASS evidence.
+
+## Gamepad rung n8 (B03 O1)
+
+| Rung | Probe | Native action / current limitation |
+| --- | --- | --- |
+| n8 | Windows.Gaming.Input.Gamepad | Verified Xbox UWP activation only: RoGetActivationFactory, fresh Gamepads vector each second for 10 seconds, count and every mapped XINPUT_STATE logged. Zero controllers is valid; API errors FAIL. Off-device always SKIP. Device read is build-only until console validation. |
+
+`make -C x64/on-device input-test && ./x64/on-device/out/input_test`
+checks 28 mapping cases on the host. Buttons map to XInput, unsupported paddles
+are ignored, triggers round to 0..255, and sticks round using 32768 for negatives
+and 32767 for positives. No deadzone is applied. Inputs are clamped, with
+nonfinite values mapped to zero. Packet number is zero: this stateless mapper
+does not track changes. No Wine xinput integration is included. The probe uses
+the installed SDK-compatible MinGW Gamepad ABI declarations. Host mapping tests
+are native C tests, not THROUGH-uwph or stock Wine runtime evidence.
+
+## B21 combo rung
+
+`STAGE combo hello+hello_k32-nofork,noproc,wx` runs the existing B21 hellos
+through the packaged launcher, bundled W^X Wine loader, shim and uwph on Linux.
+`offline-smoke` requires this rung to PASS, including noproc reports and all
+20 ntdll-to-uwph bindings/counters; constraints remain `nofork,noproc,wx`.
+`package` and `kit` carry both PE guests plus the Linux runner, launcher, shim,
+W^X loader tree and verifiers in `payload/combo/`: `hello.exe`, `hello_k32.exe`,
+`run`, `run_via_wine`, `libuwph_wine_shim.so`, `wine-wx/`, `verify_noproc.py`,
+`verify_acceptance.py` and `surface-trace.tsv`. MakeAppx packs this directory
+too; the console app never runs it. The Linux loader tree retains
+B21's links to matching installed Debian Wine 10.0 DLLs/data: these are hosted
+diagnostics, not a Windows/UWP runtime. Build-time `prebuilt-prefix` preparation
+uses stock Wine. For a source or extracted kit run, set
+`UWPH_COMBO_PREFIX=/absolute/path/to/x64/uwp-host/harness/prebuilt-prefix`
+(the B21 fixture prepared by `make -C x64/uwp-host/harness prebuilt-prefix`).
+Run `UWPH_COMBO_PREFIX=... /path/to/kit/ladder --offline`, or invoke
+`/path/to/kit/payload/combo/run` with the same environment. The kit can live
+anywhere; it does not require a source checkout. The host must supply Debian
+Wine 10.0, Python, bubblewrap and the readiness constraint wrapper plus its
+`bin/uwpjail` and `fakesys` support at `/workspace/xbox-readiness`;
+`UWPH_UWP_RUN` can select another compatible wrapper. Offline stage a still
+requires the source harness; only combo is runnable independently of it.
+`offline-smoke` supplies the fixture and checks combo in a relocated kit.
+The routed run copies that explicit fixture, disables wineboot,
+and retains a separate stock Linux wineserver concession. Logs/reports remain
+in `${TMPDIR:-/tmp}/kit-combo.*/`; the temporary prefix is deleted, and no
+prefix is packaged.
+
+On device, PASS means both hellos exit 0 through an in-process Wine W^X loader
+and uwph with `nofork,noproc,wx`, TEB/thread checks and routing counters verified;
+until that native combo adapter exists, report SKIP (the Linux runner cannot run
+inside UWP). Hosted online mode accepts `LocalState/adapters/combo` under the
+same exit-code/routing contract as the other loader adapters.

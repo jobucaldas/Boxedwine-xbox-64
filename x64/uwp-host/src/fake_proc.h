@@ -14,4 +14,9 @@ void uwph_proc_mapping(void *addr, size_t len, int mapped);
 #ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
 int uwph_proc_pthread_create(void *out, const void *attr, void *(*start)(void *), void *arg);
 #endif
+
+uwph_DIR *uwph_fake_opendir(const char *path);
+struct uwph_dirent *uwph_fake_readdir(uwph_DIR *dir);
+int uwph_fake_closedir(uwph_DIR *dir);
+
 #endif

@@ -11,9 +11,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef UWPH_BACKEND_WIN32
+# include <windows.h>
+#endif
 #ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
 # include <time.h>
+# include <sys/socket.h>
 # include <unistd.h>
+# include <sys/wait.h>
 #endif
 
 static int fails, passes;
@@ -242,6 +247,218 @@ static void test_files(void)
 #endif
 }
 
+static void test_b06(void)
+{
+    struct uwph_rlimit lim;
+    struct uwph_stat st;
+    uwph_Dl_info info;
+    uwph_sigset_t set;
+    int p[2], value=1024;
+    char *argv[] = { "missing", NULL };
+    static char env[] = "UWPH_B06=value";
+    CHECK(uwph_putenv(env)==0 && !strcmp(uwph_getenv("UWPH_B06"),"value"), "B06 putenv shares getenv table");
+    uwph_unsetenv("UWPH_B06");
+    CHECK(uwph_getrlimit(UWPH_RLIMIT_NOFILE,&lim)==0 && lim.rlim_cur>0, "B06 getrlimit NOFILE");
+    CHECK(uwph_setrlimit(UWPH_RLIMIT_NOFILE,&lim)==0, "B06 setrlimit unchanged NOFILE");
+#ifndef UWPH_BACKEND_LINUX_PASSTHROUGH
+    CHECK(uwph_setrlimit(UWPH_RLIMIT_STACK,&lim)==-1 && uwph_errno==UWPH_ENOSYS,
+          "B06 setrlimit unsupported host limit -> ENOSYS");
+    struct uwph_rlimit invalid={2,1};
+    CHECK(uwph_setrlimit(UWPH_RLIMIT_NOFILE,&invalid)==-1 && uwph_errno==UWPH_EINVAL,
+          "B06 setrlimit rejects soft greater than hard");
+#endif
+    CHECK(uwph_sysconf(UWPH_SC_PAGESIZE)==4096, "B06 sysconf page size");
+    CHECK(uwph_sigemptyset(&set)==0 && uwph_sigismember(&set,UWPH_SIGUSR2)==0, "B06 sigemptyset clears membership");
+    CHECK(uwph_execv("/uwph-b06-missing",argv)==-1 && uwph_errno==
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+          UWPH_ENOENT,
+#else
+          UWPH_ENOSYS,
+#endif
+          "B06 execv missing / UWP ENOSYS");
+    CHECK(uwph_dladdr(NULL,&info)==0, "B06 dladdr unknown address");
+    CHECK(uwph_chdir("/")==0, "B06 chdir root");
+    CHECK(uwph_fstat(-1,&st)==-1 && uwph_errno==UWPH_EBADF, "B06 fstat invalid descriptor");
+    CHECK(uwph_isatty(-1)==0 && uwph_errno==UWPH_EBADF, "B06 isatty invalid descriptor");
+    CHECK(uwph_pipe2(p,UWPH_O_CLOEXEC)==0, "B06 pipe2 CLOEXEC");
+    CHECK(uwph_fcntl(p[0],UWPH_F_GETFD)==UWPH_FD_CLOEXEC, "B06 pipe2 preserves CLOEXEC");
+    CHECK(uwph_write(p[1],"b",1)==1, "B06 pipe write");
+    char b=0;
+    CHECK(uwph_read(p[0],&b,1)==1 && b=='b', "B06 pipe read");
+    uwph_close(p[0]); uwph_close(p[1]);
+    struct uwph_msghdr msg; memset(&msg,0,sizeof(msg));
+    CHECK(uwph_sendmsg(-1,&msg,0)==-1 && uwph_errno==UWPH_EBADF, "B06 sendmsg invalid descriptor");
+    CHECK(uwph_recvmsg(-1,&msg,0)==-1 && uwph_errno==UWPH_EBADF, "B06 recvmsg invalid descriptor");
+    CHECK(uwph_setsockopt(-1,1,8,&value,sizeof(value))==-1 && uwph_errno==UWPH_EBADF, "B06 setsockopt invalid descriptor");
+    int sv[2];
+    int pair_ok=uwph_socketpair(UWPH_AF_UNIX,UWPH_SOCK_STREAM,0,sv);
+    CHECK(pair_ok==0, "B06 socket pair fixture");
+    if (pair_ok==0) {
+        struct uwph_iovec v={ (void *)"ok", 2 };
+        msg.msg_iov=&v; msg.msg_iovlen=1;
+        CHECK(uwph_setsockopt(sv[0],UWPH_SOL_SOCKET,8,&value,sizeof(value))==0, "B06 setsockopt receive buffer");
+        CHECK(uwph_sendmsg(sv[0],&msg,0)==2, "B06 sendmsg payload");
+        char received[3]={0}; v.iov_base=received;
+        CHECK(uwph_recvmsg(sv[1],&msg,0)==2 && !strcmp(received,"ok"), "B06 recvmsg payload");
+        CHECK(uwph_close(sv[0])==0 && uwph_close(sv[1])==0, "B06 socket pair uwph close");
+    }
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    /* Exercise the other descriptor producers, not just a native fixture. */
+    struct uwph_sockaddr_un address={UWPH_AF_UNIX,{0}};
+    uwph_snprintf(address.sun_path,sizeof(address.sun_path),"/tmp/uwph-b06-%d.sock",uwph_getpid());
+    int listener=uwph_socket(UWPH_AF_UNIX,UWPH_SOCK_STREAM,0);
+    int client=uwph_socket(UWPH_AF_UNIX,UWPH_SOCK_STREAM,0);
+    CHECK(listener>=0 && client>=0, "B06 uwph socket producers");
+    int bound=uwph_bind(listener,(struct uwph_sockaddr *)&address,sizeof(address));
+    CHECK(bound==0, "B06 uwph bind native lifecycle");
+    if (bound==0) {
+        CHECK(uwph_listen(listener,1)==0, "B06 uwph listen native lifecycle");
+        int connected=uwph_connect(client,(struct uwph_sockaddr *)&address,sizeof(address));
+        CHECK(connected==0, "B06 uwph connect native lifecycle");
+        if (connected==0) {
+            int peer=uwph_accept(listener,NULL,NULL);
+            CHECK(peer>=0, "B06 uwph accept producer");
+            int kind=0; uwph_socklen_t length=sizeof(kind);
+            CHECK(uwph_getsockopt(peer,UWPH_SOL_SOCKET,UWPH_SO_TYPE,&kind,&length)==0 && kind==UWPH_SOCK_STREAM,
+                  "B06 uwph getsockopt accepted descriptor");
+            struct uwph_sockaddr_un name; length=sizeof(name);
+            CHECK(uwph_getsockname(peer,(struct uwph_sockaddr *)&name,&length)==0, "B06 uwph getsockname");
+            length=sizeof(name);
+            CHECK(uwph_getpeername(peer,(struct uwph_sockaddr *)&name,&length)==0, "B06 uwph getpeername");
+            CHECK(uwph_send(client,"x",1,0)==1, "B06 uwph send created descriptor");
+            char payload=0;
+            CHECK(uwph_recv(peer,&payload,1,0)==1 && payload=='x', "B06 uwph recv accepted descriptor");
+            CHECK(uwph_shutdown(client,UWPH_SHUT_WR)==0 && uwph_recv(peer,&payload,1,0)==0,
+                  "B06 uwph shutdown delivers EOF");
+            CHECK(uwph_close(peer)==0, "B06 uwph close accepted descriptor");
+        }
+        uwph_unlink(address.sun_path);
+    }
+    uwph_close(client); uwph_close(listener);
+#endif
+    uwph_FILE *f=uwph_fopen(input,"r");
+    if (f) { uwph_setbuf(f,NULL); CHECK(uwph_fread(&b,1,1,f)==1 && b=='u', "B06 setbuf stream remains readable"); uwph_fclose(f); }
+#if !HOST
+    else { int q[2]; uwph_pipe(q); f=uwph_fdopen(q[0],"r"); uwph_setbuf(f,NULL); uwph_close(q[1]); uwph_fclose(f); }
+#endif
+}
+
+/* Internal locale bridge deliberately leaves the public uwph API unchanged. */
+extern char *uwph_trace_nl_langinfo(int);
+static void test_b07(void)
+{
+    char cwd_buf[1024];
+    struct uwph_stat st;
+    uwph_mode_t old = uwph_umask(077);
+    CHECK(uwph_umask(old)==077, "B07 umask returns previous mask");
+    CHECK(uwph_getcwd(cwd_buf,sizeof(cwd_buf))!=NULL && cwd_buf[0]=='/', "B07 getcwd absolute path");
+    CHECK(uwph_getcwd(cwd_buf,1)==NULL && uwph_errno==UWPH_ERANGE, "B07 getcwd small buffer -> ERANGE");
+    CHECK(uwph_getpid()>0, "B07 getpid positive identity");
+    CHECK(uwph_access(input,0)==(HOST ? 0 : -1), "B07 access fixture existence");
+    CHECK(uwph_lstat(input,&st)==(HOST ? 0 : -1), "B07 lstat fixture");
+    CHECK(uwph_mkdir("/uwph-b07-no-parent/subdir",0700)==-1 && uwph_errno==(HOST ? UWPH_ENOENT : UWPH_ENOSYS),
+          "B07 mkdir missing parent");
+    CHECK(uwph_fchdir(-1)==-1 && uwph_errno==
+#if HOST
+          UWPH_EBADF,
+#else
+          UWPH_ENOSYS,
+#endif
+          "B07 fchdir invalid / unsupported directory descriptor");
+#if HOST
+    char newdir[1024];
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    uwph_snprintf(newdir,sizeof(newdir),"/tmp/uwph-b07-%d",uwph_getpid());
+#else
+    uwph_snprintf(newdir,sizeof(newdir),"/uwph-b07-%d",uwph_getpid());
+#endif
+    CHECK(uwph_mkdir(newdir,0700)==0, "B07 mkdir creates directory");
+    CHECK(uwph_access(newdir,0)==0, "B07 access created directory exists");
+    CHECK(uwph_access(newdir,5)==0, "B07 access created directory read/search");
+    CHECK(uwph_stat(newdir,&st)==0 && (st.st_mode & UWPH_S_IFMT)==UWPH_S_IFDIR,
+          "B07 stat created directory");
+    CHECK(uwph_lstat(newdir,&st)==0 && (st.st_mode & UWPH_S_IFMT)==UWPH_S_IFDIR,
+          "B07 lstat created directory");
+    uwph_DIR *created=uwph_opendir(newdir);
+    CHECK(created!=NULL, "B07 opendir created directory");
+    if(created) uwph_closedir(created);
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    CHECK(rmdir(newdir)==0, "B07 remove directory fixture");
+#else
+    char hostdir[2048];
+    uwph_snprintf(hostdir,sizeof(hostdir),"%s%s",root,newdir);
+    CHECK(RemoveDirectoryA(hostdir)!=0, "B07 remove directory fixture");
+#endif
+    int directory_fd=uwph_open("/",UWPH_O_RDONLY|UWPH_O_DIRECTORY);
+    CHECK(directory_fd>=0 && uwph_fchdir(directory_fd)==0, "B07 fchdir owned directory");
+    if(directory_fd>=0) uwph_close(directory_fd);
+#endif
+    int p[2];
+    CHECK(uwph_pipe2(p,0)==0, "B07 descriptor fixture");
+    int copy=uwph_dup(p[1]);
+    CHECK(copy>=0 && copy!=p[1], "B07 dup independent descriptor");
+    uwph_close(p[1]);
+    CHECK(uwph_write(copy,"abc\nlast",8)==8, "B07 duplicate survives original close");
+    uwph_close(copy);
+    uwph_FILE *f=uwph_fdopen(p[0],"r");
+    char *line=NULL; size_t capacity=0;
+    CHECK(f && uwph___getdelim(&line,&capacity,'\n',f)==4 && !strcmp(line,"abc\n"), "B07 getdelim includes delimiter");
+    CHECK(f && uwph___getdelim(&line,&capacity,'\n',f)==4 && !strcmp(line,"last"), "B07 getdelim unterminated tail");
+    CHECK(f && uwph___getdelim(&line,&capacity,'\n',f)==-1 && uwph_feof(f), "B07 getdelim EOF");
+    free(line); if(f) uwph_fclose(f);
+    CHECK(uwph_dup(-1)==-1 && uwph_errno==UWPH_EBADF, "B07 dup invalid fd");
+    CHECK(uwph_connect(-1,NULL,0)==-1 && uwph_errno==UWPH_EBADF, "B07 connect invalid fd");
+    uwph_DIR *dir=uwph_opendir("/");
+#if HOST
+    CHECK(dir!=NULL, "B07 opendir root");
+    if(dir) {
+        int found=0; struct uwph_dirent *entry;
+        while((entry=uwph_readdir(dir))) { if(entry->d_name[0]) found++; }
+        CHECK(found>0, "B07 directory enumeration");
+        CHECK(uwph_closedir(dir)==0, "B07 directory closes");
+    }
+#else
+    CHECK(!dir && uwph_errno==UWPH_ENOSYS, "B07 stub opendir ENOSYS");
+#endif
+    uwph_setlocale(UWPH_LC_CTYPE,"C");
+    char *codeset=uwph_trace_nl_langinfo(14);
+    CHECK(codeset && !strcmp(codeset,"ANSI_X3.4-1968"), "B07 nl_langinfo C codeset");
+#ifndef UWPH_BACKEND_LINUX_PASSTHROUGH
+    CHECK(!uwph_trace_nl_langinfo(-1) && uwph_errno==UWPH_ENOSYS, "B07 unsupported locale item ENOSYS");
+#endif
+    static int marker;
+    static const struct uwph_dl_symbol symbols[]={{"b07_marker",&marker},{NULL,NULL}};
+    static const struct uwph_dl_library lib={"b07",symbols,NULL,NULL};
+    uwph_dl_register(&lib);
+    void *handle=uwph_dlopen("b07",0);
+    CHECK(handle && uwph_dlsym(handle,"b07_marker")==&marker, "B07 dlsym static registry");
+    CHECK(!uwph_dlsym(handle,"missing"), "B07 dlsym missing");
+    CHECK(uwph_dlsym(uwph_dlopen(NULL,0),"b07_marker")==&marker, "B07 dlsym main registry handle");
+    CHECK(!uwph_dlsym(uwph_dlopen(NULL,0),"missing"), "B07 dlsym main registry missing");
+#ifndef UWPH_BACKEND_LINUX_PASSTHROUGH
+    CHECK(uwph_fork()==-1 && uwph_errno==UWPH_ENOSYS, "B07 fork counted ENOSYS");
+#else
+    CHECK(uwph_dlsym(NULL,"malloc")!=NULL, "B07 dlsym native lookup without resolver recursion");
+    int directory=uwph_open("/",UWPH_O_RDONLY|UWPH_O_DIRECTORY);
+    CHECK(directory>=0 && uwph_fchdir(directory)==0, "B07 fchdir translates owned directory slot");
+    if(directory>=0) uwph_close(directory);
+    uwph_pid_t child=uwph_fork();
+    if(child==0) _exit(0);
+    int status=-1;
+    CHECK(child>0 && waitpid(child,&status,0)==child && status==0, "B07 Linux fork child reaped");
+#endif
+    void *page=uwph_mmap(NULL,4096,UWPH_PROT_READ|UWPH_PROT_WRITE,UWPH_MAP_PRIVATE|UWPH_MAP_ANONYMOUS,-1,0);
+#if HOST
+    CHECK(page!=UWPH_MAP_FAILED && uwph_mprotect(page,4096,UWPH_PROT_READ)==0, "B07 mprotect read only");
+    CHECK(uwph_protect(page,4096,UWPH_PROT_WRITE|UWPH_PROT_EXEC)==-1 && uwph_errno==UWPH_EACCES,
+          "B07 protection gate rejects RWX");
+    if(page!=UWPH_MAP_FAILED) uwph_munmap(page,4096);
+#else
+    CHECK(uwph_mprotect(NULL,4096,UWPH_PROT_READ)==-1 && uwph_errno==UWPH_ENOSYS, "B07 stub mprotect ENOSYS");
+    (void)page;
+#endif
+}
+
 int main(int argc, char **argv)
 {
     uwph_snprintf(root, sizeof(root), "%s", argc > 1 ? argv[1] : "x64/uwp-host/tests");
@@ -255,6 +472,8 @@ int main(int argc, char **argv)
     printf("uwph traced-set test, backend: %s (built as %s)\n", uwph_backend_name(), BACKEND);
     for (int s = 0; s < UWPH_TRACE_COUNT; s++) base[s] = uwph_trace_count(s);
 
+    test_b06();
+    test_b07();
     test_format();
     test_threads();
     test_process();

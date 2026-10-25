@@ -20,12 +20,12 @@ export_names={line.split()[-1].split('@')[0] for line in exports.splitlines()}
 # O2 traced set plus proc provider/registry wrappers: exact export inventory.
 script=pathlib.Path('shim.map').read_text()
 selected={x.strip() for x in script.split('global:')[1].split('local:')[0].split(';') if x.strip()}-{'uwph_shim_report'}
-assert {'open','read','close','mmap','mprotect','munmap','_exit'}<=selected and len(selected)==32, sorted(selected)
-proc_exports={'opendir','readdir','closedir','pthread_create'}
+assert {'open','read','close','mmap','mprotect','munmap','_exit'}<=selected and len(selected)==60, sorted(selected)
+proc_exports={'readdir','closedir','pthread_create'}
 assert proc_exports <= selected
 assert all(policy[s]['classification']=='explicit host fallback' for s in proc_exports)
 traced=set(re.findall(r'"([^"]+)"',pathlib.Path('../src/trace.c').read_text().split('names[]')[1].split(';')[0]))
-assert traced==selected-proc_exports-{'open','read','close','mmap','munmap','mprotect','_exit','readlink'}, 'uwph trace counters != shim traced exports'
+assert traced==selected-proc_exports-{'open','read','close','mmap','munmap','_exit','readlink'}, 'uwph trace counters != shim traced exports'
 assert {s for s,r in policy.items() if r['classification']=='routed'}==selected-proc_exports-{'_exit','readlink'}
 # readlink is a Wine loader export, absent from this ntdll import inventory.
 assert 'readlink' in export_names

@@ -8,7 +8,16 @@ static struct uwph_sigaction actions[UWPH_NSIG];
 static uwph_lock_t sig_lock = UWPH_LOCK_INIT;
 
 /* ---- sigset ---- */
-UWPH_API int uwph_sigemptyset(uwph_sigset_t *s) { memset(s, 0, sizeof(*s)); return 0; }
+UWPH_API int uwph_sigemptyset(uwph_sigset_t *s)
+{
+    uwph_trace_hit(UWPH_TRACE_SIGEMPTYSET);
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    UWPH_NATIVE(int, "sigemptyset", (uwph_sigset_t *));
+    UWPH_NATIVE_RETURN(fn(s));
+#endif
+    memset(s, 0, sizeof(*s));
+    return 0;
+}
 UWPH_API int uwph_sigaddset(uwph_sigset_t *s, int sig)
 {
     uwph_trace_hit(UWPH_TRACE_SIGADDSET);

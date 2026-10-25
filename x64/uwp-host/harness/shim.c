@@ -14,6 +14,8 @@
 #include <stdarg.h>
 #include <errno.h>
 #include <stdint.h>
+#include <dlfcn.h>
+#include <stdio.h>
 _Static_assert(sizeof(off_t)==sizeof(uwph_off_t),"offset ABI");
 _Static_assert(sizeof(ssize_t)==sizeof(uwph_ssize_t),"read ABI");
 _Static_assert(O_CREAT==UWPH_O_CREAT && MAP_ANONYMOUS==UWPH_MAP_ANONYMOUS,"flag ABI");
@@ -31,6 +33,21 @@ static int owned(int fd) { return 1; }
 #else
 static int owned(int fd) { return fd>=0x100000 && fd<0x100400; }
 #endif
+/* Log refused requests immediately: a timeout can prevent final counters, and
+ * these requests never reach strace. Diagnostic only; W^X remains enforced. */
+static void report_wx(const char *op, int prot, void *caller)
+{
+    if ((prot & (PROT_WRITE|PROT_EXEC)) != (PROT_WRITE|PROT_EXEC)) return;
+    Dl_info info={0};
+    dladdr(caller,&info);
+    char line[1024];
+    int n=snprintf(line,sizeof line,"UWPH_RWX pid=%ld op=%s caller=%s+%#lx\n",
+        harness_raw(SYS_getpid,0,0,0,0,0,0),op,
+        info.dli_fname ? info.dli_fname : "<unknown>",
+        (unsigned long)((uintptr_t)caller-(uintptr_t)info.dli_fbase));
+    if(n>0 && (size_t)n<sizeof line)
+        harness_raw(SYS_write,2,(long)line,n,0,0,0);
+}
 static long native_result(long r) { if((unsigned long)r>=(unsigned long)-4095) { errno=-r; return -1; } return r; }
 int open(const char *path,int flags,...)
 {
@@ -58,6 +75,7 @@ int close(int fd)
 void *mmap(void *addr,size_t len,int prot,int flags,int fd,off_t off)
 {
     BEGIN(C_MMAP,MAP_FAILED);
+    report_wx("mmap",prot,__builtin_return_address(0));
     /* W^X: refuse WRITE|EXEC before any backend; shows as calls > backend. */
     if((prot&PROT_WRITE) && (prot&PROT_EXEC)) { count_end(); errno=EACCES; return MAP_FAILED; }
     /* Borrowed native fds have no uwph ownership: explicit counted passthrough. */
@@ -71,6 +89,7 @@ void *mmap(void *addr,size_t len,int prot,int flags,int fd,off_t off)
 int mprotect(void *addr,size_t len,int prot)
 {
     BEGIN(C_PROTECT,-1);
+    report_wx("mprotect",prot,__builtin_return_address(0));
     int saved=errno, r=uwph_protect(addr,len,prot); END(r,r<0);
 }
 int munmap(void *addr,size_t len)
@@ -150,13 +169,9 @@ _Static_assert(sizeof(struct dirent)==sizeof(struct uwph_dirent) &&
                offsetof(struct dirent,d_name)==offsetof(struct uwph_dirent,d_name),"dirent ABI");
 DIR *opendir(const char *path)
 {
-    if (!strcmp(path, "/proc") || !strncmp(path, "/proc/", 6)) {
-        DIR *d = (DIR *)uwph_opendir(path);
-        if (!d) errno = uwph_errno;
-        return d;
-    }
-    DIR *(*native_fn)(const char *) = uwph_linux_symbol("opendir");
-    return native_fn(path);
+    DIR *d = (DIR *)uwph_opendir(path);
+    if (!d) errno = uwph_errno;
+    return d;
 }
 struct dirent *readdir(DIR *dir)
 {
@@ -175,3 +190,46 @@ int pthread_create(pthread_t *out, const pthread_attr_t *attr, void *(*start)(vo
 {
     return uwph_proc_pthread_create(out, attr, start, arg);
 }
+#include <sys/socket.h>
+#include <sys/resource.h>
+#include <dlfcn.h>
+#define B06_INT(expr) do { int result_=(expr); if(result_<0) errno=uwph_errno; return result_; } while(0)
+ssize_t sendmsg(int fd, const struct msghdr *m, int f)
+{ ssize_t r=uwph_sendmsg(fd,(const struct uwph_msghdr *)m,f); if(r<0) errno=uwph_errno; return r; }
+ssize_t recvmsg(int fd, struct msghdr *m, int f)
+{ ssize_t r=uwph_recvmsg(fd,(struct uwph_msghdr *)m,f); if(r<0) errno=uwph_errno; return r; }
+int fstat(int fd, struct stat *s) { B06_INT(uwph_fstat(fd,(struct uwph_stat *)s)); }
+int putenv(char *s) { B06_INT(uwph_putenv(s)); }
+int setsockopt(int fd,int l,int n,const void *v,socklen_t z) { B06_INT(uwph_setsockopt(fd,l,n,v,z)); }
+int chdir(const char *p) { B06_INT(uwph_chdir(p)); }
+int dladdr(const void *a,Dl_info *i) { return uwph_dladdr(a,(uwph_Dl_info *)i); }
+int execv(const char *p,char *const a[]) { B06_INT(uwph_execv(p,a)); }
+int getrlimit(__rlimit_resource_t r,struct rlimit *l) { B06_INT(uwph_getrlimit(r,(struct uwph_rlimit *)l)); }
+int setrlimit(__rlimit_resource_t r,const struct rlimit *l) { B06_INT(uwph_setrlimit(r,(const struct uwph_rlimit *)l)); }
+int isatty(int fd) { int r=uwph_isatty(fd); if(!r) errno=uwph_errno; return r; }
+int pipe2(int p[2],int f) { B06_INT(uwph_pipe2(p,f)); }
+void setbuf(FILE *f,char *b) { uwph_setbuf((uwph_FILE *)f,b); }
+int sigemptyset(sigset_t *s) { B06_INT(uwph_sigemptyset((uwph_sigset_t *)s)); }
+long sysconf(int n) { long r=uwph_sysconf(n); if(r<0) errno=uwph_errno; return r; }
+_Static_assert(sizeof(struct msghdr)==sizeof(struct uwph_msghdr),"msghdr ABI");
+_Static_assert(sizeof(struct rlimit)==sizeof(struct uwph_rlimit),"rlimit ABI");
+_Static_assert(sizeof(Dl_info)==sizeof(uwph_Dl_info),"dladdr ABI");
+
+#include <dirent.h>
+#include <langinfo.h>
+extern char *uwph_trace_nl_langinfo(int);
+mode_t umask(mode_t m) { return uwph_umask(m); }
+ssize_t __getdelim(char **p,size_t *n,int d,FILE *f)
+{ ssize_t r=uwph___getdelim(p,n,d,(uwph_FILE *)f); if(r<0) errno=uwph_errno; return r; }
+int access(const char *p,int m) { B06_INT(uwph_access(p,m)); }
+int connect(int fd,const struct sockaddr *a,socklen_t n)
+{ B06_INT(uwph_connect(fd,(const struct uwph_sockaddr *)a,n)); }
+void *dlsym(void *h,const char *n) { return uwph_dlsym(h,n); }
+int dup(int fd) { B06_INT(uwph_dup(fd)); }
+int fchdir(int fd) { B06_INT(uwph_fchdir(fd)); }
+pid_t fork(void) { B06_INT(uwph_fork()); }
+char *getcwd(char *p,size_t n) { char *r=uwph_getcwd(p,n); if(!r) errno=uwph_errno; return r; }
+pid_t getpid(void) { return uwph_getpid(); }
+int lstat(const char *p,struct stat *s) { B06_INT(uwph_lstat(p,(struct uwph_stat *)s)); }
+int mkdir(const char *p,mode_t m) { B06_INT(uwph_mkdir(p,m)); }
+char *nl_langinfo(nl_item item) { char *r=uwph_trace_nl_langinfo(item); if(!r) errno=uwph_errno; return r; }

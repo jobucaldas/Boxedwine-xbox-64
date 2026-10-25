@@ -10,7 +10,8 @@
 /* Capture invocation identity before application code can change cwd.
  * No dependency on procfs, including when AT_EXECFN is relative. */
 static char invocation_exe[PATH_MAX];
-__attribute__((constructor)) static void capture_invocation_exe(void)
+/* Preload constructors (including the hosted server) may query this identity. */
+__attribute__((constructor(101))) static void capture_invocation_exe(void)
 {
     const char *exe = (const char *)getauxval(AT_EXECFN);
     if (!exe) return;
@@ -153,7 +154,7 @@ int uwph_fake_dir_owned(const void *dir)
     for (struct uwph_dir *d = directories; d; d = d->next) if (d == dir) { found = 1; break; }
     uwph_unlock(&proc_lock); return found;
 }
-uwph_DIR *uwph_opendir(const char *path)
+uwph_DIR *uwph_fake_opendir(const char *path)
 {
     if (!uwph_fake_proc_dir(path)) return UWPH_FAILP(UWPH_ENOENT);
     struct uwph_dir *d = calloc(1, sizeof(*d));
@@ -163,7 +164,7 @@ uwph_DIR *uwph_opendir(const char *path)
     uwph_lock(&proc_lock); d->next = directories; directories = d; uwph_unlock(&proc_lock);
     return d;
 }
-struct uwph_dirent *uwph_readdir(uwph_DIR *d)
+struct uwph_dirent *uwph_fake_readdir(uwph_DIR *d)
 {
     if (!uwph_fake_dir_owned(d)) return UWPH_FAILP(UWPH_EBADF);
     if (d->at >= d->count + 2) return NULL;
@@ -175,7 +176,7 @@ struct uwph_dirent *uwph_readdir(uwph_DIR *d)
     else snprintf(d->entry.d_name, sizeof(d->entry.d_name), "%d", d->ids[d->at - 2]);
     d->at++; return &d->entry;
 }
-int uwph_closedir(uwph_DIR *d)
+int uwph_fake_closedir(uwph_DIR *d)
 {
     uwph_lock(&proc_lock);
     struct uwph_dir **p = &directories;

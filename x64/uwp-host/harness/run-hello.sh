@@ -3,22 +3,26 @@
 set -euo pipefail
 cd "$(dirname "$(realpath "$0")")"
 root=$(realpath ../../../..)
+pe=${1:-$root/x64/pe/tests/hello.exe}
 work=$PWD/wx-hello
 mkdir -p "$work"
 exec 9>"$work/lock"
 flock -n 9
-if [[ ! -d $work/prefix ]]; then
-    cp -a --reflink=auto /workspace/megabonk/pfx-stock "$work/prefix"
-fi
-export WINEPREFIX=$work/prefix WINEDLLOVERRIDES=wineboot.exe=d WINEDEBUG=${WINEDEBUG:--all}
+source "$root/x64/uwp-host/harness/prefix-hygiene.sh"
+source_prefix=${UWPH_FIXTURE_PREFIX:-/workspace/megabonk/pfx-stock}
+refuse_dereferenced_prefix "$source_prefix"
+run=$(mktemp -d "$work/run-XXXXXXXX")
+cp -a --reflink=auto "$source_prefix" "$run/prefix"
+work=$run
+export WINEPREFIX=$run/prefix WINEDLLOVERRIDES=wineboot.exe=d WINEDEBUG=${WINEDEBUG:--all}
 /usr/lib/wine/wineserver64 -f -p >"$work/server.log" 2>&1 &
 server_pid=$!
-trap '/usr/lib/wine/wineserver64 -k >/dev/null 2>&1 || true; wait "$server_pid" || true' EXIT
 export WINESERVER=/bin/false WINE_LOADER=${WINE_LOADER:-$PWD/wine-wx/lib/wine/wine64}
 rm -f "$work"/counters*
 set +e
-timeout --kill-after=2s 15s env LD_PRELOAD="$PWD/libuwph_wine_shim.so" UWPH_REPORT="$work/counters" UWPH_REPORT_PID=1 ./run_via_wine "$root/x64/pe/tests/hello.exe"
+timeout --kill-after=2s 15s env LD_PRELOAD="$PWD/libuwph_wine_shim.so" UWPH_REPORT="$work/counters" UWPH_REPORT_PID=1 ./run_via_wine "$pe"
 rc=$?
+printf '%s\n' "$rc" > "$work/hello.exit"
 set -e
 for report in "$work"/counters*; do [[ ! -f $report ]] || cat "$report"; done
 # W^X evidence: protect transitions reached the uwph backend; RWX mmap/mprotect

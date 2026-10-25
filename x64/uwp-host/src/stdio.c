@@ -107,6 +107,7 @@ UWPH_API char *uwph_fgets(char *s, int n, uwph_FILE *f)
 
 UWPH_API uwph_ssize_t uwph___getdelim(char **line, size_t *n, int delim, uwph_FILE *f)
 {
+    uwph_trace_hit(UWPH_TRACE___GETDELIM);
     size_t i = 0;
     if (!*line || !*n) { *n = 128; if (!(*line = malloc(*n))) return UWPH_FAIL(UWPH_ENOMEM); }
     while (fill(f)) {
@@ -146,7 +147,12 @@ UWPH_API int uwph_puts(const char *s)
 UWPH_API int uwph_feof(uwph_FILE *f) { uwph_trace_hit(UWPH_TRACE_FEOF); return f->eof; }
 UWPH_API int uwph_fileno(uwph_FILE *f) { return f->fd; }
 UWPH_API int uwph_fflush(uwph_FILE *f) { (void)f; return 0; }   /* writes are unbuffered */
-UWPH_API void uwph_setbuf(uwph_FILE *f, char *buf) { (void)buf; f->unbuffered = 1; }
+UWPH_API void uwph_setbuf(uwph_FILE *f, char *buf)
+{
+    uwph_trace_hit(UWPH_TRACE_SETBUF);
+    (void)buf;
+    f->unbuffered = 1;
+}
 UWPH_API int uwph_setvbuf(uwph_FILE *f, char *buf, int mode, size_t size)
 { (void)buf; (void)mode; (void)size; f->unbuffered = 1; return 0; }
 

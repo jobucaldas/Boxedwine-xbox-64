@@ -202,6 +202,7 @@ UWPH_API int uwph_munmap(void *addr, size_t len)
 
 UWPH_API int uwph_mprotect(void *addr, size_t len, int prot)
 {
+    uwph_trace_hit(UWPH_TRACE_MPROTECT);
 #ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
     return uwph_linux_mprotect(addr, len, prot);
 #else
@@ -264,6 +265,7 @@ UWPH_API int uwph_munmap(void *addr, size_t len) {
 #endif
 }
 UWPH_API int uwph_mprotect(void *addr, size_t len, int prot) {
+    uwph_trace_hit(UWPH_TRACE_MPROTECT);
 #ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
     return uwph_linux_mprotect(addr, len, prot);
 #else
