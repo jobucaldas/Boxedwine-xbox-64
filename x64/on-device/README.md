@@ -49,6 +49,17 @@ These checks are build-only and do not validate an Appx schema or Xbox activatio
 this README and `/workspace/x64-run/ON-DEVICE-TOMORROW.md` exists in the built
 kit, and that every kit entry and rung is documented here. It's build-only.
 
+`package` stages files only and does not execute the ladder or print stage records. The packaged hosted
+`ladder` prints 26 STAGE lines (a–h, combo, p1–p6, n0–n8, n10, n11).
+The current loose payload includes `probe_native.exe`; this remains optional
+and is copied only when the R4N build output exists. The generated
+`kit-manifest.txt` records the actual optional probes available at kit-build time.
+
+The B60 deployment tools remain in the source checkout: `deploy-devportal.sh`,
+`linux/pack-linux.sh`, `linux/appx_check.py`, `linux/devportal.py` and
+`linux/build-makemsix.sh`. They are not entries in the extracted kit or payload.
+Run the Linux pack/sign/deploy commands below from the checkout.
+
 ## Pack, sign and deploy from Linux (B60: no Windows PC needed)
 
 Everything runs on this Linux box; João only gives network access to the
