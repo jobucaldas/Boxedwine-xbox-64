@@ -103,6 +103,10 @@ WINEDEBUG=-all WINEDLLOVERRIDES="mscoree,mshtml=" wineboot -i >/dev/null 2>&1
 wineserver -w
 [ -f "$PFX/system.reg" ] || { log "FATAL: wineboot failed"; exit 1; }
 log "prefix initialised"
+# B70 O2: Valve's HTTPS verifier fetches http:// CRLs; this box has no :80. Seed the CAs'
+# CRLs (fetched over HTTPS, signature-checked) and make plain-HTTP fetches fail fast.
+bash "$HERE/net/fix-prefix-tls.sh" --prefix "$PFX" --evidence "$EVID" > "$EVID/prefix-tls-fix.out" 2>&1 \
+    && log "prefix TLS/CRL fix applied" || log "WARN: prefix TLS/CRL fix partial (see prefix-tls-fix.log)"
 
 # --- 5. Steam's own login state, seeded from the SteamClient refresh token ----------------
 python3 "$HERE/seed-login.py" --prefix "$PFX" --helper "$OUT/bin/dpapi_protect.exe" | tee "$EVID/seed.log"
