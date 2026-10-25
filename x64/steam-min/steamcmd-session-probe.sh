@@ -50,7 +50,7 @@ umask 077
 mkdir -p "$EVID"
 EVID=$(cd "$EVID" && pwd)
 rm -rf "$EVID/steam-logs" "$EVID/uwph-reports"
-rm -f "$EVID"/{summary.txt,run.log,steamcmd.out,activeprocess1.txt,activeprocess2.txt,probe1.log,probe2.log,probe1-wine.log,probe2-wine.log,fetch.log,in}
+rm -f "$EVID"/{summary.txt,run.log,steamcmd.out,activeprocess1.txt,activeprocess2.txt,probe1.log,probe2.log,probe1-wine.log,probe2-wine.log,fetch.log,in,probe1.exec,probe2.exec,route-verification.txt,registry-pid.log,registry-dll.log}
 exec > >(tee "$EVID/run.log") 2>&1
 log() { echo "[steamcmd-probe $(date +%T)] $*"; }
 
@@ -70,7 +70,7 @@ run_probe() { # $1 = tag; stdout = probe output
     api_w=$(winepath -w "$API")
     if [ "$MODE" = uwph ]; then
         UWPH_GUEST_RW="$OUT" UWPH_REPORT="$OUT/b76-reports/$1.report" WINEDEBUG=+process \
-            timeout 90 "$HARNESS/run-wine.sh" --guest "$OUT/bin/steamapi_probe.exe" "$api_w" \
+            timeout 90 strace -f -e trace=execve -o "$EVID/$1.exec" "$HARNESS/run-wine.sh" --guest "$OUT/bin/steamapi_probe.exe" "$api_w" \
             2> "$EVID/$1-wine.log" | tr -d '\r'
     else
         WINEDEBUG=+process timeout 90 wine "$OUT/bin/steamapi_probe.exe" "$api_w" \
@@ -168,28 +168,39 @@ if [ "$LOGON" = 1 ]; then
         | sed -E 's/(ActiveUser\s+REG_DWORD\s+)0x[0-9a-f]+/\1<redacted>/I' > "$EVID/activeprocess1.txt"
     grep -q 'Unable to find' "$EVID/activeprocess1.txt" && AP1=absent || AP1=present
     log "stage 1: ActiveProcess $AP1"; cat "$EVID/activeprocess1.txt"
-    run_probe probe1 > "$EVID/probe1.log"; cat "$EVID/probe1.log"
+    RC1=0; run_probe probe1 > "$EVID/probe1.log" || RC1=$?; cat "$EVID/probe1.log"
     # --- stage 2: ActiveProcess pid + SteamClientDll64 -> steamcmd (config only) ----------
     WPID=$(wine tasklist 2>/dev/null | tr -d '\r' | awk 'tolower($1)=="steamcmd.exe"{print $2; exit}')
     SC=$(winepath -w "$STEAM/steamclient64.dll")
     [ -f "$STEAM/steamclient64.dll" ] || log "WARN: steamcmd tree has no steamclient64.dll"
     log "stage 2: steamcmd winpid=${WPID:-none}; SteamClientDll64=$SC"
-    if [ -n "$WPID" ]; then
-        wine reg add 'HKCU\Software\Valve\Steam\ActiveProcess' /v pid /t REG_DWORD /d "$WPID" /f >/dev/null 2>&1
-        wine reg add 'HKCU\Software\Valve\Steam\ActiveProcess' /v SteamClientDll64 /t REG_SZ /d "$SC" /f >/dev/null 2>&1
+    REG_OK=0 RC2=255
+    if [[ $WPID =~ ^[0-9]+$ ]] && [ "$WPID" -gt 0 ] && [ -f "$STEAM/steamclient64.dll" ]; then
+        wine reg add 'HKCU\Software\Valve\Steam\ActiveProcess' /v pid /t REG_DWORD /d "$WPID" /f >"$EVID/registry-pid.log" 2>&1 &&
+        wine reg add 'HKCU\Software\Valve\Steam\ActiveProcess' /v SteamClientDll64 /t REG_SZ /d "$SC" /f >"$EVID/registry-dll.log" 2>&1 && REG_OK=1
         wine reg query 'HKCU\Software\Valve\Steam\ActiveProcess' 2>&1 | tr -d '\r' \
             | sed -E 's/(ActiveUser\s+REG_DWORD\s+)0x[0-9a-f]+/\1<redacted>/I' > "$EVID/activeprocess2.txt"
         cat "$EVID/activeprocess2.txt"
-        run_probe probe2 > "$EVID/probe2.log"; cat "$EVID/probe2.log"
+        if [ "$REG_OK" = 1 ]; then
+            RC2=0; run_probe probe2 > "$EVID/probe2.log" || RC2=$?
+        fi
+        [ -f "$EVID/probe2.log" ] || printf 'stage 2 not run: registry configuration failed\n' > "$EVID/probe2.log"
+        cat "$EVID/probe2.log"
         STAGE2=$(stage_msg "$EVID/probe2.log")
     else
         STAGE2="not run: steamcmd.exe not in wine tasklist"
     fi
     STAGE1=$(stage_msg "$EVID/probe1.log")
-    if grep -q '^SteamAPI_Init=[01] msg=' "$EVID/probe1.log" &&
-       grep -q '^SteamAPI_Init=[01] msg=' "$EVID/probe2.log" &&
-       grep -q '^IsSteamRunning=[01]$' "$EVID/probe2.log" &&
-       [ -n "$WPID" ] && [ -f "$STEAM/steamclient64.dll" ]; then
+    ROUTE_OK=0
+    if python3 "$HERE/verify-steamcmd-route.py" "$EVID" "$OUT/b76-reports" "$HARNESS" > "$EVID/route-verification.txt" 2>&1; then
+        ROUTE_OK=1
+    fi
+    cat "$EVID/route-verification.txt"
+    # Init failure exits 1 by design; loader/setup failures must never count.
+    if [ "$RC1" = 1 ] && [ "$RC2" = 1 ] && [ "$REG_OK" = 1 ] && [ "$ROUTE_OK" = 1 ] &&
+       grep -qxF 'SteamAPI_Init=0 msg=Could not determine Steam client install directory.' "$EVID/probe1.log" &&
+       grep -qxF 'SteamAPI_Init=0 msg=Cannot create IPC pipe to Steam client process. Steam is probably not running.' "$EVID/probe2.log" &&
+       grep -qxF 'IsSteamRunning=1' "$EVID/probe2.log"; then
         PROBES_OK=1
     fi
     [ -n "$FFMPEG" ] && { wait "$FFMPEG" 2>/dev/null; FFMPEG=; }
@@ -209,7 +220,10 @@ done
 [ "$MODE" = uwph ] && cp -a "$OUT/b76-reports" "$EVID/uwph-reports"
 VER=$(sed -n 's/^manifest .* version \([0-9]*\)$/\1/p' "$EVID/fetch.log" | head -1)
 
-{   echo "route=$MODE"
+{   echo "route_requested=$MODE"
+    echo "route_verified=${ROUTE_OK:-0}"
+    echo "registry_stage2_ok=${REG_OK:-0}"
+    echo "probe1_exit=${RC1:-not-run} probe2_exit=${RC2:-not-run}"
     echo "steamcmd_route=stock-wine"
     echo "manifest=steam_cmd_win32 version=${VER:-?}"
     echo "logon=$LOGON"
