@@ -1044,3 +1044,40 @@ and separate RW/RX views pass. No verifier or jail changes, no RWX fallback.
 This is THROUGH launcher -> Wine's own loader -> uwph on Linux, not stock-Wine-only
 or on-device UWP proof; Xbox codeGeneration still requires device validation.
 Video: `/workspace/x64-run/videos/R4X-O3.mp4` (free Xvfb display, ffmpeg, 10 s).
+
+## R4X O4: W^X acceptance (2026-10-24)
+
+Exact test: `/workspace/xbox-readiness/bin/uwpjail --wx -- make -C x64/uwp-host/harness wine-test`.
+Exit **2**, preserved unchanged: stock control hello_k32/hello exit **13** under
+W^X; verifier reports `BLOCKED: control-hello_k32: nonzero exit`. Both routed
+hellos exit **0**, through our launcher → Wine's own loader/private patched
+ntdll.so → shim → public uwph Linux backend. This is a partial W^X result,
+not an overall wine-test PASS. Wineboot attempts remain in routed traces.
+
+routed-hello_k32: PASS exit=0; selected backend open=12,read=603,close=45,mmap=131,munmap=7,mprotect=84; bypass=0; wineboot attempt remains present
+routed-hello: PASS exit=0; selected backend open=13,read=643,close=61,mmap=183,munmap=7,mprotect=129; bypass=0; wineboot attempt remains present
+
+Evidence: `harness/out/wine-o4/run-rmVrdlV7/` (video run) and
+`run-wYt5ntrF/` (initial exact run). Main-process reports selected by launcher
+execve PID; all six selected families have backend entries, zero reported
+bypass and matching module calls/backend counts. This does not cover all Wine
+imports or direct syscalls. Verifier and jail were not changed.
+
+Megabonk attempt: owned `/workspace/steam-owned/games/megabonk/Megabonk.exe`,
+our launcher + same patched Wine loader + shim under `uwpjail --wx`, isolated
+copy of initialized fixture, wineboot disabled. 20-second timeout exits **124**.
+Player log reaches Unity 2023.2.22f1 engine, D3D11 device and input initialization.
+Trace loads native GameAssembly.dll, sets MONO_REFLECTION_SERIALIZER and
+MONO_XMLSERIALIZER_THS, and queries MONO_DISABLE_MANAGED_COLLATION. These markers
+are not proof that a Mono runtime initialized. No Steam replacement or DRM
+modification was used. Game main-process counters may be absent after timeout;
+do not treat child reports as game acceptance.
+
+Raw logs/scripts: `/workspace/x64-run/lanes/R4X/O4-*` and `record-O4.sh`.
+Free Xvfb display allocated using `-displayfd`; ffmpeg video:
+`/workspace/x64-run/videos/R4X-O4.mp4` (38 seconds, 1280x720).
+Readiness `/workspace/xbox-readiness/STATUS.md` W^X row updated to PARTIAL.
+Separate stock Linux wineserver remains; no on-device UWP/VirtualProtectFromApp
+or in-process-server proof. Stock controls are not uwph evidence; no build-only
+result is presented as runtime evidence. No verifier weakening, commits or remote
+operations.
