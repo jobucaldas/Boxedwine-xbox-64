@@ -2295,3 +2295,5 @@ Exact O2 command passed, exit 0; complete output:
 60/63/70 traced, Windows futex 500 passed, all zero failures).
 These remain Linux THROUGH-uwph client/probe proofs, with separate stock-Wine
 Windows smoke; no Xbox-device claim, Steam login, or client modification.
+
+B32 O2: run-isolated.sh uses a private user/PID namespace whose user runs as mapped uid 0 (host uid mapped by unshare -Urpf); this is namespace-local, not host root or Xbox privilege.
