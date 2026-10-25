@@ -1543,3 +1543,43 @@ Video /workspace/x64-run/videos/B10-O1.mp4 (30 seconds) shows the routed
 installer blocker, not a running Steam client. No commits or remotes touched.
 
 Literal last installer log line: `44367.703:0030:0034:trace:module:MODULE_InitDLL (00006FFFFFC20000,PROCESS_DETACH,0000000000000001) - RETURN 1`.
+
+## B12
+
+O1 reran the owned Megabonk executable with `UWPH_CONSTRAINTS=nofork,wx,noproc
+MEGABONK_TIMEOUT=45 x64/uwp-host/harness/run-megabonk.sh` on a free Xvfb
+allocated with `-displayfd`. Exact output: `MEGABONK reached=unityplayer`;
+game exit=1, harness exit=0 (the harness reports the reached stage). The
+45-second ceiling was not reached. `wine.log` confirms
+`uwpjail: seccomp wx=1 nofork=1 (34 insns)`; `uwp_run.sh`'s noproc path
+mounts an empty /proc. All three constraints remained enabled.
+
+B11's order allowed whichever constraints passed and requested the same
+`-force-d3d11 -screen-fullscreen 0` game route. Its worktree has no harness
+and its lane has no B11-O1.result or B11 video at inspection, so there is no
+verified B11 reached-stage baseline to claim an improvement against. B12
+adds the missing runnable harness with mandatory nofork+wx+noproc and records
+20 selected uwph surface-counter rows from this run. GameAssembly.dll loads
+alongside UnityPlayer.dll: this is IL2CPP, so no Mono JIT is needed.
+
+The first errors are blocked wineboot and explorer startup (`c0000017`);
+later RWX anonymous mappings fail with Permission denied (`unix_prot 0x7`).
+The final window diagnostic says the explorer process failed to start.
+Windows.System.DispatcherQueue is also unavailable. No Direct3D initialization,
+first frame, or menu was observed; these logs do not isolate one unique root
+cause. The two CreateProcessInternalW attempts are attempts, not successful
+child processes. No constraint was relaxed to proceed further.
+
+This is off-device THROUGH-uwph: uwp_run.sh -> our launcher -> Wine's own
+private W^X loader -> shim -> Linux uwph backend, with the harness's explicitly
+retained separate stock Linux wineserver outside the jail. It is not an
+in-process server acceptance or Xbox execution proof, nor stock-Wine-only or
+build-only evidence. One shim report records open=10431, read=13512,
+close=14295, mmap=8993, munmap=7982, mprotect=1526.
+
+Evidence: `/workspace/x64-run/lanes/B12/B12-O1.exact.log` and
+`/workspace/x64-run/lanes/B12/final-evidence/`; original run is
+`harness/out/megabonk/run-EN9wu9kh`. Video:
+`/workspace/x64-run/videos/B12-O1.mp4`, 11.7 seconds, showing the routed run's
+terminal output and failure (no game window). Shell syntax check passed.
+No commit or remote operation was performed.
