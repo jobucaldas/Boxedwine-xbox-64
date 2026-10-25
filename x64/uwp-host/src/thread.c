@@ -128,6 +128,11 @@ static volatile int key_used[128];
 
 UWPH_API int uwph_pthread_key_create(uwph_pthread_key_t *k, void (*dtor)(void *))
 {
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    UWPH_NATIVE(int, "pthread_key_create", (uwph_pthread_key_t *, void (*)(void *)));
+    UWPH_NATIVE_RETURN(fn(k, dtor));
+#endif
+
     for (int i = 0; i < 128; i++) {
         int expect = 0;
         if (__atomic_compare_exchange_n(&key_used[i], &expect, 1, 0, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)) {
@@ -139,9 +144,21 @@ UWPH_API int uwph_pthread_key_create(uwph_pthread_key_t *k, void (*dtor)(void *)
     return UWPH_EAGAIN;
 }
 UWPH_API void *uwph_pthread_getspecific(uwph_pthread_key_t k)
-{ return k < 128 ? uwph_thread_current()->keys[k] : NULL; }
+{
+    uwph_trace_hit(UWPH_TRACE_PTHREAD_GETSPECIFIC);
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    UWPH_NATIVE(void *, "pthread_getspecific", (uwph_pthread_key_t));
+    UWPH_NATIVE_RETURN(fn(k));
+#endif
+    return k < 128 ? uwph_thread_current()->keys[k] : NULL;
+}
 UWPH_API int uwph_pthread_setspecific(uwph_pthread_key_t k, const void *v)
 {
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    UWPH_NATIVE(int, "pthread_setspecific", (uwph_pthread_key_t, const void *));
+    UWPH_NATIVE_RETURN(fn(k, v));
+#endif
+
     if (k >= 128) return UWPH_EINVAL;
     uwph_thread_current()->keys[k] = (void *)v;
     return 0;
@@ -183,6 +200,7 @@ UWPH_API int uwph_pthread_mutex_init(uwph_pthread_mutex_t *m, const uwph_pthread
 }
 UWPH_API int uwph_pthread_mutex_lock(uwph_pthread_mutex_t *m)
 {
+    uwph_trace_hit(UWPH_TRACE_PTHREAD_MUTEX_LOCK);
     struct mutex_impl *mi = mutex_get(m);
     int me = uwph_gettid();
     if (m->type == UWPH_PTHREAD_MUTEX_RECURSIVE && mi->owner == me) { mi->count++; return 0; }
@@ -193,6 +211,7 @@ UWPH_API int uwph_pthread_mutex_lock(uwph_pthread_mutex_t *m)
 }
 UWPH_API int uwph_pthread_mutex_unlock(uwph_pthread_mutex_t *m)
 {
+    uwph_trace_hit(UWPH_TRACE_PTHREAD_MUTEX_UNLOCK);
     struct mutex_impl *mi = mutex_get(m);
     if (mi->owner != uwph_gettid()) return UWPH_EPERM;
     if (--mi->count) return 0;

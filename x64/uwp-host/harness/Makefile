@@ -16,9 +16,16 @@ backend-test: $(OUT)/backend_test
 	timeout 15s $(OUT)/backend_test
 .PHONY: backend-test
 
-$(OUT)/shim.map: Makefile
+# O2 traced set on the passthrough archive: real host calls, no shim/Wine.
+$(OUT)/traced: ../tests/traced.c $(OUT)/libuwph.a
+	$(CC) $(CFLAGS) $< $(OUT)/libuwph.a -ldl -o $@
+traced-test: $(OUT)/traced
+	timeout 15s $(OUT)/traced "$(abspath ../tests)"
+.PHONY: traced-test
+
+$(OUT)/shim.map: shim.map
 	@mkdir -p $(OUT)
-	printf '{ global: open; read; close; mmap; mprotect; munmap; _exit; uwph_shim_report; local: *; };\n' > $@
+	cp $< $@
 $(OUT)/libuwph_shim.so: shim.c counters.c counters.h $(OUT)/libuwph.a $(OUT)/shim.map
 	$(CC) $(CFLAGS) -shared shim.c counters.c $(OUT)/libuwph.a -ldl -Wl,--version-script=$(OUT)/shim.map -Wl,-z,defs -o $@
 $(OUT)/elf_probe: elf_probe.c
@@ -66,6 +73,17 @@ evidence-replay: $(OUT)/backend_test
 	./evidence-replay.sh
 .PHONY: evidence-replay
 
+# O3 provider assertions run with host /proc hidden (not stock Wine proof).
+$(OUT)/fake_proc_test: ../tests/fake_proc.c $(OUT)/libuwph.a
+	$(CC) $(CFLAGS) $< $(OUT)/libuwph.a -ldl -o $@
+noproc-test:
+	./run-noproc.sh
+.PHONY: noproc-test
+
+# O4 strict acceptance: wx is included by default when supported by uwpjail.
+acceptance-test:
+	./run-acceptance.sh
+.PHONY: acceptance-test
 # R4X O2: private W^X ntdll.so (RW map/relocate, then per-section RX/R/RW).
 $(OUT)/wine-wx/.stamp: prepare-wine-wx.sh wine-image-wx.patch
 	./prepare-wine-wx.sh

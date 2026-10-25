@@ -1,0 +1,1 @@
+{ global: readlink; open; read; close; mmap; mprotect; munmap; _exit; uwph_shim_report; snprintf; fopen; __isoc23_fscanf; fclose; pthread_getspecific; pthread_sigmask; feof; stat; write; pthread_mutex_lock; pthread_mutex_unlock; writev; getenv; asprintf; sigaddset; fcntl; setlocale; time; getuid; realpath; local: *; };

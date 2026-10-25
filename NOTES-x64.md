@@ -652,6 +652,121 @@ uwp-host build/surface check. No uwp-host runtime, launcher or stock Wine
 execution is exercised; UI routing evidence and Linux-box video are deferred
 to their respective later orders. See x64/ui/README.md for the exact checks.
 
+## R4S O1 trace
+
+`x64/uwp-host/harness/surface-trace.tsv` records the unsupported ntdll.so
+imports actually called by routed hello, hello_k32 and the existing owned
+`/workspace/steam-owned/games/megabonk/Megabonk.exe` invocation. Priority is
+aggregate observed entry count (descending, symbol name breaks ties), not an
+implementation commitment. Top 20: snprintf, fopen, __isoc23_fscanf, fclose,
+pthread_getspecific, pthread_sigmask, feof, stat, write, pthread_mutex_lock,
+pthread_mutex_unlock, writev, getenv, asprintf, sigaddset, fcntl, setlocale,
+time, getuid, realpath. No imports are implemented by O1.
+
+Reproduce on this Linux host with
+`/workspace/x64-run/lanes/R4S/evidence/run.sh`, then
+`python3 /workspace/x64-run/lanes/R4S/evidence/aggregate.py`.
+The retained trace.py, per-target JSON/logs, prefix copy and server log live in
+that evidence directory. The existing shim and our run_via_wine launcher are
+built by the harness; Wine identity/hash inventory is in
+`x64/uwp-host/harness/out/wine/identity.json`. GDB launches only our owned
+launcher and follows its exec into Wine's own loader. It arms breakpoints at
+all 159 unsupported PLT entries and both decoded syscall instructions, rebasing
+and rearming across Wine's startup reexec. The remaining unsupported function
+import, longjmp (GLOB_DAT rather than PLT), has a separate pending function
+breakpoint and is not hit. Counts include startup reexec; each
+breakpoint records an actual entry, not an LD_DEBUG binding or static reference.
+The TSV is the hit set, not a claim that unlisted imports are supported.
+
+Each target hits 64 unsupported import names before the same child gate.
+Both direct sites (ntdll-relative 0x3ad92, 0x3b05d) are armed and **not hit**;
+the libc `syscall` import is separately hit once per target. GDB catches
+fork/vfork/clone/clone3 syscall entry and kills the owned inferior at its first
+clone entry, before a child is created. The backtrace shows libc fork called
+from ntdll NtCreateUserProcess; Wine's process log names wineboot.exe --init.
+This is a trace up to the child gate, not guest completion or Megabonk gameplay.
+No Wine source, loader, gate, or syscall bytes are patched on disk.
+
+Routing proof before that gate: debugger reads of the existing shim's counters
+show ntdll caller wrapper/backend pairs open=3, read=108, close=6, mmap=44,
+munmap=1 for each target, with bypass={0,0,0,0,0}. Reads do not call functions
+in the inferior. These selected calls go THROUGH ntdll -> existing shim ->
+public uwph -> Linux passthrough backend. The 64 unsupported imports retain
+Linux dependencies; they are not THROUGH uwph. An explicit separate, unshimmed
+stock Linux wineserver services only a copied initialized fixture. This is
+Linux-host routing evidence, not in-process UWP or Xbox-device acceptance.
+No stock-Wine-only PE run is substituted for the routed trace. The wineboot
+child gate remains intact. Video: /workspace/x64-run/videos/R4S-O1.mp4.
+
+Exact test after routed hello trace:
+`test -s x64/uwp-host/harness/surface-trace.tsv && wc -l x64/uwp-host/harness/surface-trace.tsv`
+prints `67 x64/uwp-host/harness/surface-trace.tsv` (header, 64 hit imports,
+two explicitly unhit direct sites).
+
+## R4S O2 traced set
+
+The O1 top 20 (snprintf … realpath, see the O1 list above) are implemented
+behind public uwph entries with per-symbol counters (`uwph/trace.h`) on all
+backends and exported by the harness shim; surface.tsv routed 5 -> 25,
+unsupported 160 -> 140. Linux passthrough uses raw syscalls for
+stat/write/writev/fcntl/time and host libc via RTLD_NEXT for the native-ABI
+objects (FILE, pthread keys/mutexes, sigset, locale, env). Win32/UWP uses
+existing uwph objects plus CRT vsnprintf/setlocale; its fscanf is a bounded
+integer/string scanner. `tests/traced.c` (run three times by `make test`: stub,
+Win32 under wine64, passthrough) checks each symbol and its counter.
+
+THROUGH: routed hello and hello_k32 via run_via_wine -> Wine's own loader ->
+ntdll.so -> shim -> uwph complete with every traced counter nonzero (e.g.
+hello: fopen 223, __isoc23_fscanf 222, pthread_mutex_lock 1855, write 295).
+Counts are process-wide uwph entries. The wine-test gate is still BLOCKED by
+the pre-existing wineboot attempt (same in stock control). Linux-host evidence
+only; no Xbox/UWP device acceptance. Video: /workspace/x64-run/videos/R4S-O2.mp4.
+
+### R4S O2 reviewer fixes
+
+Win32 integer scanning now stores Linux x64 `l` conversions with explicit
+64-bit width, including `%ln`. The regression initializes all destination high
+bits and scans hex, signed, and unsigned values above the 32-bit range.
+Linux diagnostic FILE bridges now translate private descriptors: fdopen retains
+the slot, fopen registers one, fileno returns it, and fclose releases it without
+a second native close. Failed fdopen leaves the descriptor owned by its caller.
+Borrowed native standard streams are not adopted into private descriptor slots.
+Composition regressions cover fdopen/fileno, fopen/fileno/read, fclose invalidation,
+and slot reuse. Exact test passes (stub traced 60, Win32 traced 63, passthrough
+traced 70; smoke 55/566). Backend/shim checks pass. Fresh launcher runs retain all
+20 counters, while the unchanged wineboot gate still blocks both controls and
+routed runs. These are Linux harness and Win32-under-Wine results, not Xbox
+acceptance; process-wide counters prove entry/routing, not per-ntdll completion.
+
+## R4S O3 fake proc
+
+`make -C x64/uwp-host/harness noproc-test` tests the bounded in-process
+provider with host procfs hidden, then invokes the readiness wrapper's exact
+`--noproc INSTALL -- COMMAND` interface for hello through our launcher, Wine's
+own loader and the uwph shim. The wrapper now accepts `--noproc` and uses an
+empty tmpfs for `/proc` for either noproc spelling. Its updated copy is retained
+as `harness/uwp_run-noproc.sh`; set `UWPH_UWP_RUN` to use that copy. The installed
+`/workspace/xbox-readiness/tests/uwp_run.sh` was updated locally as well.
+
+Snapshots cover self/maps, self/cmdline, cpuinfo; self/exe uses process executable
+identity for readlink, realpath and open. No snapshot reads host `/proc`.
+Linux maps enumerate ELF load segments via dl_iterate_phdr (anonymous/PE ranges
+not yet included); cmdline contains only the executable with a trailing NUL;
+cpuinfo advertises the x64 baseline, not console topology. Linux snapshots use
+sealed memfds and the existing private/native fd adapters and native FILE ABI.
+Win32 snapshots use in-process read-only file objects and VirtualQuery for maps;
+this path is build-checked with WINAPI_FAMILY_APP, not console-tested. A separate
+prestarted stock wineserver remains a concession. This is a bounded hello PASS,
+not full Linux proc fidelity or full UWP acceptance. Video:
+`/workspace/x64-run/videos/R4S-O3.mp4`.
+
+O3 review fixes: provider handling is independent of negative errno, including
+unsupported host-existing `/proc/version` for both open and fopen. Linux captures
+an absolute AT_EXECFN identity at initialization, before chdir; the hidden-proc
+provider test launches relatively and checks readlink, realpath and ELF open after
+chdir("/"). The acceptance script deletes the previous report and requires a new
+process report with positive ntdll open/read/close/mmap/munmap routing, zero bypass,
+recursion, unattributed calls and module overflow before printing THROUGH PASS.
 ## R4X O1 RWX sites
 
 Source inventory only, Wine version 10.0 (`/tmp/wine-src/VERSION`). The initial
