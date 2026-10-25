@@ -409,3 +409,29 @@ and marker existence. ALLOWED requires exit 7 plus the fresh file; REFUSED
 records a platform error; INCOMPLETE records a timeout or inconsistent result.
 This rung is informational and never retries or uses another launch API.
 Unpackaged desktop runs report SKIP; they cannot establish Xbox permission.
+
+## Lifecycle log n13 (informational)
+
+João: during n13's **20 s observation window**, press **Home once**, then
+return to the app. Send the entire `LocalState/ladder-native.log` through Device
+Portal, with App/Game mode noted. The BEGIN/END lines identify the window;
+lifecycle handlers stay registered afterwards and the log stays open. A later
+launch replaces the log, so download it before relaunching.
+
+n13 registers ABI-level CoreApplication Suspending, Resuming and
+EnteredBackground handlers. Each event appends a UTC timestamp and monotonic
+`tick_ms` and flushes the log. Suspending takes a SuspendingDeferral, flushes its
+record, immediately calls Complete, and logs the HRESULT and elapsed milliseconds
+from obtaining the deferral. It does no artificial background work.
+
+While still in the foreground, n13 requests one ExtendedExecutionSession with
+Reason Unspecified and logs ExtendedExecutionResult Allowed/Denied or the
+original HRESULT. It pumps the dispatcher during the window, reports a pending
+request at the end, cancels it once if needed, and closes the session. Refusals
+are observations; there are no alternate APIs or retries. Extended execution
+is no guarantee of continued background operation, and missing lifecycle events
+are not a PASS or FAIL. This rung is informational. Off-device execution skips
+n13 and cannot prove Xbox suspension/resumption behavior.
+
+ABI references: [CoreApplication metadata](https://github.com/microsoft/windows-rs/blob/master/crates/libs/windows/src/Windows/ApplicationModel/Core/mod.rs)
+and [ExtendedExecution metadata](https://github.com/microsoft/windows-rs/blob/master/crates/libs/windows/src/Windows/ApplicationModel/ExtendedExecution/mod.rs).

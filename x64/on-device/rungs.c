@@ -195,7 +195,11 @@ static const GUID IID_IAgileObject_ =
 typedef struct ICoreApplication_ {
     struct {
         IInspectableVtblX base;
-        void *get_Id, *add_Suspending, *remove_Suspending, *add_Resuming, *remove_Resuming;
+        void *get_Id;
+        HRESULT (STDMETHODCALLTYPE *add_Suspending)(void *, void *, INT64 *);
+        void *remove_Suspending;
+        HRESULT (STDMETHODCALLTYPE *add_Resuming)(void *, void *, INT64 *);
+        void *remove_Resuming;
         void *get_Properties, *GetCurrentView;
         HRESULT (STDMETHODCALLTYPE *Run)(void *, void *view_source);
     } *lpVtbl;
@@ -915,6 +919,7 @@ static void rung_n12(void)
 }
 
 #include "input/probe.inc"
+#include "lifecycle.inc"
 
 static void run_all(IUnknown *window)
 {
@@ -932,6 +937,7 @@ static void run_all(IUnknown *window)
     rung_n10();
     rung_n11();
     rung_n12();
+    rung_n13();
     rung_n5(); /* last: the commit test may hit the app's memory limit */
     note("rungs done; run once as App and once as Game and keep both logs");
 }
@@ -1027,8 +1033,7 @@ static HRESULT STDMETHODCALLTYPE view_run(void *This)
     g_window->lpVtbl->get_Dispatcher(g_window, (void **)&g_dispatcher);
     pump();
     run_all((IUnknown *)g_window);
-    if (g_log) fclose(g_log);
-    g_log = NULL;
+    /* Keep the log open for lifecycle events after the observation window. */
     /* Keep the window (and the n3 colour) up until the user leaves the app. */
     if (g_dispatcher) g_dispatcher->lpVtbl->ProcessEvents(g_dispatcher, 2);
     return S_OK;
