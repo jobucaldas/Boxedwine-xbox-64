@@ -24,6 +24,8 @@ extern "C" {
 
 UWPH_API void *uwph_mmap(void *addr, size_t len, int prot, int flags, int fd, uwph_off_t off);
 UWPH_API int   uwph_munmap(void *addr, size_t len);
+/* Strict W^X transition: rejects WRITE|EXEC; FromApp only on Windows. */
+UWPH_API int   uwph_protect(void *addr, size_t len, int prot);
 UWPH_API int   uwph_mprotect(void *addr, size_t len, int prot);
 UWPH_API int   uwph_madvise(void *addr, size_t len, int advice);
 UWPH_API int   uwph_msync(void *addr, size_t len, int flags);

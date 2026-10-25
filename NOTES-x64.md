@@ -999,3 +999,28 @@ dlls/msvcp90/tests/misc.c:197:                                                 M
 dlls/msvcp90/tests/ios.c:609:                                                 MEM_COMMIT, PAGE_EXECUTE_READWRITE );
 dlls/msvcp90/tests/string.c:137:                                                 MEM_COMMIT, PAGE_EXECUTE_READWRITE );
 ```
+
+## R4X O2 uwph_protect + RW-then-RX PE map
+
+- API: `uwph_protect` (x64/uwp-host/include/uwph/mem.h, src/mem.c) refuses
+  WRITE|EXEC (EACCES); Linux harness = mprotect, Win32/UWP =
+  VirtualProtectFromApp only (needs `codeGeneration`), no RWX emulation.
+- Wine: x64/uwp-host/harness/wine-image-wx.patch on dlls/ntdll/unix/virtual.c
+  (sites from R4X O1: :2445 header mmap, :3019 image view, :2796 flat images,
+  :2951 per-section). Pages are mapped RW, filled + relocated, then set R/RW/RX
+  per section. view->protect keeps VPROT_EXEC as the allowed maximum (without
+  it set_protection rejects later PAGE_EXECUTE_READ on image pages). Flat images
+  and W+X sections fail with STATUS_NOT_SUPPORTED (no RWX fallback).
+- Build: harness/prepare-wine-wx.sh rebuilds only ntdll.so. It must match the
+  Debian package: install-paths/tmpdir/virtual.c patches, and make_requests
+  regenerates SERVER_PROTOCOL_VERSION as 1 (upstream 855 -> "version mismatch 1/855").
+- Result: hello.exe passes under `uwpjail --wx` THROUGH our launcher -> patched
+  Wine loader -> shim -> uwph: 129 uwph_protect backend calls in the main process
+  (131 total), 0 refused RWX mmaps, strace shows no PROT_WRITE|PROT_EXEC
+  syscall. Stock Debian ntdll under the same jail exits 13.
+- Still RWX elsewhere (not hit by hello): virtual_create_builtin_view
+  (:3539/:3552, ELF-embedded builtins) and PE code that asks for
+  PAGE_EXECUTE_READWRITE. Both now get EACCES from uwph_protect/--wx instead of
+  RWX pages; an ad-hoc PE check showed VirtualProtect(PAGE_EXECUTE_READWRITE)
+  failing with error 5 while RX->RW->RX on an image section worked.
+

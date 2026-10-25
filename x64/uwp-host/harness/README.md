@@ -336,3 +336,44 @@ stock Wine is separate evidence. Linux libc, raw/inline syscalls, Linux TLS and
 signals, initialized-prefix setup and separate unrouted wineserver remain
 stand-in dependencies; there is no full UWP or Xbox acceptance claim. No
 DONE-R4H is written because the required no-wineboot gate remains unresolved.
+
+## R4X O2: uwph_protect and W^X PE image mapping
+
+`uwph_protect(addr, len, prot)` (include/uwph/mem.h) is the strict W^X
+transition: it refuses WRITE|EXEC with EACCES and has no RWX tracking or
+fallback. Linux passthrough = mprotect; Win32/UWP = VirtualProtectFromApp
+only (ENOSYS if it cannot be resolved; executable protection needs the
+`codeGeneration` capability in a real package). The legacy `uwph_mprotect`
+RWX emulation is unchanged for other callers.
+
+The harness shim now also exports `mprotect` (routed to uwph_protect; counted
+as `mprotect`), and its `mmap` refuses WRITE|EXEC before any backend entry, so
+a refused RWX request shows as a wrapper call without a backend entry.
+
+`prepare-wine-wx.sh` builds a private `out/wine-wx/` tree: upstream Wine 10.0
+(`/tmp/wine-src`) + the Debian 10.0~repack-6 Unix-ntdll patches (install paths,
+server tmpdir, two virtual.c fixes, regenerated protocol version 1) +
+`wine-image-wx.patch`. Only ntdll.so is rebuilt; wine64 is copied and every
+other file is a symlink to the installed Debian Wine. The patch keeps Wine's own
+loader algorithm and changes only the protection order: image pages are mapped
+RW (copy-on-write), sections are read and relocated, then each section gets its
+final R/RW/RX via mprotect. The view keeps EXEC as its allowed maximum
+(AllocationProtect PAGE_EXECUTE_WRITECOPY; later NtProtectVirtualMemory to
+PAGE_EXECUTE_READ works). Flat (non page-aligned) images and writable+executable
+sections are refused with STATUS_NOT_SUPPORTED; there is no RWX fallback.
+
+Exact test, from the repository root:
+`make -C x64/uwp-host && /workspace/xbox-readiness/bin/uwpjail --wx -- x64/uwp-host/harness/out/run_hello`.
+`run_hello` runs hello.exe through our launcher -> W^X Wine loader/ntdll.so ->
+shim -> uwph Linux backend. It exits 3 when hello passes but no protect call
+reached the backend or an RWX mmap was refused. `WINE_LOADER=/usr/lib/wine/wine64`
+selects the stock Debian ntdll as a control; under `--wx` that exits 13.
+`make -C x64/uwp-host/harness protect-test` checks the API alone under --wx.
+
+| R4X O2 evidence | Routing and limit |
+| --- | --- |
+| run_hello under uwpjail --wx | THROUGH our launcher -> Wine's own loader (patched private ntdll.so) -> shim -> uwph; Linux seccomp W^X, not UWP/Xbox |
+| Stock-ntdll control | Our launcher + stock Debian Wine, same shim; fails under --wx |
+| protect-test | uwph API only, no PE |
+| Windows uwph_protect | Build-only (mingw APP headers); no VirtualProtectFromApp run |
+| Separate wineserver | Stock Linux wineserver64 (unshimmed), as in R4H O4 |

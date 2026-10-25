@@ -16,7 +16,7 @@ def verify(run):
         assert hashlib.sha256(pathlib.Path(item['path']).read_bytes()).hexdigest() == item['sha256'], 'artifact changed'
     ntdll = pathlib.Path(identity['artifacts']['unix_ntdll']['path']).resolve()
     shim = (pathlib.Path(__file__).resolve().parent / 'out/libuwph_wine_shim.so').resolve()
-    selected = ('open', 'read', 'close', 'mmap', 'munmap')
+    selected = ('open', 'read', 'close', 'mmap', 'munmap', 'mprotect')
     blockers = []
     for mode in ('control', 'routed'):
         for pe in ('hello_k32', 'hello'):
@@ -70,7 +70,7 @@ def verify(run):
                 assert totals[op][1] == 0, f'unexpected {op} bypass'
                 values = modules.get((str(ntdll), op), (0, 0))
                 assert values[0] == values[1], f'{op}: wrapper/backend mismatch'
-                # Require all five selected families to execute in real ntdll.
+                # Require all six selected families to execute in real ntdll.
                 assert values[1] > 0, f'zero ntdll {op} backend entries'
                 assert totals[op][0] == sum(v[1] for (_, operation), v in modules.items() if operation == op)
                 assert all(c == b for (module, operation), (c, b) in modules.items() if operation == op)

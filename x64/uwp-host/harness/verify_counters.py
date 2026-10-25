@@ -5,6 +5,7 @@ import sys
 
 expected = {"open": 202, "read": 200, "close": 201, "mmap": 401, "munmap": 401}
 bypasses = {"open": 0, "read": 2, "close": 2, "mmap": 0, "munmap": 0}
+idle = {"mprotect": (0, 0)}  # routed, but the probe never changes protection
 assert not pathlib.Path(sys.argv[1]).exists(), "unshimmed control created a report"
 for filename in sys.argv[2:]:
     totals, modules, classes = {}, {}, {}
@@ -29,7 +30,7 @@ for filename in sys.argv[2:]:
         else:
             raise AssertionError(line)
     assert pid and pid > 0
-    assert totals == {op: (n, bypasses[op]) for op, n in expected.items()}, totals
+    assert totals == {**{op: (n, bypasses[op]) for op, n in expected.items()}, **idle}, totals
     assert classes == dict(recursion="0", unattributed="0", module_overflow="0",
                            instrumentation_raw_io="1"), classes
     for op, n in expected.items():

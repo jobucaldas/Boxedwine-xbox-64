@@ -16,9 +16,9 @@ backend-test: $(OUT)/backend_test
 	timeout 15s $(OUT)/backend_test
 .PHONY: backend-test
 
-$(OUT)/shim.map:
+$(OUT)/shim.map: Makefile
 	@mkdir -p $(OUT)
-	printf '{ global: open; read; close; mmap; munmap; _exit; uwph_shim_report; local: *; };\n' > $@
+	printf '{ global: open; read; close; mmap; mprotect; munmap; _exit; uwph_shim_report; local: *; };\n' > $@
 $(OUT)/libuwph_shim.so: shim.c counters.c counters.h $(OUT)/libuwph.a $(OUT)/shim.map
 	$(CC) $(CFLAGS) -shared shim.c counters.c $(OUT)/libuwph.a -ldl -Wl,--version-script=$(OUT)/shim.map -Wl,-z,defs -o $@
 $(OUT)/elf_probe: elf_probe.c
@@ -33,7 +33,7 @@ shim-test: $(OUT)/libuwph_shim.so $(OUT)/elf_probe
 .PHONY: shim-test
 
 # Host-only inventory and relocation diagnostic; no Wine execution proof.
-wine-surface-check: out/libuwph_shim.so
+wine-surface-check: out/libuwph_shim.so out/run_hello
 	./prepare-wine.sh
 	./check_surface.sh
 .PHONY: wine-surface-check
@@ -65,3 +65,16 @@ windows-file-test:
 evidence-replay: $(OUT)/backend_test
 	./evidence-replay.sh
 .PHONY: evidence-replay
+
+# R4X O2: private W^X ntdll.so (RW map/relocate, then per-section RX/R/RW).
+$(OUT)/wine-wx/.stamp: prepare-wine-wx.sh wine-image-wx.patch
+	./prepare-wine-wx.sh
+$(OUT)/run_hello: run-hello.sh $(OUT)/libuwph_wine_shim.so $(OUT)/run_via_wine $(OUT)/wine-wx/.stamp
+	cp $< $@
+	chmod +x $@
+
+$(OUT)/protect_test: protect_test.c $(OUT)/libuwph.a
+	$(CC) $(CFLAGS) $< $(OUT)/libuwph.a -o $@
+protect-test: $(OUT)/protect_test
+	/workspace/xbox-readiness/bin/uwpjail --wx -- $<
+.PHONY: protect-test
