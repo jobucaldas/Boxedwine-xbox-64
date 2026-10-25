@@ -3198,6 +3198,37 @@ nor stock Wine was executed. No runtime/console compatibility claim. Evidence:
 `/workspace/x64-run/lanes/B80/o1.txt`, `network-failure.txt`; seven-second Xvfb
 terminal recording `/workspace/x64-run/videos/B80-O1.mp4`. No prefix created.
 
+## B77 O1
+
+B70 marker `fix-prefix-tls` was present. No code changes. Route: stock Wine; this is neither THROUGH-uwph nor console proof. Logged on: **no**, `logon=0 after 360s`. Exact gate failed (`run_rc=1`, `exact_gate_rc=1`); the gate stopped at its first logon check. Independently checked: webhelper_count=0 (363 samples, one spawn attempt of the absent helper), CRL total present, and the prescribed token scan passed with no matches. Initial disk free: 14 GB; prefix reached 1.7 GB and was deleted after evidence collection.
+
+`connection_log.txt` has no GetCMListForConnect (therefore no OK), no Connect(), no RecvMsgClientLogOnResponse, and no [Logged On]. No EResult or CM transport was reported: **no CM connect was attempted**. Connectivity test repeatedly reports `TimedOut` for 198.18.0.1:80; port 80 is blackholed on this box, so that result is a box artefact. IPv6 HTTP timed out and IPv6 UDP reported no addresses resolved. This run does not establish why the client never initiated CM logon.
+
+`steamui_html.txt` still says `Timed out waiting for webhelper init` (22:32:36); logon did not happen anyway. `prefix-tls-fix.log`: `crl_seed_total=23 ok=23` (23 seeds with cache_hit=1); two intermediate CRL URLs reported HTTPS fetch failure. SteamAPI_Init/BIsSubscribedApp probe and game were skipped because logon failed; they are informational and outside this gate.
+
+Last 60 seconds of connection_log (22:37:47–22:38:47, using its final timestamp):
+
+```text
+[2026-10-25 22:37:59] Connectivity test: Starting test, fetching 'http://steamconnecttest.com/204'
+[2026-10-25 22:38:14] Connectivity test (198.18.0.1:80 (198.18.0.1:80)): HTTP fetch failed
+[2026-10-25 22:38:14] Connectivity test: result=TimedOut (since 312.3s ago), prev=Unknown, in progress=0
+[2026-10-25 22:38:33] Connectivity test: Starting test, fetching 'http://steamconnecttest.com/204'
+[2026-10-25 22:38:47] [Logged Off, 0, 0] [U:1:0] ResetVoiceRecording() (was recording: 0) (last get voice time: 1792964327 seconds ago)
+[2026-10-25 22:38:47] [Logged Off, 0, 0] [U:1:0] Log session ended
+```
+
+Evidence: `/workspace/x64-run/lanes/B77/o1`. Video: `/workspace/x64-run/videos/B77-O1.mp4`, free Xvfb :170 + ffmpeg, 8.000 seconds. Test output ended:
+
+```text
+[run-minimal 18:38:38] logon=0 after 360s
+[run-minimal 18:38:38] BLOCKED: Valve client did not reach logged-on state; no alternate credential path attempted
+[run-minimal 18:38:52] webhelper samples=363 running_max=0 spawn_attempts=1 count=0
+run_rc=1
+exact_gate_rc=1
+token_scan=PASS
+```
+
+The script also emitted missing-file grep diagnostics for probe-wine.log and game-wine.log, since both stages were skipped. No follow-up orders started; no commit or remote operations performed.
 ## B47 (B13 retry)
 
 O1 BLOCKED: preflight `df -BG /` reports only 14G available (128G total,
