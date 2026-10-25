@@ -728,3 +728,38 @@ Artifacts: `/workspace/x64-run/videos/R4G-O3.mp4` (6 seconds) and
 labeled SAVED RESULTS FROM LIVE LAUNCHER TEST, displaying real retained output,
 not a rendered clear or fake game screenshot. Original executions used :99.
 No console access, commits, pushes or remote operations. O3 only.
+
+## R4G O4
+
+On-device D3D12 probe exe for R4D packaging (2026-10-24). Added
+`x64/graphics/probe_d3d12.c`, Makefile rule `out/probe_d3d12.exe` and
+`tests/run-probe.sh`; README "O4" section carries the R4D packaging snippet
+(args, log locations, RESULT line format, exit codes).
+
+Exact test: `x86_64-w64-mingw32-gcc -O2 -std=c11 -Wall -Wextra -Werror
+-municode -static-libgcc -s x64/graphics/probe_d3d12.c -o
+x64/graphics/out/probe_d3d12.exe -ldxguid` exit 0; file is `PE32+ executable
+(console) x86-64`, 82432 bytes, imports KERNEL32/msvcrt/USER32 only, sha256
+eaee3624...7219. Log: `x64/graphics/evidence/R4G-O4/exact-test.log`.
+
+Linux smoke of that same binary (hash in artifacts.sha256):
+`DISPLAY=:104 x64/graphics/tests/run-probe.sh --frames 3600` exit 0, THROUGH
+run_via_wine -> Wine's own PE loader with selected uwph routing (positive
+counters in PID reports) and a separate stock wineserver on the O2 prefix.
+Output: `offscreen: 64x64 RGBA8 clear expect=0xffff00ff pixels=4096
+mismatches=0`, `present: PASS (3600 frames, 640x360 flip-discard HWND
+swapchain)`, `RESULT: PASS adapter="NVIDIA GeForce GTX 470" feature_level=11_1`.
+That adapter is Wine's reported identity; backend is Wine builtin d3d12
+(vkd3d) over lavapipe. **lavapipe ≠ Xbox D3D12**: nothing here proves the
+probe runs, creates a device, or presents on Xbox. HWND presentation is
+expected to SKIP under UWP; CoreWindow presentation is not implemented.
+
+Video: `/workspace/x64-run/videos/R4G-O4.mp4` (6.6 s, Xvfb :104) shows the
+live probe window clearing green -> blue during the run above.
+
+O4 resume verification (2026-10-24): independently reran the exact MinGW
+command above, exit 0; PE32+ x86-64 output exists (82432 bytes). Fresh output
+and hash: `x64/graphics/evidence/R4G-O4/exact-test-resume.log`. This is
+build-only; earlier smoke/video and their hashes remain historical evidence,
+not a runtime test of this fresh rebuild. Recreated lane result/commitmsg;
+no commit or remote operations.

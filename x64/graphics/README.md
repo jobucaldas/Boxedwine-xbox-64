@@ -42,3 +42,42 @@ are in evidence/R4G-O3. Both normal and loader-diagnostic runs exit 0, 4096 pixe
 and zero mismatches. This clears no window and creates no swapchain. The Linux
 backend is lavapipe, regardless of Wine's reported NVIDIA adapter identity;
 lavapipe ≠ Xbox D3D12. See NOTES-x64.md for proof limits and artifact paths.
+
+## O4 on-device D3D12 probe (for R4D packaging)
+
+Build: `make -C x64/graphics out/probe_d3d12.exe` (MinGW only, no Xbox needed).
+Output `x64/graphics/out/probe_d3d12.exe`: PE32+ x86-64 console exe, imports
+only KERNEL32/USER32/msvcrt; d3d12.dll and dxgi.dll are loaded at runtime, so a
+missing runtime is logged as FAIL rather than a loader error. No extra DLLs.
+
+What it does: enumerates DXGI adapters (name, vendor/device id, memory,
+software flag), creates a D3D12 device at FL 11_0 on the first hardware
+adapter (fallback: default adapter), logs the max feature level, clears a
+64x64 RGBA8 render target to magenta, copies it to a readback buffer and
+checks all 4096 pixels. Then, unless `--no-window`, it tries a Win32 window
+plus flip-discard HWND swapchain and presents `--frames N` (default 120)
+green-to-blue clears. Under UWP there is normally no HWND: that step logs
+`present: SKIP` and does not fail the probe. CoreWindow presentation is not
+implemented here.
+
+R4D snippet:
+
+```
+Copy x64/graphics/out/probe_d3d12.exe into the package payload.
+Args:  probe_d3d12.exe [--log <path>] [--no-window] [--frames N]
+Log:   first writable of --log, %PROBE_D3D12_LOG%, <exe dir>\probe_d3d12.log,
+       %LOCALAPPDATA%\probe_d3d12.log, %TEMP%\probe_d3d12.log. The package
+       install dir is read-only, so pass --log <LocalState>\probe_d3d12.log or
+       read it from the app's TEMP/LocalAppData. Also mirrored to stdout and
+       OutputDebugString.
+Read:  last line `RESULT: PASS|FAIL adapter="..." feature_level=.. offscreen=..
+       present=PASS|FAIL|SKIP`.
+Exit:  0 PASS; 1 FAIL after device creation; 2 FAIL no device/runtime.
+Needs: D3D12 FL 11_0 available to the packaged app (assumed for a Dev Mode
+       game-type app; unverified on device). No extra capabilities.
+```
+
+Linux smoke: `DISPLAY=:99 x64/graphics/tests/run-probe.sh [--frames N]` runs it
+via run_via_wine + selected uwph routing + Wine's own PE loader, with Wine's
+builtin d3d12/dxgi (vkd3d) on lavapipe. Evidence in evidence/R4G-O4. This is
+not Xbox evidence: Wine reports a fake NVIDIA adapter; lavapipe ≠ Xbox D3D12.

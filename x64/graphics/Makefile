@@ -13,3 +13,8 @@ out/test_dcomp.exe: tests/test_dcomp.cpp | out
 all: out/vulkan_clear.exe
 out/vulkan_clear.exe: vulkan_clear.c | out
 	x86_64-w64-mingw32-gcc -O2 -std=c11 -Wall -Wextra -Werror -I../../source/vulkan/vk $< -o $@
+
+# O4: standalone on-device D3D12 probe (Windows target; d3d12/dxgi loaded at runtime).
+all: out/probe_d3d12.exe
+out/probe_d3d12.exe: probe_d3d12.c | out
+	x86_64-w64-mingw32-gcc -O2 -std=c11 -Wall -Wextra -Werror -municode -static-libgcc -s $< -o $@ -ldxguid
