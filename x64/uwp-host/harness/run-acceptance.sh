@@ -16,11 +16,20 @@ export WINE_LOADER=/usr/lib/wine/wine64
 export WINESERVER=/bin/false
 wrapper=${UWPH_UWP_RUN:-/workspace/xbox-readiness/tests/uwp_run.sh}
 constraints=${UWPH_CONSTRAINTS:-nofork,noproc,wx}
+# Apply the opt-in policy inside the wrapper's namespace, before the launcher.
+# Empty preserves the existing acceptance networking behavior.
+net_jail=()
+case ${UWPJAIL_NET:-} in
+    '') ;;
+    xbox) net_jail=(/workspace/xbox-readiness/bin/uwpjail --net-xbox --) ;;
+    *) echo "unsupported UWPJAIL_NET: $UWPJAIL_NET" >&2; exit 2 ;;
+esac
+echo "acceptance networking=${UWPJAIL_NET:-legacy}"
 for pe in hello_k32 hello; do
     stem=$PWD/out/accept-$pe
     rm -f "$stem.report" "$stem.log"
     rc=0
-    timeout --kill-after=2s 20s "$wrapper" "$constraints" "$root" -- env \
+    timeout --kill-after=2s 20s "$wrapper" "$constraints" "$root" -- "${net_jail[@]}" env \
         LD_PRELOAD="$PWD/out/libuwph_wine_shim.so" UWPH_REPORT="$stem.report" \
         LD_DEBUG=bindings "$PWD/out/run_via_wine" "$root/x64/pe/tests/$pe.exe" \
         > "$stem.log" 2>&1 || rc=$?
