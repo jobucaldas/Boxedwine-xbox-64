@@ -161,7 +161,7 @@ void *uwph_linux_mmap(void *addr, size_t len, int prot, int flags, int fd, uwph_
     UNLOCK(); return (void *)result(r);
 }
 int uwph_linux_munmap(void *addr, size_t len) { COUNT(C_MUNMAP); return result(raw(SYS_munmap,PTR(addr),len,0,0,0,0)); }
-int uwph_linux_mprotect(void *addr, size_t len, int prot) { return result(raw(SYS_mprotect,PTR(addr),len,prot,0,0,0)); }
+int uwph_linux_mprotect(void *addr, size_t len, int prot) { COUNT(C_PROTECT); return result(raw(SYS_mprotect,PTR(addr),len,prot,0,0,0)); }
 int uwph_linux_clock_gettime(uwph_clockid_t id, struct uwph_timespec *ts) { return result(raw(SYS_clock_gettime,id,PTR(ts),0,0,0,0)); }
 int uwph_linux_clock_getres(uwph_clockid_t id, struct uwph_timespec *ts) { return result(raw(SYS_clock_getres,id,PTR(ts),0,0,0,0)); }
 int uwph_linux_nanosleep(const struct uwph_timespec *req, struct uwph_timespec *rem) { return result(raw(SYS_nanosleep,PTR(req),PTR(rem),0,0,0,0)); }

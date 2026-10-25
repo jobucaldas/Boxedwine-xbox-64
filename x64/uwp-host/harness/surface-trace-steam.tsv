@@ -1,0 +1,6 @@
+phase	kind	symbol_or_surface	count	evidence
+installer	disabled-helper	wineboot.exe	1	44365.391:0020:0024:err:environ:run_wineboot failed to start wineboot c0000135
+installer	architecture-limit	wow64	1	44367.695:0038:003c:err:environ:init_peb starting L"Z:\\workspace\\steam-owned\\SteamSetup.exe" in experimental wow64 mode
+installer	missing-module	C:\windows\syswow64\ntdll.dll	1	wine: failed to load L"\\??\\C:\\windows\\syswow64\\ntdll.dll" error c0000135
+installer	startup-failure	ShellExecuteEx	1	ShellExecuteEx failed: 44367.701:0020:0024:err:start:fatal_error flags 0x1, load_path 0000000000000000, dll_characteristics 0000000000000000, name 00007FFFFE2FE870, base 00007FFFFE2FE868.
+steam	not-run	steam.exe -silent -no-browser	0	No installed executable; 180-second client trace unavailable

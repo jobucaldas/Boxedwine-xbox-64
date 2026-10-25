@@ -99,7 +99,7 @@ mkdtemp	unsupported	no exported O2 shim wrapper; retained Linux dependency; bloc
 mktime	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 mlock	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 mmap	routed	O2 selected wrapper; relocation diagnostic only; native-fd bypasses for read/close/file mmap; no full operation compatibility claim
-mprotect	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
+mprotect	routed	strict uwph_protect transition; rejects WRITE|EXEC; Linux harness backend
 msync	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 munlock	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 munmap	routed	O2 selected wrapper; relocation diagnostic only; native-fd bypasses for read/close/file mmap; no full operation compatibility claim

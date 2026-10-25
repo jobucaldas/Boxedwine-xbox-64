@@ -8,7 +8,9 @@ shift
 (($#)) || exit 2
 for tool in Xvfb xterm ffmpeg ffprobe xdpyinfo setsid; do command -v "$tool" >/dev/null || { echo "missing capture tool: $tool" >&2; exit 127; }; done
 base=/workspace/x64-run
-mkdir -p "$base/videos" "$base/v2/R4H"
+lane=${UWPH_RECORD_LANE:-R4H}
+[[ $lane =~ ^R[0-9A-Z]+$ ]] || exit 2
+mkdir -p "$base/videos" "$base/v2/$lane"
 work=$(mktemp -d)
 xpid= tpid= fpid=
 cleanup() {
@@ -31,7 +33,7 @@ work=$1
 log=$2
 shift 2
 exec > >(tee "$log") 2>&1
-printf 'R4H terminal proof on Linux box (not Xbox device)\n'
+printf '%s terminal proof on Linux box (not Xbox device)\n' "$UWPH_RECORD_LANE"
 if [[ -n ${UWPH_RECORD_LABEL:-} ]]; then printf 'Recording label: %s\n' "$UWPH_RECORD_LABEL"; fi
 printf 'Command:'
 printf ' %q' "$@"
@@ -51,11 +53,11 @@ mv "$work/status.tmp" "$work/status"
 sleep 8
 RUN
 chmod +x "$work/run"
-video=$base/videos/R4H-$order.mp4
-ffmpeg -hide_banner -loglevel warning -y -f x11grab -framerate 15 -video_size 1280x720 -i "$DISPLAY" -t 58 -c:v libx264 -preset ultrafast -pix_fmt yuv420p "$video" >"$base/v2/R4H/$order-ffmpeg.log" 2>&1 &
+video=$base/videos/$lane-$order.mp4
+ffmpeg -hide_banner -loglevel warning -y -f x11grab -framerate 15 -video_size 1280x720 -i "$DISPLAY" -t 58 -c:v libx264 -preset ultrafast -pix_fmt yuv420p "$video" >"$base/v2/$lane/$order-ffmpeg.log" 2>&1 &
 fpid=$!
 sleep .5
-xterm -geometry 126x34+0+0 -fa Monospace -fs 12 -bg black -fg white -e "$work/run" "$work" "$base/v2/R4H/$order-record.log" "$@" &
+UWPH_RECORD_LANE=$lane xterm -geometry 126x34+0+0 -fa Monospace -fs 12 -bg black -fg white -e "$work/run" "$work" "$base/v2/$lane/$order-record.log" "$@" &
 tpid=$!
 for ((i=0;i<550;i++)); do [[ -f $work/status ]] && break; sleep .1; done
 if [[ -f $work/status ]]; then rc=$(cat "$work/status"); else rc=124; fi
@@ -66,7 +68,7 @@ wait "$fpid" || encoder_rc=$?
 # ffmpeg returns 255 after the requested SIGINT, after finalizing the MP4.
 if ((encoder_rc != 0 && encoder_rc != 255)); then exit "$encoder_rc"; fi
 fpid=
-printf '%d\n' "$rc" > "$base/v2/R4H/$order-record.exit"
+printf '%d\n' "$rc" > "$base/v2/$lane/$order-record.exit"
 ffprobe -v error -select_streams v:0 -show_entries stream=codec_name -show_entries format=duration -of default=noprint_wrappers=1 "$video"
 echo "recorded command exit status: $rc"
 exit "$rc"

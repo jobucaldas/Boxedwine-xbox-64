@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Owned Linux-box harness only; no Wine source/loader modification.
+# Owned Linux-box harness only. Controls use stock Debian Wine; routed runs use
+# the private W^X ntdll.so from prepare-wine-wx.sh (R4X O2), because the shim
+# refuses WRITE|EXEC and stock ntdll maps PE images RWX.
 set -euo pipefail
 cd "$(dirname "$0")"
 root=$(realpath ../../..)
@@ -14,6 +16,8 @@ identity=json.loads(pathlib.Path('out/wine/identity.json').read_text())
 for item in identity['artifacts'].values():
     assert hashlib.sha256(pathlib.Path(item['path']).read_bytes()).hexdigest()==item['sha256'], 'Wine identity changed; run prepare-wine.sh'
 PY
+[[ -f out/wine-wx/.stamp ]] || ./prepare-wine-wx.sh
+wx=$PWD/out/wine-wx
 # Never use ~/.wine. Only copy an already initialized, explicit fixture.
 source_prefix=${UWPH_FIXTURE_PREFIX:-/workspace/megabonk/pfx-stock}
 if [[ ! -d $work/prefix ]]; then
@@ -32,6 +36,18 @@ fi
 export WINEPREFIX=$work/prefix
 run=$(mktemp -d "$work/run-XXXXXXXX")
 cp out/wine/identity.json "$run/identity.json"
+# Routed identity: same PE dlls (symlinks), private W^X loader copy + ntdll.so.
+python3 - "$run/identity-wx.json" "$wx" <<'PY'
+import hashlib,json,pathlib,sys
+tree=pathlib.Path(sys.argv[2])
+paths=dict(loader=tree/'lib/wine/wine64', pe_ntdll=tree/'lib/x86_64-linux-gnu/wine/x86_64-windows/ntdll.dll',
+           unix_ntdll=tree/'lib/x86_64-linux-gnu/wine/x86_64-unix/ntdll.so')
+def identity(p):
+    return dict(path=str(p.resolve()),sha256=hashlib.sha256(p.read_bytes()).hexdigest())
+data=dict(selection='private W^X ntdll.so (prepare-wine-wx.sh, wine-image-wx.patch); other files = installed Debian Wine',
+          stamp=(tree/'.stamp').read_text().strip(), artifacts={k:identity(v) for k,v in paths.items()})
+pathlib.Path(sys.argv[1]).write_text(json.dumps(data,indent=2)+'\n')
+PY
 cp "$work/fixture.txt" "$run/fixture.txt"
 cp out/wine/direct-syscalls.tsv "$run/direct-syscalls.tsv"
 cp surface.tsv "$run/surface.tsv"
@@ -51,7 +67,6 @@ sleep .2
 kill -0 "$server_pid"
 # Prevent automatic server startup from inheriting preload if our server dies.
 export WINESERVER=/bin/false
-export WINE_LOADER=/usr/lib/wine/wine64
 export WINEDEBUG=+loaddll,+process
 export WINEDLLOVERRIDES=wineboot.exe=d
 status=0
@@ -59,9 +74,9 @@ for mode in control routed; do
     for pe in hello_k32 hello; do
         name=$mode-$pe
         rm -f "$run/$name.report"
-        extra=()
+        extra=(WINE_LOADER=/usr/lib/wine/wine64)
         if [[ $mode == routed ]]; then
-            extra=(LD_PRELOAD="$PWD/out/libuwph_wine_shim.so" LD_DEBUG=bindings)
+            extra=(WINE_LOADER="$wx/lib/wine/wine64" LD_PRELOAD="$PWD/out/libuwph_wine_shim.so" LD_DEBUG=bindings)
         fi
         rc=0
         timeout --kill-after=2s 12s strace -f -e trace=execve -o "$run/$name.exec" \
@@ -69,7 +84,7 @@ for mode in control routed; do
             "$PWD/out/run_via_wine" "$root/x64/pe/tests/$pe.exe" \
             > "$run/$name.log" 2>&1 || rc=$?
         echo "$rc" > "$run/$name.exit"
-        echo "$name exit=$rc ($([[ $mode == routed ]] && echo 'selected calls THROUGH ntdll -> shim -> uwph' || echo 'stock Wine / launcher-only control'))"
+        echo "$name exit=$rc ($([[ $mode == routed ]] && echo 'selected calls THROUGH W^X ntdll -> shim -> uwph' || echo 'stock Wine / launcher-only control'))"
         # Show owned output/handoff without drowning the terminal in bindings.
         sed -n '/^\[launcher\]/p; /^hello /p; /^hello.exe:/p; /^TEB self-check:/p; /^malloc:/p; /^threads:/p' "$run/$name.log"
     done
