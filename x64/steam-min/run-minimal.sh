@@ -5,17 +5,17 @@
 # game's own unmodified steam_api64.dll.
 #
 # Usage: run-minimal.sh --stock --evidence DIR [--steam-wait 120] [--game-secs 60] [--video FILE]
-#   --uwph is O3 (not implemented here).
+#   --uwph uses run-wine.sh: wx,noproc; nofork OFF, external Wine server.
 # Evidence: probe.log, Player.log, webhelper_samples, webhelper_count, processes.txt,
 #   flags.txt, logon.txt, steam-wine.log / game-wine.log (+process), steam-logs/ (redacted).
-# Linux stock-Wine proof only; nothing here runs THROUGH uwph.
+# Linux harness proof only; never Xbox device proof.
 set -uo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 MODE= EVID= STEAM_WAIT=120 GAME_SECS=60 VIDEO=/workspace/x64-run/videos/B50-O2.mp4
 while [ $# -gt 0 ]; do
     case $1 in
         --stock) MODE=stock ;;
-        --uwph) echo "run-minimal.sh: --uwph is B50 O3, not implemented" >&2; exit 3 ;;
+        --uwph) MODE=uwph ;;
         --evidence) EVID=$2; shift ;;
         --steam-wait) STEAM_WAIT=$2; shift ;;
         --game-secs) GAME_SECS=$2; shift ;;
@@ -24,8 +24,12 @@ while [ $# -gt 0 ]; do
     esac
     shift
 done
-[ "$MODE" = stock ] && [ -n "$EVID" ] || { echo "usage: $0 --stock --evidence DIR" >&2; exit 2; }
+[[ "$MODE" = stock || "$MODE" = uwph ]] && [ -n "$EVID" ] || { echo "usage: $0 --stock|--uwph --evidence DIR" >&2; exit 2; }
 
+if [ "$MODE" = uwph ] && [ "$VIDEO" = /workspace/x64-run/videos/B50-O2.mp4 ]; then
+    VIDEO=/workspace/x64-run/videos/B50-O3.mp4
+fi
+HARNESS=$(cd "$HERE/../uwp-host/harness" && pwd)
 OUT=$HERE/out
 PFX=$OUT/pfx
 STEAM="$PFX/drive_c/Program Files (x86)/Steam"
@@ -42,6 +46,22 @@ rm -rf "$EVID/steam-logs"
 rm -f "$EVID"/{probe.log,Player.log,webhelper_samples,webhelper_samples_raw,webhelper_count,processes.txt,flags.txt,logon.txt,steam-wine.log,game-wine.log,probe-wine.log,run.log,seed.log}
 exec > >(tee "$EVID/run.log") 2>&1
 log() { echo "[run-minimal $(date +%T)] $*"; }
+
+# Setup/build and credential seeding remain outside the proof jail.
+if [ "$MODE" = uwph ]; then
+    make -C "$HARNESS" out/libuwph_wine_shim.so out/run_via_wine out/wine-wx/.stamp || exit 1
+    mkdir -p "$OUT/o3-reports"
+    rm -f "$OUT/o3-reports/"*
+fi
+run_guest() {
+    if [ "$MODE" = uwph ]; then
+        UWPH_GUEST_RW="$OUT" UWPH_REPORT="$OUT/o3-reports/$GUEST_TAG.report" \
+            "$HARNESS/run-wine.sh" --guest "$@"
+    else
+        wine "$@"
+    fi
+}
+log "route=$MODE; uwph constraints=wx,noproc; nofork OFF; stock external wineserver concession"
 
 # --- 1. Valve's client tree, from Valve's manifest only (cached, sha2-verified) -------
 python3 "$HERE/fetch-valve-client.py" --set "$SETS" --out "$STEAM" | tail -1 || exit 1
@@ -105,7 +125,7 @@ fi
 # --- 7. Valve's steam.exe, minimal flags, +process ---------------------------------------
 FLAGS="-silent -nofriendsui -nochatui -nobigpicture -nointro -noverifyfiles"
 log "start steam.exe $FLAGS"
-( cd "$STEAM" && WINEDEBUG=+process exec wine steam.exe $FLAGS ) > "$EVID/steam-wine.log" 2>&1 &
+( cd "$STEAM" && GUEST_TAG=steam WINEDEBUG=+process run_guest "$STEAM/steam.exe" $FLAGS ) > "$EVID/steam-wine.log" 2>&1 &
 STEAM_PID=$!
 PIDS+=($STEAM_PID)
 
@@ -119,16 +139,19 @@ done
 log "logon=$LOGON after ${i}s"
 
 if [ "$LOGON" = 1 ]; then
+export -f run_guest
+export MODE OUT HARNESS
 # --- 8. probe: game's unmodified steam_api64.dll -> Valve's steamclient64 -----------------
 API_W=$(WINEDEBUG=-all winepath -w "$GAME_SRC/Megabonk_Data/Plugins/x86_64/steam_api64.dll")
-WINEDEBUG=+process timeout 60 wine "$OUT/bin/steamapi_probe.exe" "$API_W" \
+GUEST_TAG=probe WINEDEBUG=+process timeout 60 bash -c 'run_guest "$@"' bash "$OUT/bin/steamapi_probe.exe" "$API_W" \
     2> "$EVID/probe-wine.log" | tr -d '\r' > "$EVID/probe.log"
 log "probe:"; cat "$EVID/probe.log"
 
 # --- 9. Megabonk from a symlink farm (install untouched), -force-d3d11, GAME_SECS --------
 rm -rf "$FARM"
 cp -as "$GAME_SRC" "$FARM"
-PLAYER_W=$(WINEDEBUG=-all winepath -w "$EVID/Player.log")
+PLAYER_W=$(WINEDEBUG=-all winepath -w "$OUT/Player.log")
+rm -f "$OUT/Player.log"
 if [ -n "$VIDEO" ]; then
     ffmpeg -y -loglevel error -f x11grab -video_size 1280x720 -framerate 15 -i "$DISPLAY" \
         -t 58 -c:v libx264 -preset veryfast -pix_fmt yuv420p "$VIDEO" &
@@ -136,9 +159,10 @@ if [ -n "$VIDEO" ]; then
 fi
 log "start Megabonk.exe -force-d3d11 (${GAME_SECS}s)"
 ( cd "$FARM" && SteamAppId=$APPID SteamGameId=$APPID WINEDEBUG=+process \
-    exec timeout -s KILL "$GAME_SECS" wine Megabonk.exe -force-d3d11 -screen-fullscreen 0 \
+    GUEST_TAG=game timeout -s KILL "$GAME_SECS" bash -c 'run_guest "$@"' bash "$FARM/Megabonk.exe" -force-d3d11 -screen-fullscreen 0 \
     -screen-width 1280 -screen-height 450 -logFile "$PLAYER_W" ) > "$EVID/game-wine.log" 2>&1
 log "Megabonk ended rc=$?"
+[ -f "$OUT/Player.log" ] && cp "$OUT/Player.log" "$EVID/Player.log"
 [ -n "$VIDEO" ] && wait $FFMPEG 2>/dev/null
 
 else
@@ -151,6 +175,8 @@ else
     fi
 fi
 kill "$SAMPLER" 2>/dev/null; wait "$SAMPLER" 2>/dev/null
+
+[ "$MODE" = uwph ] && cp -a "$OUT/o3-reports" "$EVID/uwph-reports"
 
 # --- 10. shut Steam down, collect evidence ------------------------------------------------
 ( cd "$STEAM" && WINEDEBUG=-all timeout 30 wine steam.exe -shutdown ) >/dev/null 2>&1

@@ -2939,3 +2939,7 @@ Exact test exited 1 at run-minimal.sh, so subsequent && assertions did not execu
 ```
 
 Steam UI log: `[2026-10-25 17:20:57] Started webhelper process 0`. Wine trace records the attempted `bin\cef\cef.win64\steamwebhelper.exe` CreateProcess. This does not prove that a helper process successfully started.
+
+## B50 O3
+
+Added `run-minimal.sh --uwph` via `run-wine.sh --guest`: launcher -> Wine own W^X loader -> shim -> uwph, constraints `wx,noproc`, nofork OFF, external stock wineserver concession. Linux only. Valve bootstrap reached “Suppressing Steam update” but no connection log/logged-on state appeared within 120s. Probe and game skipped by the login gate; no SteamAPI or game-progress proof. Webhelper count 0 (127 samples, max 0, matching CreateProcess lines 0). Exact test exited 1. Host tests and Windows smoke command exited 0 (500 smoke checks passed). Evidence and detailed limitations: `/workspace/x64-run/lanes/B50/o3`, `B50-O3.result`; video `/workspace/x64-run/videos/B50-O3.mp4` (8s). No alternate credential path or CEF attempted.
