@@ -2134,6 +2134,27 @@ Video /workspace/x64-run/videos/B20-O2.mp4 (60 s, Xvfb :122): routed client
 run 2, the 32-bit Steam updater window under uwph. Run 1 (installer + crypt32
 failure) is kept as /workspace/x64-run/lanes/B20/B20-O2-run1.mp4.
 
+## B13
+
+O2 (2026-10-25): blocked by the incomplete O1 download. The exact
+prerequisite check reports:
+
+```text
+ls: cannot access '/workspace/steam-owned/games/hades/x64/Hades.exe': No such file or directory
+find /workspace/steam-owned/games/hades -iname 'Hades*.exe': no matches
+stock Wine baseline: HADES reached=not-started (missing Hades.exe)
+THROUGH-uwph attempt: HADES reached=not-started (missing Hades.exe)
+```
+
+Stock Wine is installed (`wine-10.0 (Debian 10.0~repack-6)`), but neither
+requested game run could start. O1's result records an incomplete download
+stopped by its 20 GB free-space guard; existing partial content is unverified.
+O2 does not authorize repeating O1. No 90 s stock/DXVK/lavapipe baseline,
+no routed launcher/Wine-loader/uwph execution, and no Xbox-device proof occurred.
+The status lines above describe prerequisite failures, not runtime stages.
+The exact O2 test is **BLOCKED**: both status lines are recorded here, but
+`/workspace/x64-run/videos/B13-O2a.mp4` and `B13-O2b.mp4` are absent because
+there was no game to capture. No placeholder videos were generated.
 
 ## B24 O1 — fresh RWX caller investigation (blocked)
 
