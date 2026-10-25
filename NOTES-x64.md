@@ -1373,3 +1373,59 @@ Video /workspace/x64-run/videos/B10-O1.mp4 (30 seconds) shows the routed
 installer blocker, not a running Steam client. No commits or remotes touched.
 
 Literal last installer log line: `44367.703:0030:0034:trace:module:MODULE_InitDLL (00006FFFFFC20000,PROCESS_DETACH,0000000000000001) - RETURN 1`.
+
+## B20 O1
+
+Question: which WoW64 mode the installed Debian Wine (wine-10.0, Debian
+10.0~repack-6: wine64 amd64 + wine32:i386) gives us, and a syswow64 prefix.
+All of this is **stock Wine, outside uwpjail** (no uwph routing in O1).
+
+Install layout: there is no `/usr/lib/wine/i386-windows`; Debian puts 32-bit PE
+dlls in `/usr/lib/i386-linux-gnu/wine/i386-windows` (810 files) next to an
+`i386-unix` tree (32-bit ELF .so). 64-bit side has
+`/usr/lib/x86_64-linux-gnu/wine/x86_64-windows/{wow64,wow64cpu,wow64win}.dll`
+and an `x86_64-unix/ntdll.so` containing the WoW64 code paths
+(`load_wow64_ntdll`, "starting %s in experimental wow64 mode"). No
+`/usr/share/doc/wine*` docs beyond copyright/examples; `WINEARCH` only accepts
+win32/win64 (no `WINEARCH=wow64` switch). This is a classic
+`--enable-win64` + separate i386 build, not an `--enable-archs` build.
+
+Prefix: `WINEPREFIX=x64/uwp-host/harness/out/b20/pfx-wow64 wineboot -i`
+(~27 s) -> `#arch=win64`; `drive_c/windows/syswow64/ntdll.dll` exists
+(PE32 i386 Wine builtin, 3372656 bytes), syswow64/cmd.exe etc. likewise.
+
+Mode found, default: **old-style WoW64 (separate i386 loader process)**.
+`/usr/bin/wine` prefers `/usr/lib/wine/wine` (32-bit). Running
+`C:\windows\syswow64\cmd.exe` gives a Linux process whose exe is
+`/usr/lib/wine/wine`, ELF 32-bit i386, mapping
+`i386-linux-gnu/wine/i386-unix/ntdll.so`. Even when started via `wine64`
+(with WINELOADER pointed at a dir with no 32-bit sibling) the 64-bit ntdll.so
+still finds and execs `/usr/lib/wine/wine`. So 32-bit = a separate 32-bit
+Linux ELF process: unusable under Xbox `--nofork`/single 64-bit process.
+
+Mode available: **new-style in-process WoW64 works with these same stock
+binaries** when no 32-bit loader is reachable. In a private mount namespace
+(`unshare -rm`, bind-mount an empty file over `/usr/lib/wine/wine` and
+`wineserver32`; nothing system-wide changed) `wine64 C:\windows\syswow64\cmd.exe`
+prints `err:environ:init_peb starting ... in experimental wow64 mode` and:
+- with `WINEDLLPATH` unset -> `failed to load \??\C:\windows\syswow64\ntdll.dll
+  error c0000135` — the 64-bit ntdll looks for 32-bit PE in
+  `x86_64-linux-gnu/wine/i386-windows`, which Debian doesn't ship.
+  **This is exactly the B10 failure text**, so B10's blocker is the PE search
+  path, not only the missing prefix syswow64.
+- with `WINEDLLPATH=/usr/lib/i386-linux-gnu/wine` -> 32-bit cmd.exe runs
+  (`ver` + echo work) inside ONE Linux process, exe `/usr/lib/wine/wine64`
+  (ELF x86-64), mapping x86_64-unix/ntdll.so, x86_64-windows/{ntdll,wow64,
+  wow64cpu,wow64win}.dll and i386-windows/{ntdll,kernel32,cmd}.dll. No
+  i386-unix .so and no 32-bit ELF loaded. (wineserver is still its usual
+  separate process, same as for 64-bit apps.)
+
+Consequence for Xbox/uwph: the uwph route already runs wine64 only, so it lands
+in experimental in-process WoW64 automatically; it needs (a) a prefix with
+syswow64 (this one) and (b) the i386-windows PE dlls on WINEDLLPATH (on Xbox:
+package `i386-windows/` alongside x86_64-windows; no i386-unix needed). "Experimental"
+caveat: Wine 10 marks this mode experimental; 32-bit GL/Vulkan/thunks via
+wow64win are less mature than old-style. O2 should set WINEDLLPATH in the uwph
+run. Video /workspace/x64-run/videos/B20-O1.mp4 (19 s): prefix check,
+old-style 32-bit process, in-process wow64 cmd.exe. Probe scripts:
+/workspace/x64-run/lanes/B20/o1-*.sh.
