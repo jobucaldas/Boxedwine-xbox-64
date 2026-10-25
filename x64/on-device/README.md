@@ -155,14 +155,16 @@ routing of smoke.exe, UWP activation, or Xbox behaviour.
 ## Hosted ladder (O2)
 
 `make -C x64/on-device ladder && ./x64/on-device/out/ladder --offline` prints
-twenty-four STAGE lines (a–h, combo, p1–p6, n0–n8) and overwrites `LocalState/ladder.log`, flushing each
+26 STAGE lines (a–h, combo, p1–p6, n0–n8, n10, n11) and overwrites `LocalState/ladder.log`, flushing each
 line. Use `--local-state PATH` to pick another LocalState directory. Adapter stages
 time out after 20 seconds by default (`--timeout 1..60`); the offline combo
 has a 60-second bound with 20 seconds per guest. A stage FAIL or SKIP
 doesn't stop the run, and the exit code stays 0. An unwritable log is an error.
 Offline mode runs stage a (public uwph Linux backend) and the combo rung.
-Stages b–h and n0–n8 stay SKIP. This is a hosted Python tool, so it doesn't run on the
-console.
+Stages b–h and n0–n8 stay SKIP. n10 and n11 are always SKIP in the hosted
+ladder; when the payload and desktop Wine are present it also copies their
+`standin` sub-lines (see "Platform rungs n10 and n11" below). This is a hosted
+Python tool, so it doesn't run on the console.
 
 LocalState layout (Git-ignored):
 
@@ -295,6 +297,53 @@ Activation API reference: [IFrameworkView.Load](https://learn.microsoft.com/en-u
 | 13. Pack, sign or install fails with a secure-channel/SHA1 error, or with tools from an old SDK | PC MakeAppx/SignTool console output and the full SDK path of each tool used (for example `C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\`); **Home > My games & apps > Add** error if install was reached. | Tools older than the Windows SDK for Windows 11, 22H2 (10.0.22621). Pack and sign with MakeAppx and SignTool from Windows SDK 10.0.22621 or later: "As of the August 2023 Xbox recovery, UWP development on Xbox requires using the Windows SDK for Windows 11, 22H2 (22621) or later. Older tools do not use the latest secure communication channel required by Xbox which no longer supports SHA1." (Microsoft DirectX engineer Chuck Walbourn, [DirectX and UWP on Xbox Series X\|S](https://walbourn.github.io/directx-and-uwp-on-xbox-series-x-s/); the [setup page](https://learn.microsoft.com/en-us/windows/uwp/xbox-apps/development-environment-setup) asks for the latest SDK). |
 | 14. n5 reports more memory than the App/Game budget | `LocalState/ladder-native.log` with n5, plus how the app was launched (Dev Home tile vs Visual Studio or another debugger). | A debugger was attached. Microsoft: "When running your app or game from the Visual Studio debugger, these memory constraints do not apply." ([System resources](https://learn.microsoft.com/en-us/windows/uwp/xbox-apps/system-resource-allocation)). Do not launch from Visual Studio for n5; start the tile from Dev Home with no debugger and send that log. |
 
+## Platform rungs n10 and n11 (B40)
+
+These two rungs only observe what the console allows. They don't change the
+W^X loader or uwph. They run inside `rungs.exe` (after n8, before n5) and write
+to `LocalState/ladder-native.log`. Each sub-line starts with `# n10 |` or
+`# n11 |`, then `console` (verified Xbox activation) or `standin` (anything
+else, e.g. Wine on Linux). A final STAGE line gives the verdict. Off-device the
+verdict is always SKIP, even when every stand-in call worked.
+
+n10 platform-allow. Only the codeGeneration path decides PASS/FAIL:
+
+| Sub-line | Meaning |
+| --- | --- |
+| VirtualAlloc RWX 64KiB ALLOWED/REFUSED ptr= err= | Classic PAGE_EXECUTE_READWRITE allocation (informational). It is freed at once, never written or executed. |
+| VirtualFree RWX OK/REFUSED/SKIP | Release of that allocation. |
+| VirtualAllocFromApp RW 4KiB OK/REFUSED | Documented codeGeneration path, step 1. |
+| write ret 0xC3 OK/SKIP | One `ret` byte written into the RW page. |
+| VirtualProtectFromApp RX OK/REFUSED err= | RW to PAGE_EXECUTE_READ. err=127 means the export is missing (desktop Wine). |
+| FlushInstructionCache OK/REFUSED/SKIP | Flush before executing. |
+| call ret OK returned/SKIP | The single `ret` was called and returned. |
+| VirtualFree FromApp OK/REFUSED | Page released. |
+| GetModuleHandleA ntdll.dll, then five Nt* names FOUND/MISSING | NtProtectVirtualMemory, NtWaitForSingleObject, NtSetEvent, NtDelayExecution, NtQueryVirtualMemory resolve through GetProcAddress. None are called. |
+| STAGE n10 platform-allow PASS/FAIL/SKIP | PASS only on console when `call ret OK returned`. |
+
+n11 loopback-dlls. Only the loopback round-trip decides PASS/FAIL:
+
+| Sub-line | Meaning |
+| --- | --- |
+| WSAStartup 2.2 OK/REFUSED rc= | Winsock start. |
+| listener 127.0.0.1:PORT OK | AF_INET SOCK_STREAM listener with SO_REUSEADDR, bound to INADDR_LOOPBACK port 0; getsockname gave PORT; listen(1). This is the BoxedWine-uwp socketpair sequence. |
+| connect+accept OK | A second socket in the same process connected and was accepted. |
+| loopback round-trip 4B each way OK / FAIL at STEP; wsa= | `ping` sent one way and `pong` back, with a 2 s receive timeout; STEP names the first call that failed, including receive-timeout setup. |
+| socket AF_UNIX SOCK_STREAM ALLOWED/REFUSED wsa= | Whether AF_UNIX sockets exist (informational, closed at once). wsa=10047 is WSAEAFNOSUPPORT. |
+| LoadLibraryW FOUND/MISSING | LoadLibraryW/FreeLibrary resolved via GetProcAddress (kernelbase, then kernel32). |
+| LoadLibraryW NAME LOADED/REFUSED err= | One line each for d3d11.dll, dxgi.dll, d3d12.dll, xaudio2_9.dll, xinputuap.dll, xinput1_4.dll, mmdevapi.dll, bcrypt.dll, crypt32.dll and ws2_32.dll (informational). Each loaded module is freed straight away. err=126 means not found; err=5 means access denied; err=127 means a required loader export is missing. |
+| STAGE n11 loopback-dlls PASS/FAIL/SKIP | PASS only on console when the round-trip is OK. |
+
+`rungs.exe --n10-standin --n11-standin --local-state DIR` runs only these two
+rungs off-device (always SKIP). The hosted ladder uses it through
+`payload/combo/run_via_wine` and stock desktop Wine in a temporary prefix. That
+is our launcher plus Wine's own loader, not uwph and not Xbox proof.
+
+What to send back: the whole `LocalState/ladder-native.log` from each run
+(App and Game). Don't trim it. Every `# n10 |` and `# n11 |` line matters,
+including REFUSED/MISSING lines and their err/wsa numbers. A REFUSED line is a
+result, not a failure to retry another way.
+
 ## How to send results back
 
 1. Before each relaunch, download the following through Device Portal **File
@@ -308,6 +357,8 @@ Activation API reference: [IFrameworkView.Load](https://learn.microsoft.com/en-u
    - A directory listing of `LocalState` if an expected log is missing. Report
      absent files explicitly. `big-file.bin` is temporary and is not a required
      download; the n7 result in `ladder-native.log` is the evidence to send.
+     Keep all `# n10 |` and `# n11 |` sub-lines in it too (REFUSED/MISSING
+     with their err/wsa codes are results).
 2. If you ran the hosted ladder on Linux, send its `ladder.log` too, labelled
    off-device. A source-tree run (`out/ladder` or `ladder.py`) writes
    `x64/on-device/LocalState/ladder.log`, an extracted kit's `ladder` writes
