@@ -6,10 +6,10 @@ CFLAGS := -O2 -std=c11 -Wall -Wextra -Werror
 all: smoke-exe
 
 # Loose layout fallback; no SDK packer or device activation is implied.
-package: smoke-exe $(OUT)/rungs.exe combo-binaries
+package: smoke-exe $(OUT)/rungs.exe $(OUT)/probe_d3d12.exe combo-binaries
 	./pack.sh
 
-kit: smoke-exe ladder combo-binaries
+kit: smoke-exe ladder $(OUT)/probe_d3d12.exe combo-binaries
 	./pack.sh --kit
 
 smoke-exe: $(OUT)/smoke.exe
@@ -22,12 +22,17 @@ clean:
 	rm -rf $(OUT)
 
 # Hosted Linux diagnostic; device activation remains separate.
-ladder: $(OUT)/ladder $(OUT)/rungs.exe
+ladder: $(OUT)/ladder $(OUT)/rungs.exe $(OUT)/probe_d3d12.exe
 
 $(OUT)/ladder: ladder.py Makefile
 	mkdir -p $(OUT)
 	cp ladder.py $@
 	chmod +x $@
+
+# R4G standalone D3D12 probe, same flags as x64/graphics; d3d12/dxgi load at runtime.
+$(OUT)/probe_d3d12.exe: ../graphics/probe_d3d12.c Makefile
+	mkdir -p $(OUT)
+	$(CC_WIN) $(CFLAGS) -municode -static-libgcc -s -o $@ $< -ldxguid
 
 # Linux-box smoke: package, offline ladder, payload exe via run_via_wine -> Wine.
 offline-smoke: ladder

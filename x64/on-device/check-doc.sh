@@ -55,6 +55,8 @@ finally:
 rung_ids = [s[0] for s in stages]
 rungs_bin = (kit / 'payload/rungs.exe').read_bytes()
 rungs_strings = rungs_bin.decode('latin-1') + rungs_bin.decode('utf-16-le', 'ignore')
+d3d12_bin = (kit / 'payload/probe_d3d12.exe').read_bytes()
+d3d12_strings = d3d12_bin.decode('latin-1') + d3d12_bin.decode('utf-16-le', 'ignore')
 manifest = ET.parse(kit / 'payload/AppxManifest.xml').getroot()
 ns = {'f': 'http://schemas.microsoft.com/appx/manifest/foundation/windows10',
       'uap': 'http://schemas.microsoft.com/appx/manifest/uap/windows10'}
@@ -135,7 +137,8 @@ for doc, text in docs.items():
         check(count == len(stages), doc, f'claims {n} STAGE lines; packaged ladder prints {len(stages)}')
     # Flags must exist on the ladder or rungs.exe.
     for flag in sorted(set(re.findall(r'(?<![\w-])--[a-z][a-z-]+', text))):
-        check(flag in ladder_help or flag in rungs_strings, doc, f'flag {flag} not accepted by ladder or rungs.exe')
+        check(flag in ladder_help or flag in rungs_strings or flag in d3d12_strings, doc,
+              f'flag {flag} not accepted by ladder, rungs.exe or probe_d3d12.exe')
     # make targets used in steps.
     for target_list in re.findall(r'make -C x64/(?:on-device|uwp-host/harness) ([\w -]+?)(?:`|&&|$)', text, re.M):
         for t in target_list.split():
@@ -211,8 +214,20 @@ check(listed == files, 'package', f'kit-manifest.txt vs kit files: {sorted(liste
 if (out / 'SHA256SUMS').is_file():
     rc = subprocess.run(['sha256sum', '--quiet', '-c', 'SHA256SUMS'], cwd=out, capture_output=True).returncode
     check(rc == 0, 'package', 'out/SHA256SUMS does not verify')
+    # Coverage: every packaged file, payload symlinks followed as MakeAppx reads them.
+    summed = {l.split('  ', 1)[1] for l in (out / 'SHA256SUMS').read_text().splitlines() if '  ' in l}
+    packaged = {'test-cert.cer', 'test-cert.pfx', 'kit.zip'}
+    for top in (out / 'payload', kit):
+        packaged |= {Path(d, f).relative_to(out).as_posix()
+                     for d, _, names in os.walk(top, followlinks=True) for f in names}
+    missing = sorted(packaged - summed)
+    check(not missing, 'package', f'out/SHA256SUMS omits {len(missing)} packaged files: {missing[:5]}')
 else:
     check(False, 'package', 'out/SHA256SUMS missing')
+# Install section names the exact package file MakeAppx produces.
+install = re.search(r'^## Install.*?(?=^## |\Z)', readme, re.M | re.S)
+check(install is not None and '`BoxedwineDev.appx`' in install.group(0), 'README.md',
+      'Install section does not name the package file `BoxedwineDev.appx`')
 
 for m in mismatches:
     print(m)
