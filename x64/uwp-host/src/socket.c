@@ -424,6 +424,7 @@ UWPH_API int uwph_listen(int fd, int backlog)
 
 UWPH_API int uwph_connect(int fd, const struct uwph_sockaddr *addr, uwph_socklen_t len)
 {
+    uwph_trace_hit(UWPH_TRACE_CONNECT);
 #ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
     if (uwph_linux_native_fds()) {
         UWPH_NATIVE(int, "connect", (int, const struct uwph_sockaddr *, uwph_socklen_t));

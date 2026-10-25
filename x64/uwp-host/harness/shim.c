@@ -163,3 +163,23 @@ long sysconf(int n) { long r=uwph_sysconf(n); if(r<0) errno=uwph_errno; return r
 _Static_assert(sizeof(struct msghdr)==sizeof(struct uwph_msghdr),"msghdr ABI");
 _Static_assert(sizeof(struct rlimit)==sizeof(struct uwph_rlimit),"rlimit ABI");
 _Static_assert(sizeof(Dl_info)==sizeof(uwph_Dl_info),"dladdr ABI");
+
+#include <dirent.h>
+#include <langinfo.h>
+extern char *uwph_trace_nl_langinfo(int);
+mode_t umask(mode_t m) { return uwph_umask(m); }
+ssize_t __getdelim(char **p,size_t *n,int d,FILE *f)
+{ ssize_t r=uwph___getdelim(p,n,d,(uwph_FILE *)f); if(r<0) errno=uwph_errno; return r; }
+int access(const char *p,int m) { B06_INT(uwph_access(p,m)); }
+int connect(int fd,const struct sockaddr *a,socklen_t n)
+{ B06_INT(uwph_connect(fd,(const struct uwph_sockaddr *)a,n)); }
+void *dlsym(void *h,const char *n) { return uwph_dlsym(h,n); }
+int dup(int fd) { B06_INT(uwph_dup(fd)); }
+int fchdir(int fd) { B06_INT(uwph_fchdir(fd)); }
+pid_t fork(void) { B06_INT(uwph_fork()); }
+char *getcwd(char *p,size_t n) { char *r=uwph_getcwd(p,n); if(!r) errno=uwph_errno; return r; }
+pid_t getpid(void) { return uwph_getpid(); }
+int lstat(const char *p,struct stat *s) { B06_INT(uwph_lstat(p,(struct uwph_stat *)s)); }
+int mkdir(const char *p,mode_t m) { B06_INT(uwph_mkdir(p,m)); }
+char *nl_langinfo(nl_item item) { char *r=uwph_trace_nl_langinfo(item); if(!r) errno=uwph_errno; return r; }
+DIR *opendir(const char *p) { DIR *r=(DIR *)uwph_opendir(p); if(!r) errno=uwph_errno; return r; }

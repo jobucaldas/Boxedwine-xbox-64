@@ -43,6 +43,11 @@ static void *lookup(const struct uwph_dl_library *lib, const char *name)
 
 UWPH_API void *uwph_dlsym(void *handle, const char *name)
 {
+    uwph_trace_hit(UWPH_TRACE_DLSYM);
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    UWPH_NATIVE(void *, "dlsym", (void *, const char *));
+    UWPH_NATIVE_RETURN(fn(handle, name));
+#endif
     void *p = NULL;
     if (handle == (void *)libs) {
         for (int i = 0; i < nlibs && !p; i++) p = lookup(libs[i], name);

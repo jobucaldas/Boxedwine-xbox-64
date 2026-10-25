@@ -120,7 +120,14 @@ static int dup_from(int fd, int start, int cloexec)
     return nfd;
 }
 
-UWPH_API int uwph_dup(int fd) { return dup_from(fd, 0, 0); }
+UWPH_API int uwph_dup(int fd) {
+    uwph_trace_hit(UWPH_TRACE_DUP);
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    return uwph_linux_dup(fd);
+#else
+    return dup_from(fd, 0, 0);
+#endif
+}
 
 UWPH_API int uwph_dup2(int fd, int newfd)
 {

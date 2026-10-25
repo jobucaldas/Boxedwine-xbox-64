@@ -1441,3 +1441,65 @@ This is Linux off-device THROUGH-uwph evidence, with separate stock Wine
 controls/wineserver and desktop Windows smoke; the UWP archive is built,
 not executed on an Xbox. Updated video records the test output and fresh
 surface verification on a free Xvfb display (10 seconds).
+
+## B07
+
+O1 implements trace priorities 36–50, the next 15 imports after B06. Each has
+an entry counter, shim binding and direct regression coverage. No public
+function signatures changed; nl_langinfo uses an internal counted adapter.
+Linux uses native libc, except descriptor calls retain the existing explicit
+owned-slot versus native-Wine-fd backend. dup adopts the new descriptor into
+an owned slot and fchdir translates it while holding the namespace lock.
+The dlsym resolver bootstraps libc dlsym via versioned dlvsym so interposition
+cannot recurse through itself.
+
+| Import | Win32/UWP implementation and limits |
+| --- | --- |
+| umask | Existing virtual creation mask; Windows ACLs are not changed |
+| __getdelim | Private FILE buffer, growing allocation, delimiter and EOF semantics |
+| access | Mapped-path metadata and mode checks; write checks honor read-only mounts; no Windows ACL emulation |
+| connect | Existing in-process Unix endpoints; Linux native-fd domain stays explicit |
+| dlsym | Static registered Unix-library symbols; Linux native lookup |
+| dup | Shared private object with independent descriptor lifetime; Linux raw dup plus slot adoption |
+| fchdir | Virtual cwd from a private directory descriptor; Linux translated native directory descriptor |
+| fork | Counted ENOSYS: UWP has no documented POSIX process-cloning equivalent; Linux native fork |
+| getcwd | Virtual cwd; Linux actual process cwd |
+| getpid | GetCurrentProcessId; Linux actual PID |
+| lstat | Mapped-file/socket metadata; existing UWP backend has no symlink tree; Linux native no-follow stat |
+| mkdir | CreateDirectoryW after mount translation/read-only check; mode does not emulate POSIX ACLs |
+| mprotect | Existing memory backend, now counted; shim retains uwph_protect validation and RWX refusal |
+| nl_langinfo | C/POSIX CODESET (Linux nl_item 14); other UWP items/locales counted ENOSYS; Linux native locale |
+| opendir | GetFileAttributesW/FindFirstFileExW; private readdir/closedir use FindNextFileW/FindClose |
+
+Directory descriptors use virtual paths validated with GetFileAttributesW,
+not an unrestricted host-directory handle. Enumeration and mkdir remain
+inside the mount table. Tests cover created/empty directory lifecycle,
+owned-directory fchdir, dup lifetime after closing the original, invalid
+handles, delimiter/tail/EOF reads, static/native symbol resolution, C codeset,
+missing parent, native fork/reap, read-only protection, and the existing RWX
+gate. Protection tests exercise uwph_mprotect directly for read-only pages;
+strict uwph_protect still requires FromApp availability and is not relaxed.
+
+Exact command `make -C x64/uwp-host test && make -C x64/uwp-host/harness windows-smoke-test`
+exits 0. Stub smoke: 55 passed, 0 failed; normal Windows smoke: 566 passed,
+0 failed; traced tests: stub 137/0, Win32/UWP 148/0, Linux passthrough 164/0
+(50 counted symbols each); desktop full Windows smoke: 569 passed, 0 failed.
+Full exact output: `/workspace/x64-run/lanes/B07/B07-O1.exact.log`.
+
+Actual launcher -> Wine's private W^X loader -> ntdll -> shim -> uwph runs
+both hello PEs successfully. `harness/verify_b07.py` checks all 50 real ntdll
+bindings, single-process counters, successful PE output, clean stock controls,
+and the >=10 new-entry delta. Both reports rise from B06's 34 to 49 (+15);
+all 15 new symbols have hits. Evidence: `harness/out/wine-o4/run-gPdUzSM2/`;
+surface verification: `/workspace/x64-run/lanes/B07/B07-surface.log`.
+The broader `wine-test` still fails because execv is bound but unhit. Its
+all-symbols-hit assertion remains intact; only its traced set now includes
+mprotect as both a backend operation and a traced import. The static binding
+checker likewise requires all 57 shim exports and all 50 counters.
+
+Classification: Linux off-device THROUGH-uwph proof, with separate stock
+Wine launcher controls and a stock Linux wineserver. Windows tests execute
+uwph Windows code under stock Wine; the desktop exception artifact is separate
+from the UWP archive. The UWP archive compiles with APP headers; no Xbox device
+execution or full Wine/UWP compatibility is claimed. Video (12 seconds, free
+Xvfb display): `/workspace/x64-run/videos/B07-O1.mp4`.

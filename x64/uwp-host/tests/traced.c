@@ -11,10 +11,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef UWPH_BACKEND_WIN32
+# include <windows.h>
+#endif
 #ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
 # include <time.h>
 # include <sys/socket.h>
 # include <unistd.h>
+# include <sys/wait.h>
 #endif
 
 static int fails, passes;
@@ -339,6 +343,112 @@ static void test_b06(void)
 #endif
 }
 
+/* Internal locale bridge deliberately leaves the public uwph API unchanged. */
+extern char *uwph_trace_nl_langinfo(int);
+static void test_b07(void)
+{
+    char cwd_buf[1024];
+    struct uwph_stat st;
+    uwph_mode_t old = uwph_umask(077);
+    CHECK(uwph_umask(old)==077, "B07 umask returns previous mask");
+    CHECK(uwph_getcwd(cwd_buf,sizeof(cwd_buf))!=NULL && cwd_buf[0]=='/', "B07 getcwd absolute path");
+    CHECK(uwph_getcwd(cwd_buf,1)==NULL && uwph_errno==UWPH_ERANGE, "B07 getcwd small buffer -> ERANGE");
+    CHECK(uwph_getpid()>0, "B07 getpid positive identity");
+    CHECK(uwph_access(input,0)==(HOST ? 0 : -1), "B07 access fixture existence");
+    CHECK(uwph_lstat(input,&st)==(HOST ? 0 : -1), "B07 lstat fixture");
+    CHECK(uwph_mkdir("/uwph-b07-no-parent/subdir",0700)==-1 && uwph_errno==(HOST ? UWPH_ENOENT : UWPH_ENOSYS),
+          "B07 mkdir missing parent");
+    CHECK(uwph_fchdir(-1)==-1 && uwph_errno==
+#if HOST
+          UWPH_EBADF,
+#else
+          UWPH_ENOSYS,
+#endif
+          "B07 fchdir invalid / unsupported directory descriptor");
+#if HOST
+    char newdir[1024];
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    uwph_snprintf(newdir,sizeof(newdir),"/tmp/uwph-b07-%d",uwph_getpid());
+#else
+    uwph_snprintf(newdir,sizeof(newdir),"/uwph-b07-%d",uwph_getpid());
+#endif
+    CHECK(uwph_mkdir(newdir,0700)==0, "B07 mkdir creates directory");
+    uwph_DIR *created=uwph_opendir(newdir);
+    CHECK(created!=NULL, "B07 opendir created directory");
+    if(created) uwph_closedir(created);
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    CHECK(rmdir(newdir)==0, "B07 remove directory fixture");
+#else
+    char hostdir[2048];
+    uwph_snprintf(hostdir,sizeof(hostdir),"%s%s",root,newdir);
+    CHECK(RemoveDirectoryA(hostdir)!=0, "B07 remove directory fixture");
+#endif
+    int directory_fd=uwph_open("/",UWPH_O_RDONLY|UWPH_O_DIRECTORY);
+    CHECK(directory_fd>=0 && uwph_fchdir(directory_fd)==0, "B07 fchdir owned directory");
+    if(directory_fd>=0) uwph_close(directory_fd);
+#endif
+    int p[2];
+    CHECK(uwph_pipe2(p,0)==0, "B07 descriptor fixture");
+    int copy=uwph_dup(p[1]);
+    CHECK(copy>=0 && copy!=p[1], "B07 dup independent descriptor");
+    uwph_close(p[1]);
+    CHECK(uwph_write(copy,"abc\nlast",8)==8, "B07 duplicate survives original close");
+    uwph_close(copy);
+    uwph_FILE *f=uwph_fdopen(p[0],"r");
+    char *line=NULL; size_t capacity=0;
+    CHECK(f && uwph___getdelim(&line,&capacity,'\n',f)==4 && !strcmp(line,"abc\n"), "B07 getdelim includes delimiter");
+    CHECK(f && uwph___getdelim(&line,&capacity,'\n',f)==4 && !strcmp(line,"last"), "B07 getdelim unterminated tail");
+    CHECK(f && uwph___getdelim(&line,&capacity,'\n',f)==-1 && uwph_feof(f), "B07 getdelim EOF");
+    free(line); if(f) uwph_fclose(f);
+    CHECK(uwph_dup(-1)==-1 && uwph_errno==UWPH_EBADF, "B07 dup invalid fd");
+    CHECK(uwph_connect(-1,NULL,0)==-1 && uwph_errno==UWPH_EBADF, "B07 connect invalid fd");
+    uwph_DIR *dir=uwph_opendir("/");
+#if HOST
+    CHECK(dir!=NULL, "B07 opendir root");
+    if(dir) {
+        int found=0; struct uwph_dirent *entry;
+        while((entry=uwph_readdir(dir))) { if(entry->d_name[0]) found++; }
+        CHECK(found>0, "B07 directory enumeration");
+        CHECK(uwph_closedir(dir)==0, "B07 directory closes");
+    }
+#else
+    CHECK(!dir && uwph_errno==UWPH_ENOSYS, "B07 stub opendir ENOSYS");
+#endif
+    uwph_setlocale(UWPH_LC_CTYPE,"C");
+    char *codeset=uwph_trace_nl_langinfo(14);
+    CHECK(codeset && !strcmp(codeset,"ANSI_X3.4-1968"), "B07 nl_langinfo C codeset");
+#ifndef UWPH_BACKEND_LINUX_PASSTHROUGH
+    CHECK(!uwph_trace_nl_langinfo(-1) && uwph_errno==UWPH_ENOSYS, "B07 unsupported locale item ENOSYS");
+    static int marker;
+    static const struct uwph_dl_symbol symbols[]={{"b07_marker",&marker},{NULL,NULL}};
+    static const struct uwph_dl_library lib={"b07",symbols,NULL,NULL};
+    uwph_dl_register(&lib);
+    void *handle=uwph_dlopen("b07",0);
+    CHECK(handle && uwph_dlsym(handle,"b07_marker")==&marker, "B07 dlsym static registry");
+    CHECK(!uwph_dlsym(handle,"missing"), "B07 dlsym missing");
+    CHECK(uwph_fork()==-1 && uwph_errno==UWPH_ENOSYS, "B07 fork counted ENOSYS");
+#else
+    CHECK(uwph_dlsym(NULL,"malloc")!=NULL, "B07 dlsym native lookup without resolver recursion");
+    int directory=uwph_open("/",UWPH_O_RDONLY|UWPH_O_DIRECTORY);
+    CHECK(directory>=0 && uwph_fchdir(directory)==0, "B07 fchdir translates owned directory slot");
+    if(directory>=0) uwph_close(directory);
+    uwph_pid_t child=uwph_fork();
+    if(child==0) _exit(0);
+    int status=-1;
+    CHECK(child>0 && waitpid(child,&status,0)==child && status==0, "B07 Linux fork child reaped");
+#endif
+    void *page=uwph_mmap(NULL,4096,UWPH_PROT_READ|UWPH_PROT_WRITE,UWPH_MAP_PRIVATE|UWPH_MAP_ANONYMOUS,-1,0);
+#if HOST
+    CHECK(page!=UWPH_MAP_FAILED && uwph_mprotect(page,4096,UWPH_PROT_READ)==0, "B07 mprotect read only");
+    CHECK(uwph_protect(page,4096,UWPH_PROT_WRITE|UWPH_PROT_EXEC)==-1 && uwph_errno==UWPH_EACCES,
+          "B07 protection gate rejects RWX");
+    if(page!=UWPH_MAP_FAILED) uwph_munmap(page,4096);
+#else
+    CHECK(uwph_mprotect(NULL,4096,UWPH_PROT_READ)==-1 && uwph_errno==UWPH_ENOSYS, "B07 stub mprotect ENOSYS");
+    (void)page;
+#endif
+}
+
 int main(int argc, char **argv)
 {
     uwph_snprintf(root, sizeof(root), "%s", argc > 1 ? argv[1] : "x64/uwp-host/tests");
@@ -353,6 +463,7 @@ int main(int argc, char **argv)
     for (int s = 0; s < UWPH_TRACE_COUNT; s++) base[s] = uwph_trace_count(s);
 
     test_b06();
+    test_b07();
     test_format();
     test_threads();
     test_process();
