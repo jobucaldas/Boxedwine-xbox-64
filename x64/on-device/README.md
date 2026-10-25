@@ -298,9 +298,21 @@ through the packaged launcher, bundled W^X Wine loader, shim and uwph on Linux.
 W^X loader tree and verifiers in `payload/combo/`. The Linux loader tree retains
 B21's links to matching installed Debian Wine 10.0 DLLs/data: these are hosted
 diagnostics, not a Windows/UWP runtime. Build-time `prebuilt-prefix` preparation
-uses stock Wine; the routed run copies that explicit fixture, disables wineboot,
+uses stock Wine. For a source or extracted kit run, set
+`UWPH_COMBO_PREFIX=/absolute/path/to/x64/uwp-host/harness/prebuilt-prefix`
+(the B21 fixture prepared by `make -C x64/uwp-host/harness prebuilt-prefix`).
+Run `UWPH_COMBO_PREFIX=... /path/to/kit/ladder --offline`, or invoke
+`/path/to/kit/payload/combo/run` with the same environment. The kit can live
+anywhere; it does not require a source checkout. The host must supply Debian
+Wine 10.0, Python, bubblewrap and the readiness constraint wrapper plus its
+`bin/uwpjail` and `fakesys` support at `/workspace/xbox-readiness`;
+`UWPH_UWP_RUN` can select another compatible wrapper. Offline stage a still
+requires the source harness; only combo is runnable independently of it.
+`offline-smoke` supplies the fixture and checks combo in a relocated kit.
+The routed run copies that explicit fixture, disables wineboot,
 and retains a separate stock Linux wineserver concession. Logs/reports remain
-in `x64/uwp-host/harness/out/kit-combo.*/`; no prefix is packaged.
+in `${TMPDIR:-/tmp}/kit-combo.*/`; the temporary prefix is deleted, and no
+prefix is packaged.
 
 On device, PASS means both hellos exit 0 through an in-process Wine W^X loader
 and uwph with `nofork,noproc,wx`, TEB/thread checks and routing counters verified;

@@ -101,6 +101,8 @@ try:
         'Use README.md for Windows SDK packaging with the existing test cert.\n'
         'test-cert.pfx is a private disposable development key: keep this kit local.\n'
         'ladder is a hosted Python diagnostic, not a console executable.\n'
+        'Combo: set UWPH_COMBO_PREFIX to the prepared B21 test fixture; see README.\n'
+        'Linux combo needs Debian Wine and the readiness wrapper/jail support.\n'
         'Optional probes are diagnostics, not automatically wired console rungs.\n'
         'No LocalState, tokens, Wine prefixes, or game files are included.\n')
     expected = {'test_dcomp.exe': 'f (DirectComposition diagnostic)',

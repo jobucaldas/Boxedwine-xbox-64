@@ -61,7 +61,8 @@ def main():
                 reason += '; THROUGH public uwph Linux backend; not Xbox proof'
             elif letter == 'combo' and args.offline:
                 status, reason = execute(
-                    [str(base / 'out/payload/combo/run')], repo, 60)
+                    [str((base if (base / 'payload/combo/run').is_file()
+                          else base / 'out') / 'payload/combo/run')], location, 60)
                 reason += '; nofork,noproc,wx THROUGH launcher -> bundled W^X Wine loader -> uwph; Linux only'
             elif args.offline:
                 status, reason = 'SKIP', 'offline: device/loader adapter disabled'

@@ -9,8 +9,17 @@ echo '== 1/3 package (loose payload + test cert; build-only) =='
 make --no-print-directory package
 
 echo '== 2/3 offline ladder (stage a THROUGH public uwph Linux backend) =='
-./out/ladder --offline
+UWPH_COMBO_PREFIX="$PWD/../uwp-host/harness/prebuilt-prefix" ./out/ladder --offline
 grep -q '^STAGE combo .* PASS:' LocalState/ladder.log
+
+# Exercise the generated kit from an unrelated directory, with no source-relative paths.
+make --no-print-directory kit
+kit_check=$(mktemp -d /tmp/b23-kit.XXXXXX)
+cp -a out/kit "$kit_check/kit"
+UWPH_COMBO_PREFIX="$PWD/../uwp-host/harness/prebuilt-prefix" \
+    "$kit_check/kit/ladder" --offline --local-state "$kit_check/state"
+grep -q '^STAGE combo .* PASS:' "$kit_check/state/ladder.log"
+rm -rf -- "$kit_check"
 
 echo '== 3/3 payload smoke.exe THROUGH our run_via_wine -> Wine loader =='
 cc -O2 -Wall -Wextra -Werror -o out/run_via_wine ../pe/launcher/run_via_wine.c
