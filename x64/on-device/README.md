@@ -1,10 +1,9 @@
 # Boxedwine Xbox Developer Mode test kit (x64)
 
-Status: no console proof exists yet. Everything below has run only on a Linux
-box. `smoke.exe` is a console diagnostic, not the UWP activation bridge
-(`Boxedwine.App` is still pending), so on the console the install may work but
-launching may fail or exit at once. Write down what actually happens; don't
-read it as success. Tomorrow's checklist:
+Status: no console proof exists yet. The package now starts `rungs.exe`, a native
+CoreApplication/IFrameworkView implementation for O5. Its activation, SDK schema
+validation and real Xbox API behaviour remain unverified. `smoke.exe` remains a
+separate build diagnostic. Tomorrow's checklist:
 `/workspace/x64-run/ON-DEVICE-TOMORROW.md`.
 
 ## Build the artifacts (Linux)
@@ -12,7 +11,7 @@ read it as success. Tomorrow's checklist:
     make -C x64/on-device package        # loose payload + test cert
     make -C x64/on-device offline-smoke  # package, offline ladder, Wine smoke
 
-- Loose payload: `x64/on-device/out/payload/` (`AppxManifest.xml`, `smoke.exe`,
+- Loose payload: `x64/on-device/out/payload/` (`AppxManifest.xml`, `rungs.exe`, `smoke.exe`, optional `probe_native.exe`,
   `Assets/*.png`, `PACKAGING-NOTES.txt`)
 - Test certificate: `x64/on-device/out/test-cert.cer` (CN=BoxedwineDev,
   matches manifest Publisher)
@@ -46,9 +45,9 @@ capabilities to get past it. We haven't run either tool here.
    - Alternative: if your Device Portal offers loose-folder registration from a
      network share, register a share holding `out/payload/`. Only use your
      own LAN share.
-4. In Dev Home (or the app's details in Device Portal), set the app type of
-   **Boxedwine Dev Mode** to **Game**. This gets the Game/Title memory budget.
-   Check the budget on the device; we haven't measured it.
+4. Dev Home -> highlight app -> View button -> View details -> App type: Game.
+   Device Portal: default new apps to Game. Run the ladder once as App and once
+   as Game and keep both logs. Record the measured memory limit for each run.
 5. Launch it from Dev Home. Record whether it activates, crashes, or exits. Also
    record any error code and the Device Portal crash/ETW output.
 6. To remove it: **My games & apps**, then pick the app and **Remove**.
@@ -59,7 +58,9 @@ hypervisor or code-signing bypass. Use documented capabilities only.
 ## Manifest and capabilities (O1)
 
 `AppxManifest.xml` targets Windows.Xbox/x64 and declares `codeGeneration`
-(base foundation capability), `internetClient` and `privateNetworkClientServer`.
+(base foundation capability), `internetClient`, `privateNetworkClientServer`
+and restricted `expandedResources` next to `codeGeneration`. `expandedResources`
+is deprecated and Store-rejected; this manifest is for dev sideload only.
 Declaring a capability doesn't prove it's available on a given console OS.
 The XML is well-formed but hasn't been validated against the SDK schema.
 `make -C x64/on-device smoke-exe` builds `out/smoke.exe` with
@@ -78,12 +79,12 @@ routing of smoke.exe, UWP activation, or Xbox behaviour.
 ## Hosted ladder (O2)
 
 `make -C x64/on-device ladder && ./x64/on-device/out/ladder --offline` prints
-eight STAGE lines (a–h) and overwrites `LocalState/ladder.log`, flushing each
+sixteen STAGE lines (a–h, n0–n7) and overwrites `LocalState/ladder.log`, flushing each
 line. Use `--local-state PATH` to pick another LocalState directory. Each stage
 times out after 20 seconds by default (`--timeout 1..60`). A stage FAIL or SKIP
 doesn't stop the run, and the exit code stays 0. An unwritable log is an error.
 Offline mode runs only stage a, which is the public uwph Linux backend test.
-Stages b–h stay SKIP. This is a hosted Python tool, so it doesn't run on the
+Stages b–h and n0–n7 stay SKIP. This is a hosted Python tool, so it doesn't run on the
 console.
 
 LocalState layout (Git-ignored):
@@ -119,3 +120,47 @@ x64 identity. It also creates the PNG assets the manifest references and
 stages `out/payload/`. LocalState, tokens and private keys are never staged.
 No signature or AppxBlockMap is produced here, so pack and sign on Windows as
 shown above.
+
+## Native ladder (O5)
+
+`make -C x64/on-device ladder package` builds `out/rungs.exe` and the hosted
+`out/ladder`, then rebuilds the loose payload. On console, launch the packaged
+app from Dev Home. It activates a real CoreWindow and writes
+`ApplicationData.Current.LocalFolder/ladder-native.log`, flushing each stage.
+Save this file separately as `ladder-App.log` and `ladder-Game.log` before
+relaunching; the native log is overwritten each run. Keep hosted a–h evidence
+separately; these native probes do not prove the Wine compatibility runtime.
+
+- n1: D3D11 hardware HRESULT, feature level, adapter and WARP fallback result.
+- n2: D3D12 creation at FL 11_0, reported feature level and shader model.
+- n3: real CoreWindow, BGRA8 FLIP_DISCARD, two buffers, #0078D7 clear,
+  120 vsynced Presents with average/max frame milliseconds.
+- n4: xaudio2_9.dll XAudio2Create and a one-second 440 Hz sine, consumed sample
+  count; WASAPI ActivateAudioInterfaceAsync export availability. Listen on device;
+  API success does not establish audibility or WASAPI endpoint activation.
+- n5: MemoryManager.AppMemoryUsageLimit via RoGetActivationFactory (hand-declared
+  ABI), then VirtualAllocFromApp reserve/commit in 256 MiB chunks up to 4608 MiB,
+  freeing every allocation. Only the first page is touched: this measures commit
+  acceptance, not physical residency. Runs last because an OS memory kill may
+  interrupt it; a starting note is flushed before allocation.
+- n6: GetGamingDeviceModelInformation raw IDs and Series S/X model.
+- n7: SKIP unless `--big-file` is passed to the native executable (or to a hosted
+  n7 adapter). Writes and reads a 2304 MiB file in verified LocalState, checks
+  per-block tags and endpoint bytes, logs bytes/errors, deletes on close.
+  This is an opt-in size/I/O probe, not a full-byte integrity test. Normal Dev
+  Home activation supplies no CLI opt-in and therefore skips n7.
+
+If `/workspace/wt/R4N/x64/native-gfx/out/probe_native.exe` exists, packaging copies
+it unchanged next to `rungs.exe`. n0 can run that copy in the desktop diagnostic;
+on UWP it reports SKIP because launching child executables with CreateProcess is
+unsupported. An in-process R4N adapter is still needed for console n0 execution.
+No child-process capability or bypass is requested.
+
+Off-device `out/ladder --offline` keeps all n0–n7 SKIP. `./x64/on-device/native-smoke.sh` runs the native executable through our `out/run_via_wine` launcher into Wine's own loader with
+`out/payload/rungs.exe --console`; successful stand-in calls are labelled SKIP,
+never console PASS. Large commit and file tests require verified Xbox activation.
+Hosted `adapters/n0`–`adapters/n7` follow the existing exit-code contract; only n7
+receives `--big-file`, and offline mode never executes these adapters.
+
+ABI references: [Microsoft SDK gaming IDs](https://github.com/microsoft/win32metadata/blob/main/generation/WinSDK/RecompiledIdlHeaders/um/gamingdeviceinformation.h)
+and [MemoryManager ABI](https://github.com/microsoft/win32metadata/blob/main/generation/WinSDK/RecompiledIdlHeaders/winrt/windows.system.h).

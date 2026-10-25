@@ -34,6 +34,7 @@ def execute(command, cwd, timeout):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--offline', action='store_true')
+    parser.add_argument('--big-file', action='store_true', help='opt in to native >2 GB storage rung')
     parser.add_argument('--local-state', type=Path)
     parser.add_argument('--timeout', type=int, default=20)
     args = parser.parse_args()
@@ -65,6 +66,29 @@ def main():
                 status, reason = execute([str(adapter.resolve())], state.resolve(), args.timeout)
                 reason += '; configured adapter (see routing contract)'
             line = f'STAGE {letter} {name} {status}: {reason}'
+            print(line, flush=True)
+            log.write(line + '\n')
+            log.flush()
+        native = [('n0', 'probe-native')] + [
+            ('n1', 'd3d11-device'), ('n2', 'd3d12-device'),
+            ('n3', 'corewindow-swapchain'), ('n4', 'audio'),
+            ('n5', 'game-memory'), ('n6', 'gaming-device-model'), ('n7', 'big-file')]
+        for ident, name in native:
+            if args.offline:
+                status, reason = 'SKIP', 'offline: native console APIs require UWP activation; no Xbox proof'
+            elif ident == 'n7' and not args.big_file:
+                status, reason = 'SKIP', 'requires --big-file'
+            else:
+                adapter = state / 'adapters' / ident
+                if adapter.is_file():
+                    command = [str(adapter.resolve())]
+                    if ident == 'n7':
+                        command.append('--big-file')
+                    status, reason = execute(command, state.resolve(), args.timeout)
+                    reason += '; configured native adapter; verify console provenance'
+                else:
+                    status, reason = 'SKIP', 'native adapter unavailable; launch packaged rungs.exe on console'
+            line = f'STAGE {ident} {name} {status}: {reason}'
             print(line, flush=True)
             log.write(line + '\n')
             log.flush()

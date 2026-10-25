@@ -31,7 +31,10 @@ cmp out/test-cert.cer "$stage/pfx-cert.cer"
 test "$(openssl x509 -inform DER -in out/test-cert.cer -noout -subject -nameopt RFC2253)" = 'subject=CN=BoxedwineDev'
 
 mkdir -p "$stage/payload/Assets"
-cp AppxManifest.xml out/smoke.exe "$stage/payload/"
+cp AppxManifest.xml out/smoke.exe out/rungs.exe "$stage/payload/"
+# Copy only the optional probe, never modify its source worktree.
+probe=/workspace/wt/R4N/x64/native-gfx/out/probe_native.exe
+if [[ -s "$probe" ]]; then cp "$probe" "$stage/payload/probe_native.exe"; fi
 # Plain generated PNG tiles supply every image referenced by the manifest.
 python3 - "$stage/payload" <<'PY'
 import pathlib, struct, sys, zlib
@@ -57,8 +60,9 @@ Use a supported Windows SDK packaging/signing workflow for a Device Portal
 upload: MakeAppx pack /d payload /p BoxedwineDev.appx, then SignTool sign
 /fd SHA256 /f test-cert.pfx BoxedwineDev.appx (empty test password).
 Trust test-cert.cer only on your own development device as required.
-UWP activation bridge Boxedwine.App is still pending in O1. smoke.exe is a
-console diagnostic, not a working UWP activation implementation. This layout
+rungs.exe implements a CoreApplication view; console activation is unverified.
+smoke.exe remains a console build diagnostic. expandedResources is deprecated
+and Store-rejected, for development sideload only. This layout
 does not establish installation, activation, capability approval, or Xbox proof.
 Do not ship test-cert.pfx or any private LocalState data with the app.
 EOF
