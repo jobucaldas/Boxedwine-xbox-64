@@ -14,10 +14,20 @@ static int readiness_locked(enum uwph_fd_kind kind, struct uwph_object *o)
     case UWPH_FD_FREE:    return UWPH_POLLNVAL;
     case UWPH_FD_PIPE_R: case UWPH_FD_PIPE_W: case UWPH_FD_UNIX:
         return uwph_unix_poll_locked(o, kind);
+#ifdef UWPH_BACKEND_WIN32
+    case UWPH_FD_INET:    return uwph_inet_poll(o);
+#endif
     case UWPH_FD_CONSOLE: return UWPH_POLLOUT;
     case UWPH_FD_FILE: case UWPH_FD_DIR: return UWPH_POLLIN | UWPH_POLLOUT;
     default:              return 0;    /* Winsock/inotify/nested epoll: backend */
     }
+}
+
+/* Winsock readiness has no in-process wakeup: sets holding an INET fd are
+ * rescanned (WSAPoll, zero timeout) at least every 10 ms. */
+static int net_wait(int net, int left)
+{
+    return net && (left < 0 || left > 10) ? 10 : left;
 }
 
 static int remaining(uint64_t start, int timeout_ms)
@@ -33,11 +43,13 @@ UWPH_API int uwph_poll(struct uwph_pollfd *pfd, uwph_nfds_t n, int timeout_ms)
     struct uwph_object *objs[256];
     enum uwph_fd_kind kinds[256];
     uint64_t start = uwph_monotonic_ms();
-    int count;
+    int count, net = 0;
 
     if (n > 256) return UWPH_FAIL(UWPH_EINVAL);
-    for (uwph_nfds_t i = 0; i < n; i++)
+    for (uwph_nfds_t i = 0; i < n; i++) {
         objs[i] = pfd[i].fd < 0 ? (kinds[i] = UWPH_FD_FREE, NULL) : uwph_fd_get(pfd[i].fd, &kinds[i], NULL);
+        net |= kinds[i] == UWPH_FD_INET;
+    }
 
     uwph_lock(&uwph_io_lock);
     for (;;) {
@@ -52,7 +64,7 @@ UWPH_API int uwph_poll(struct uwph_pollfd *pfd, uwph_nfds_t n, int timeout_ms)
             count += r != 0;
         }
         if (count || !(left = remaining(start, timeout_ms))) break;
-        uwph_cond_wait(&uwph_io_cond, &uwph_io_lock, left);
+        uwph_cond_wait(&uwph_io_cond, &uwph_io_lock, net_wait(net, left));
     }
     uwph_unlock(&uwph_io_lock);
     for (uwph_nfds_t i = 0; i < n; i++) uwph_obj_unref(objs[i]);
@@ -207,8 +219,9 @@ UWPH_API int uwph_epoll_wait(int epfd, struct uwph_epoll_event *evs, int max, in
     if (max <= 0) { uwph_obj_unref(&ep->base); return UWPH_FAIL(UWPH_EINVAL); }
     uwph_lock(&uwph_io_lock);
     for (;;) {
-        int left;
+        int left, net = 0;
         count = 0;
+        for (int i = 0; i < ep->n; i++) net |= ep->items[i].kind == UWPH_FD_INET;
         for (int i = 0; i < ep->n && count < max; i++) {
             struct ep_item *it = &ep->items[i];
             uint32_t r;
@@ -221,7 +234,7 @@ UWPH_API int uwph_epoll_wait(int epfd, struct uwph_epoll_event *evs, int max, in
             if (it->events & UWPH_EPOLLONESHOT) it->disabled = 1;
         }
         if (count || !(left = remaining(start, timeout_ms))) break;
-        uwph_cond_wait(&uwph_io_cond, &uwph_io_lock, left);
+        uwph_cond_wait(&uwph_io_cond, &uwph_io_lock, net_wait(net, left));
     }
     uwph_unlock(&uwph_io_lock);
     uwph_obj_unref(&ep->base);

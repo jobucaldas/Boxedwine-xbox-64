@@ -536,6 +536,123 @@ static void test_host(void)
 
 static void print_line(const char *l) { fputs(l, stdout); }
 
+#ifdef UWPH_BACKEND_WIN32
+/* Desktop standin: every network operation below goes through uwph. */
+static void *inet_delayed_send(void *arg)
+{
+    Sleep(40);
+    uwph_send(*(int *)arg, "later", 5, 0);
+    return NULL;
+}
+static void test_inet(void)
+{
+    struct { uint16_t family, port; unsigned char ip[4]; unsigned char pad[8]; } a = {UWPH_AF_INET, 0, {127,0,0,1}, {0}};
+    struct uwph_sockaddr *addr = (struct uwph_sockaddr *)&a;
+    uwph_socklen_t len = sizeof(a);
+    struct uwph_addrinfo *ai = NULL;
+    struct uwph_pollfd pollfd;
+    char b[16] = {0};
+    int listener = uwph_socket(UWPH_AF_INET, UWPH_SOCK_STREAM, 0), client, peer, udp, sender;
+    int ok = listener >= 0 && uwph_bind(listener, addr, sizeof(a)) == 0 &&
+        uwph_getsockname(listener, addr, &len) == 0 && a.port != 0 && uwph_listen(listener, 1) == 0;
+    client = uwph_socket(UWPH_AF_INET, UWPH_SOCK_STREAM, 0);
+    ok = ok && client >= 0 && uwph_connect(client, addr, sizeof(a)) == 0;
+    peer = ok ? uwph_accept(listener, NULL, NULL) : -1;
+    ok = ok && peer >= 0 && uwph_send(client, "echo", 4, 0) == 4;
+    pollfd = (struct uwph_pollfd){peer, UWPH_POLLIN, 0};
+    ok = ok && uwph_poll(&pollfd, 1, 1000) == 1 && (pollfd.revents & UWPH_POLLIN) &&
+        uwph_recv(peer, b, sizeof(b), 0) == 4 && uwph_send(peer, b, 4, 0) == 4 &&
+        uwph_recv(client, b, sizeof(b), 0) == 4 && !memcmp(b, "echo", 4);
+    CHECK(ok, "inet_tcp_echo %s", ok ? "PASS" : "FAIL");
+    {
+        uwph_host_thread *t = uwph_host_thread_start(inet_delayed_send, &client);
+        pollfd = (struct uwph_pollfd){peer, UWPH_POLLIN, 0};
+        CHECK(t && uwph_poll(&pollfd, 1, 1000) == 1 && uwph_recv(peer, b, sizeof(b), 0) == 5,
+              "inet_poll_delayed PASS");
+        if (t) uwph_host_thread_join(t);
+    }
+    len = sizeof(a);
+    CHECK(uwph_getpeername(client, addr, &len) == 0, "inet_getpeername");
+    { int val = 1; len = sizeof(val);
+      CHECK(uwph_setsockopt(client, UWPH_SOL_SOCKET, UWPH_SO_REUSEADDR, &val, len) == 0 &&
+            uwph_getsockopt(client, UWPH_SOL_SOCKET, UWPH_SO_TYPE, &val, &len) == 0 && val == UWPH_SOCK_STREAM &&
+            uwph_getsockopt(client, UWPH_SOL_SOCKET, UWPH_SO_REUSEADDR, &val, &len) == 0 && val == 1 &&
+            uwph_setsockopt(client, 6 /* IPPROTO_TCP */, 1 /* TCP_NODELAY */, &val, len) == 0, "inet_sockopts"); }
+    CHECK(uwph_shutdown(client, UWPH_SHUT_WR) == 0, "inet_shutdown");
+    uwph_close(peer); uwph_close(client); uwph_close(listener);
+    a.port = 0; len = sizeof(a);
+    udp = uwph_socket(UWPH_AF_INET, UWPH_SOCK_DGRAM | UWPH_SOCK_NONBLOCK, 0);
+    sender = uwph_socket(UWPH_AF_INET, UWPH_SOCK_DGRAM, 0);
+    CHECK(uwph_recv(udp, b, sizeof(b), 0) == -1 && uwph_errno == UWPH_EAGAIN, "inet_nonblocking EAGAIN");
+    ok = uwph_bind(udp, addr, sizeof(a)) == 0 && uwph_getsockname(udp, addr, &len) == 0 &&
+        uwph_sendto(sender, "udp", 3, 0, addr, len) == 3;
+    pollfd = (struct uwph_pollfd){udp, UWPH_POLLIN, 0};
+    ok = ok && uwph_poll(&pollfd, 1, 1000) == 1 && uwph_recvfrom(udp, b, sizeof(b), 0, addr, &len) == 3 &&
+        uwph_sendto(udp, b, 3, 0, addr, len) == 3 && uwph_recv(sender, b, sizeof(b), 0) == 3 && !memcmp(b, "udp", 3);
+    CHECK(ok, "inet_udp_echo %s", ok ? "PASS" : "FAIL");
+    uwph_close(udp); uwph_close(sender);
+    ok = uwph_getaddrinfo("localhost", "80", NULL, &ai) == 0 && ai &&
+        (ai->ai_family == UWPH_AF_INET || ai->ai_family == UWPH_AF_INET6);
+    CHECK(ok, "inet_getaddrinfo %s", ok ? "PASS" : "FAIL");
+    uwph_freeaddrinfo(ai);
+    {
+        struct uwph_addrinfo hints = {0};
+        hints.ai_family = UWPH_AF_INET6;
+        hints.ai_socktype = UWPH_SOCK_DGRAM;
+        hints.ai_flags = UWPH_AI_NUMERICHOST;
+        ai = NULL;
+        ok = uwph_getaddrinfo("::1", "0", &hints, &ai) == 0 && ai && ai->ai_addr->sa_family == UWPH_AF_INET6;
+        udp = uwph_socket(UWPH_AF_INET6, UWPH_SOCK_DGRAM, 0);
+        sender = uwph_socket(UWPH_AF_INET6, UWPH_SOCK_DGRAM, 0);
+        if (ok) {
+            unsigned char address[28];
+            memcpy(address, ai->ai_addr, sizeof(address));
+            len = sizeof(address);
+            ok = uwph_bind(udp, (struct uwph_sockaddr *)address, len) == 0 &&
+                uwph_getsockname(udp, (struct uwph_sockaddr *)address, &len) == 0 &&
+                ((struct uwph_sockaddr *)address)->sa_family == UWPH_AF_INET6 &&
+                uwph_sendto(sender, "v6", 2, 0, (struct uwph_sockaddr *)address, len) == 2;
+            pollfd = (struct uwph_pollfd){udp, UWPH_POLLIN, 0};
+            ok = ok && uwph_poll(&pollfd, 1, 1000) == 1 && uwph_recvfrom(udp, b, sizeof(b), 0, (struct uwph_sockaddr *)address, &len) == 2 &&
+                uwph_sendto(udp, b, 2, 0, (struct uwph_sockaddr *)address, len) == 2 && uwph_recv(sender, b, sizeof(b), 0) == 2;
+        }
+        CHECK(ok, "inet_ipv6_echo %s", ok ? "PASS" : "FAIL");
+        uwph_close(udp); uwph_close(sender); uwph_freeaddrinfo(ai);
+    }
+    listener = uwph_socket(UWPH_AF_INET, UWPH_SOCK_STREAM, 0);
+    a.port = (uint16_t)((60000 >> 8) | (60000 << 8));
+    CHECK(uwph_bind(listener, addr, sizeof(a)) == -1 && uwph_errno == UWPH_EACCES, "inet_bind_60000 EACCES");
+    uwph_close(listener);
+    {   /* AF_INET socketpair: loopback listener fallback (Winsock has none) */
+        int sv[2] = {-1, -1}, nb[2] = {-1, -1}, val = 0;
+        unsigned port0, port1;
+        uwph_socklen_t vlen = sizeof(val);
+        ok = uwph_socketpair(UWPH_AF_INET, UWPH_SOCK_STREAM, 0, sv) == 0 &&
+            uwph_send(sv[0], "pair", 4, 0) == 4 && uwph_recv(sv[1], b, sizeof(b), 0) == 4 && !memcmp(b, "pair", 4) &&
+            uwph_write(sv[1], "back", 4) == 4 && uwph_read(sv[0], b, sizeof(b)) == 4 && !memcmp(b, "back", 4);
+        len = sizeof(a);
+        ok = ok && uwph_getsockname(sv[0], addr, &len) == 0 && a.ip[0] == 127;
+        port0 = (unsigned)((a.port >> 8) | ((a.port & 0xff) << 8));
+        len = sizeof(a);
+        ok = ok && uwph_getsockname(sv[1], addr, &len) == 0;
+        port1 = (unsigned)((a.port >> 8) | ((a.port & 0xff) << 8));
+        ok = ok && port0 && port0 < 57344 && port1 && port1 < 57344 &&
+            uwph_getsockopt(sv[0], UWPH_SOL_SOCKET, UWPH_SO_TYPE, &val, &vlen) == 0 && val == UWPH_SOCK_STREAM;
+        if (sv[0] >= 0) uwph_close(sv[0]);
+        pollfd = (struct uwph_pollfd){sv[1], UWPH_POLLIN, 0};
+        ok = ok && uwph_poll(&pollfd, 1, 1000) == 1 && uwph_recv(sv[1], b, sizeof(b), 0) == 0;
+        if (sv[1] >= 0) uwph_close(sv[1]);
+        ok = ok && uwph_socketpair(UWPH_AF_INET, UWPH_SOCK_STREAM | UWPH_SOCK_NONBLOCK, 0, nb) == 0 &&
+            uwph_recv(nb[1], b, sizeof(b), 0) == -1 && uwph_errno == UWPH_EAGAIN;
+        if (nb[0] >= 0) { uwph_close(nb[0]); uwph_close(nb[1]); }
+        ok = ok && uwph_socketpair(UWPH_AF_INET, UWPH_SOCK_DGRAM, 0, nb) == -1 && uwph_errno == UWPH_EPROTONOSUPPORT &&
+            uwph_socketpair(UWPH_AF_INET6, UWPH_SOCK_STREAM, 0, nb) == -1 && uwph_errno == UWPH_EAFNOSUPPORT;
+        printf("inet_socketpair ports %u/%u (below 57344)\n", port0, port1);
+        CHECK(ok, "inet_socketpair %s", ok ? "PASS" : "FAIL");
+    }
+}
+#endif
+
 int main(int argc, char **argv)
 {
     char root[512];
@@ -546,6 +663,7 @@ int main(int argc, char **argv)
 #ifdef UWPH_BACKEND_WIN32
     if (argc > 1 && !strcmp(argv[1], "--futex-only")) {
         printf("Desktop cooperative test-only mode: Windows PE -> uwph wait/signal -> stock Wine Win32; no exception hook or live TEB mutation\n");
+        test_inet();
         test_futex_signals();
         printf("%d passed, %d failed\n", passes, fails);
         return fails ? 1 : 0;
@@ -576,6 +694,9 @@ int main(int argc, char **argv)
     printf("API probe:\n");
     uwph_probe_print(print_line);
 
+#ifdef UWPH_BACKEND_WIN32
+    test_inet();
+#endif
     test_fds();
     test_scm_rights();
     test_named_socket();

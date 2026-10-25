@@ -308,6 +308,7 @@ static struct endpoint *get_unix(int fd, int *flags)
 
 UWPH_API int uwph_socket(int domain, int type, int proto)
 {
+    uwph_trace_hit(UWPH_TRACE_SOCKET);
 #ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
     if (uwph_linux_native_fds()) {
         UWPH_NATIVE(int, "socket", (int, int, int));
@@ -319,7 +320,11 @@ UWPH_API int uwph_socket(int domain, int type, int proto)
     int fd, base_type = type & 0xf;
     (void)proto;
     if (domain == UWPH_AF_INET || domain == UWPH_AF_INET6)
-        return UWPH_ENOSYS_INT();          /* Winsock backend: next step */
+#ifdef UWPH_BACKEND_WIN32
+        return uwph_inet_socket(domain, type, proto);
+#else
+        return UWPH_ENOSYS_INT();
+#endif
     if (domain != UWPH_AF_UNIX) return UWPH_FAIL(UWPH_EAFNOSUPPORT);
     if (base_type != UWPH_SOCK_STREAM) return UWPH_FAIL(UWPH_EPROTONOSUPPORT);
     if (!(ep = endpoint_new(1, base_type))) return UWPH_FAIL(UWPH_ENOMEM);
@@ -331,6 +336,7 @@ UWPH_API int uwph_socket(int domain, int type, int proto)
 
 UWPH_API int uwph_socketpair(int domain, int type, int proto, int sv[2])
 {
+    uwph_trace_hit(UWPH_TRACE_SOCKETPAIR);
 #ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
     if (uwph_linux_native_fds()) {
         UWPH_NATIVE(int, "socketpair", (int, int, int, int *));
@@ -341,6 +347,9 @@ UWPH_API int uwph_socketpair(int domain, int type, int proto, int sv[2])
     struct endpoint *a, *b;
     int fa, fb, fl = UWPH_O_RDWR | (type & (UWPH_SOCK_NONBLOCK | UWPH_SOCK_CLOEXEC));
     (void)proto;
+#ifdef UWPH_BACKEND_WIN32
+    if (domain == UWPH_AF_INET) return uwph_inet_socketpair(domain, type, proto, sv);
+#endif
     if (domain != UWPH_AF_UNIX) return UWPH_FAIL(UWPH_EAFNOSUPPORT);
     if ((type & 0xf) != UWPH_SOCK_STREAM) return UWPH_FAIL(UWPH_EPROTONOSUPPORT);
     if (make_pair(1, UWPH_SOCK_STREAM, &a, &b) < 0) return -1;
@@ -378,6 +387,10 @@ UWPH_API int uwph_bind(int fd, const struct uwph_sockaddr *addr, uwph_socklen_t 
     }
 #endif
 
+#ifdef UWPH_BACKEND_WIN32
+    if (uwph_is_inet(fd)) return uwph_inet_call(fd, INET_BIND, NULL, 0, 0, (struct uwph_sockaddr *)addr, &len);
+#endif
+
     char abs[108];
     struct endpoint *ep = get_unix(fd, NULL);
     int ret = 0;
@@ -401,6 +414,10 @@ UWPH_API int uwph_listen(int fd, int backlog)
         UWPH_NATIVE(int, "listen", (int, int));
         UWPH_NATIVE_RETURN(fn(fd, backlog));
     }
+#endif
+
+#ifdef UWPH_BACKEND_WIN32
+    if (uwph_is_inet(fd)) return uwph_inet_call(fd, INET_LISTEN, NULL, 0, backlog, NULL, NULL);
 #endif
 
     struct endpoint *ep = get_unix(fd, NULL);
@@ -430,6 +447,10 @@ UWPH_API int uwph_connect(int fd, const struct uwph_sockaddr *addr, uwph_socklen
         UWPH_NATIVE(int, "connect", (int, const struct uwph_sockaddr *, uwph_socklen_t));
         UWPH_NATIVE_RETURN(fn(fd, addr, len));
     }
+#endif
+
+#ifdef UWPH_BACKEND_WIN32
+    if (uwph_is_inet(fd)) return uwph_inet_call(fd, INET_CONNECT, NULL, 0, 0, (struct uwph_sockaddr *)addr, &len);
 #endif
 
     char abs[108];
@@ -474,6 +495,10 @@ UWPH_API int uwph_accept(int fd, struct uwph_sockaddr *addr, uwph_socklen_t *len
 #endif
 
     int flags, nfd;
+#ifdef UWPH_BACKEND_WIN32
+    if (uwph_is_inet(fd)) return uwph_inet_call(fd, INET_ACCEPT, NULL, 0, 0, addr, len);
+#endif
+
     struct endpoint *ep = get_unix(fd, &flags), *peer = NULL;
     if (!ep) return -1;
     uwph_lock(&uwph_io_lock);
@@ -506,6 +531,10 @@ UWPH_API int uwph_shutdown(int fd, int how)
         UWPH_NATIVE(int, "shutdown", (int, int));
         UWPH_NATIVE_RETURN(fn(fd, how));
     }
+#endif
+
+#ifdef UWPH_BACKEND_WIN32
+    if (uwph_is_inet(fd)) return uwph_inet_call(fd, INET_SHUTDOWN, NULL, 0, how, NULL, NULL);
 #endif
 
     struct endpoint *ep = get_unix(fd, NULL);
@@ -604,6 +633,10 @@ UWPH_API uwph_ssize_t uwph_recvmsg(int fd, struct uwph_msghdr *msg, int flags)
 
 UWPH_API uwph_ssize_t uwph_send(int fd, const void *buf, size_t len, int flags)
 {
+#ifdef UWPH_BACKEND_WIN32
+    if (uwph_is_inet(fd)) return uwph_inet_call(fd, INET_SEND, (void *)buf, len, flags, NULL, NULL);
+#endif
+
     struct uwph_iovec iov = { (void *)buf, len };
     struct uwph_msghdr m = { NULL, 0, &iov, 1, NULL, 0, 0 };
     return uwph_sendmsg(fd, &m, flags);
@@ -611,6 +644,10 @@ UWPH_API uwph_ssize_t uwph_send(int fd, const void *buf, size_t len, int flags)
 
 UWPH_API uwph_ssize_t uwph_recv(int fd, void *buf, size_t len, int flags)
 {
+#ifdef UWPH_BACKEND_WIN32
+    if (uwph_is_inet(fd)) return uwph_inet_call(fd, INET_RECV, (void *)buf, len, flags, NULL, NULL);
+#endif
+
     struct uwph_iovec iov = { buf, len };
     struct uwph_msghdr m = { NULL, 0, &iov, 1, NULL, 0, 0 };
     return uwph_recvmsg(fd, &m, flags);
@@ -623,6 +660,10 @@ UWPH_API int uwph_getsockopt(int fd, int level, int name, void *val, uwph_sockle
         UWPH_NATIVE(int, "getsockopt", (int, int, int, void *, uwph_socklen_t *));
         UWPH_NATIVE_RETURN(fn(fd, level, name, val, len));
     }
+#endif
+
+#ifdef UWPH_BACKEND_WIN32
+    if (uwph_is_inet(fd)) return uwph_inet_sockopt(fd, 0, level, name, val, len);
 #endif
 
     struct endpoint *ep = get_unix(fd, NULL);
@@ -653,6 +694,10 @@ UWPH_API int uwph_setsockopt(int fd, int level, int name, const void *val, uwph_
     }
 #endif
 
+#ifdef UWPH_BACKEND_WIN32
+    if (uwph_is_inet(fd)) return uwph_inet_sockopt(fd, 1, level, name, (void *)val, &len);
+#endif
+
     struct endpoint *ep = get_unix(fd, NULL);
     (void)level; (void)name; (void)val; (void)len;
     if (!ep) return -1;
@@ -679,6 +724,10 @@ UWPH_API int uwph_getsockname(int fd, struct uwph_sockaddr *addr, uwph_socklen_t
     }
 #endif
 
+#ifdef UWPH_BACKEND_WIN32
+    if (uwph_is_inet(fd)) return uwph_inet_call(fd, INET_GETSOCKNAME, NULL, 0, 0, addr, len);
+#endif
+
     struct endpoint *ep = get_unix(fd, NULL);
     int ret;
     if (!ep) return -1;
@@ -694,6 +743,10 @@ UWPH_API int uwph_getpeername(int fd, struct uwph_sockaddr *addr, uwph_socklen_t
         UWPH_NATIVE(int, "getpeername", (int, struct uwph_sockaddr *, uwph_socklen_t *));
         UWPH_NATIVE_RETURN(fn(fd, addr, len));
     }
+#endif
+
+#ifdef UWPH_BACKEND_WIN32
+    if (uwph_is_inet(fd)) return uwph_inet_call(fd, INET_GETPEERNAME, NULL, 0, 0, addr, len);
 #endif
 
     struct endpoint *ep = get_unix(fd, NULL);

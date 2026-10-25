@@ -45,6 +45,7 @@ typedef int32_t  uwph_clockid_t;
 #define UWPH_ENFILE          23
 #define UWPH_EMFILE          24
 #define UWPH_ENOTTY          25
+#define UWPH_EFBIG          27
 #define UWPH_ENOSPC          28
 #define UWPH_ESPIPE          29
 #define UWPH_EROFS           30

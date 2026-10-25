@@ -78,6 +78,16 @@ struct uwph_object *uwph_fd_get(int fd, enum uwph_fd_kind *kind, int *flags)
     return o;
 }
 
+int uwph_fd_ids(int *ids, int capacity)
+{
+    int n = 0;
+    uwph_lock(&fd_lock);
+    for (int i = 0; i < UWPH_MAX_FDS && n < capacity; i++)
+        if (fds[i].kind != UWPH_FD_FREE) ids[n++] = i;
+    uwph_unlock(&fd_lock);
+    return n;
+}
+
 int uwph_fd_count(void)
 {
     int n = 0;
@@ -210,6 +220,10 @@ UWPH_API uwph_ssize_t uwph_read(int fd, void *buf, size_t len)
     struct uwph_object *o = uwph_fd_get(fd, &kind, &flags);
     switch (kind) {
     case UWPH_FD_FREE: return UWPH_FAIL(UWPH_EBADF);
+#ifdef UWPH_BACKEND_WIN32
+    case UWPH_FD_INET:
+        ret = uwph_inet_call(fd, INET_RECV, buf, len, 0, NULL, NULL); break;
+#endif
     case UWPH_FD_PIPE_R: case UWPH_FD_UNIX:
         ret = uwph_stream_read(o, kind, buf, len, flags & UWPH_O_NONBLOCK, 0); break;
     case UWPH_FD_FILE:
@@ -236,6 +250,10 @@ UWPH_API uwph_ssize_t uwph_write(int fd, const void *buf, size_t len)
     struct uwph_object *o = uwph_fd_get(fd, &kind, &flags);
     switch (kind) {
     case UWPH_FD_FREE: return UWPH_FAIL(UWPH_EBADF);
+#ifdef UWPH_BACKEND_WIN32
+    case UWPH_FD_INET:
+        ret = uwph_inet_call(fd, INET_SEND, (void *)buf, len, 0, NULL, NULL); break;
+#endif
     case UWPH_FD_PIPE_W: case UWPH_FD_UNIX:
         ret = uwph_stream_write(o, kind, buf, len, flags & UWPH_O_NONBLOCK); break;
     case UWPH_FD_CONSOLE:

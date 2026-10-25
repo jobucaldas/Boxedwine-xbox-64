@@ -21,6 +21,13 @@
       <uap:VisualElements DisplayName="Boxedwine Dev Mode" Description="In-process Wine runtime skeleton"
                           BackgroundColor="transparent" Square150x150Logo="Assets/Logo.png"
                           Square44x44Logo="Assets/SmallLogo.png" />
+      <Extensions>
+        <uap:Extension Category="windows.fileTypeAssociation">
+          <uap:FileTypeAssociation Name="bwlog">
+            <uap:SupportedFileTypes><uap:FileType>.bwlog</uap:FileType></uap:SupportedFileTypes>
+          </uap:FileTypeAssociation>
+        </uap:Extension>
+      </Extensions>
     </Application>
     <!-- Explicit destructive-storage opt-in; Load receives this EntryPoint. -->
     <Application Id="BigFile" Executable="rungs.exe" EntryPoint="Boxedwine.BigFile">
@@ -28,11 +35,24 @@
                           BackgroundColor="transparent" Square150x150Logo="Assets/Logo.png"
                           Square44x44Logo="Assets/SmallLogo.png" />
     </Application>
+    <Application Id="PickFolder" Executable="rungs.exe" EntryPoint="Boxedwine.PickFolder">
+      <uap:VisualElements DisplayName="Boxedwine Pick USB folder" Description="Write/read/delete 64 MiB in a picked folder"
+                          BackgroundColor="transparent" Square150x150Logo="Assets/Logo.png"
+                          Square44x44Logo="Assets/SmallLogo.png" />
+    </Application>
+    <Application Id="PickFolderBigFile" Executable="rungs.exe" EntryPoint="Boxedwine.PickFolderBigFile">
+      <uap:VisualElements DisplayName="Boxedwine USB big file opt-in" Description="Enable --big-file: 64 MiB then 2304 MiB in a picked folder"
+                          BackgroundColor="transparent" Square150x150Logo="Assets/Logo.png"
+                          Square44x44Logo="Assets/SmallLogo.png" />
+    </Application>
   </Applications>
   <Capabilities>
     <Capability Name="internetClient" />
+    <Capability Name="internetClientServer" />
     <Capability Name="privateNetworkClientServer" />
     <Capability Name="codeGeneration" />
+    <!-- Needs the .bwlog fileTypeAssociation on App. -->
+    <uap:Capability Name="removableStorage" />
     <!-- Dev sideload only: deprecated and Store-rejected. -->
     <rescap:Capability Name="expandedResources"/>
   </Capabilities>

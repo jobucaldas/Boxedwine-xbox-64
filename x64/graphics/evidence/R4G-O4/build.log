@@ -1,0 +1,3 @@
+mkdir -p out
+x86_64-w64-mingw32-gcc -O2 -std=c11 -Wall -Wextra -Werror -municode -static-libgcc -s probe_d3d12.c -o out/probe_d3d12.exe -ldxguid
+build exit=0

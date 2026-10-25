@@ -16,6 +16,7 @@ UWPH_API uwph_pid_t uwph_getpid(void)
 #endif
 #ifdef UWPH_BACKEND_WIN32
     return (uwph_pid_t)GetCurrentProcessId();
+
 #else
     return 1;
 #endif
@@ -145,6 +146,11 @@ UWPH_API int uwph_getrusage(int who, struct uwph_rusage *ru) { (void)who; (void)
 
 UWPH_API int uwph_prctl(int op, uint64_t a2, uint64_t a3, uint64_t a4, uint64_t a5)
 {
+    uwph_trace_hit(UWPH_TRACE_PRCTL);
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    UWPH_NATIVE(int, "prctl", (int, uint64_t, uint64_t, uint64_t, uint64_t));
+    UWPH_NATIVE_RETURN(fn(op,a2,a3,a4,a5));
+#endif
     struct uwph_thread *t = uwph_thread_current();
     (void)a3; (void)a4; (void)a5;
     switch (op) {
@@ -155,7 +161,7 @@ UWPH_API int uwph_prctl(int op, uint64_t a2, uint64_t a3, uint64_t a4, uint64_t 
         memcpy((char *)(uintptr_t)a2, t->name, sizeof(t->name));
         return 0;
     default:
-        return UWPH_FAIL(UWPH_EINVAL);   /* incl. PR_SET_SYSCALL_USER_DISPATCH: no such thing here */
+        return UWPH_ENOSYS_INT();   /* no documented UWP equivalent */
     }
 }
 
@@ -201,7 +207,15 @@ UWPH_API char *uwph_getenv(const char *name)
     return r;
 }
 
-UWPH_API char *uwph_secure_getenv(const char *name) { return uwph_getenv(name); }
+UWPH_API char *uwph_secure_getenv(const char *name) {
+    uwph_trace_hit(UWPH_TRACE_SECURE_GETENV);
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    UWPH_NATIVE(char *, "secure_getenv", (const char *));
+    UWPH_NATIVE_RETURN(fn(name));
+#else
+    return uwph_getenv(name);
+#endif
+ }
 
 static int env_put(char *entry, size_t namelen, int overwrite)
 {
