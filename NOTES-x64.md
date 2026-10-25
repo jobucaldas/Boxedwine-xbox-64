@@ -2397,6 +2397,69 @@ path stat/lstat/access answer directories from mapped-path metadata
 keep the handle-based fstat, and access W_OK still honours read-only mounts.
 Tests now cover registry/main-handle hit and miss on every backend plus
 access/stat/lstat of a newly created directory.
+## B28 O2
+
+Status: BLOCKED for an in-process desktop prototype; source investigation and
+design complete. No runtime change is made by this order.
+
+Spawn site (local Wine 10.0 source, `/tmp/wine-src/VERSION`):
+`/tmp/wine-src/dlls/win32u/winstation.c:775` defines `get_desktop_window()`.
+It queries the server at lines 792–801, then, if no top window exists,
+constructs `C:\\windows\\system32\\explorer.exe /desktop` at lines 805–809.
+The actual spawn is `NtCreateUserProcess()` at lines 855–857 (WOW64 branch)
+and 861–863 (normal x64 branch). It resumes the thread and waits for process
+input idle at 866–870; line 872 emits `failed to start explorer`. The forced
+server lookup at 874–883 is a fallback, not proof that explorer initialized.
+
+Wine's `/desktop` parser calls `manage_desktop()` in
+`/tmp/wine-src/programs/explorer/explorer.c:896` (quoted option: 902).
+`programs/explorer/desktop.c:1197` implements it: graphics-driver setup at
+1247–1249, desktop and message-parent windows at 1269–1277, clipboard thread
+at 1286, and the desktop message loop at 1326–1332. These are the existing
+Wine implementations to reuse, rather than inventing a substitute desktop.
+
+Proposed nofork design:
+
+1. Factor Wine explorer's desktop implementation into a private PE DLL with
+   an explicit desktop-thread entry and startup/stop result. Load that DLL
+   through Wine's own PE loader in the game process; do not invoke an EXE
+   entry point as a thread. Preserve explorer resource/module identity and
+   its desktop, appbar, clipboard and driver dependencies (see
+   `programs/explorer/Makefile.in:1–14`).
+2. Start the worker through a PE-side user32 initialization callback before
+   game window creation, outside the loader lock. Bind the worker to the
+   caller's window station/desktop before creating windows. Coordinate one
+   owner per desktop, with a recursion guard and an explicit ready/failure
+   event signaled after both server desktop windows exist. Wait with a
+   bounded timeout, then repeat the real server lookup. A thread readiness
+   handshake must replace the current process `NtUserWaitForInputIdle`.
+   Integrate the win32u spawn branch with that PE callback for explicit
+   nofork mode; do not directly call PE user32/explorer code from Unix code.
+3. Refactor process-lifetime assumptions first: desktop.c:1260 and 1336
+   call `ExitProcess`, and 1265–1267 changes the process token. Worker
+   failure/exit must return a status and clean up only worker resources;
+   it must not terminate or change privileges of the game. Audit callbacks,
+   clipboard and display-restorer threads for shutdown and module lifetime.
+   Use a desktop-only configuration without shell launchers, tray services,
+   DDE/COM shell startup or command execution; desktop.c:1312 otherwise
+   invokes `CreateProcessW`. Preserve window and graphics initialization.
+4. Extend the private Wine build/staging to compile the affected win32u,
+   PE support and desktop DLL together. `harness/prepare-wine-wx.sh` currently
+   builds only Unix/PE ntdll and stages other DLLs from installed Wine; a
+   source-only win32u edit would not exercise the changed code.
+
+This spans a new PE module, process-to-thread lifecycle refactoring and
+reproducible Wine staging, so it does not fit a small prototype in this
+session. Keep nofork/wx/noproc and all gates unchanged. Future acceptance
+must rerun `K_TIMEOUT=45 x64/uwp-host/harness/run-megabonk.sh` through our
+launcher and Wine loader, show zero `failed to start explorer` entries and
+a non-black `shot-*.png`, and record an Xvfb/ffmpeg video <=60 seconds at
+`/workspace/x64-run/videos/B28-O2.mp4`. No game run or video is claimed here.
+
+Validation: `grep -q '## B28 O2' NOTES-x64.md && make -C x64/uwp-host test`.
+This exercises uwph Linux/Windows library tests (the Windows tests use stock
+Wine) and harness checks; it cannot prove an in-process desktop or Xbox UWP
+graphics. Record the exact output and exit status in the lane result files.
 
 ## B11 O1 — Megabonk THROUGH-uwph (Linux only)
 
