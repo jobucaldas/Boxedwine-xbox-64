@@ -1212,3 +1212,49 @@ Evidence classification: **build-only and source inspection**, no THROUGH-uwph
 runtime proof and no stock Wine execution in O3. Recording
 `/workspace/x64-run/videos/R4W-O3.mp4` shows the blocked exact test only.
 No runtime code was changed, no commits created and no remotes accessed.
+
+## B10
+
+O1 **BLOCKED** before Steam installation. Neither readiness prefix contained
+steam.exe. An isolated copy of LocalState/pfx was made under
+`/workspace/x64-run/lanes/B10/pfx`; the supplied PE32 SteamSetup.exe /S was
+invoked THROUGH this checkout's launcher -> Wine own private W^X loader ->
+uwph shim/Linux backend. Exit 1 after approximately 2.4 seconds: missing
+`C:\windows\syswow64\ntdll.dll`, status c0000135, in experimental WoW64.
+Steam was never installed, so no `-silent -no-browser` client run or 180-second
+client observation was possible. No login or token access occurred.
+
+Child process names + count in the final recorded installer attempt:
+conhost.exe 1 (Wine reports started); SteamSetup.exe 1 child loader launch
+(fails before guest entry); wineboot.exe 1 attempted child (disabled via
+WINEDLLOVERRIDES, fails c0000135). These are three successful child Linux
+wine64 execs, not three successfully initialized guest applications.
+steam.exe 0; steamwebhelper.exe 0. A separate foreground stock Linux
+wineserver was also started once by the harness, outside routed evidence.
+Failed preloader/wine executable probes in install.exec are not extra children.
+
+Top 20 missing imports: **none observed**; guest imports were not reached.
+The one observed missing module is syswow64/ntdll.dll (1 fatal diagnostic),
+not a missing exported function. No unsupported syscall diagnostic occurred;
+this does not establish syscall completeness. surface-trace-steam.tsv records
+all observed boundary/failure diagnostics with explicit categories and the
+unexecuted Steam phase; it is not a completed Steam surface inventory.
+
+Priorities for follow-on work: (1) supply a legitimate initialized Steam
+installation or supported 32-bit installer/WoW64 runtime; (2) rerun the actual
+180-second routed client trace and rank observed missing imports/syscalls;
+(3) treat Chromium steamwebhelper's multi-process model as a separate UWP
+single-process wall, unmeasured here. No bypass or emulated Steam was used.
+
+Last substantive failure: `ShellExecuteEx failed: ... err:start:fatal_error ...`.
+The literal last log line is a normal ntdll PROCESS_DETACH return, retained
+verbatim in harness/steam-evidence/install.log; install.exec contains process
+creation and exits, and install.counters.<pid> proves selected uwph routing.
+Only open/read/close/mmap/munmap/mprotect are selected by the existing shim,
+with its documented native-fd bypasses. This is off-device THROUGH-uwph
+installer evidence, not stock-Wine-only proof, Xbox proof, or Steam success.
+Raw lane logs and reproduction script are also in /workspace/x64-run/lanes/B10.
+Video /workspace/x64-run/videos/B10-O1.mp4 (30 seconds) shows the routed
+installer blocker, not a running Steam client. No commits or remotes touched.
+
+Literal last installer log line: `44367.703:0030:0034:trace:module:MODULE_InitDLL (00006FFFFFC20000,PROCESS_DETACH,0000000000000001) - RETURN 1`.
