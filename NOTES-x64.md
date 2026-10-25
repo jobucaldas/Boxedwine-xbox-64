@@ -737,3 +737,25 @@ traced 70; smoke 55/566). Backend/shim checks pass. Fresh launcher runs retain a
 20 counters, while the unchanged wineboot gate still blocks both controls and
 routed runs. These are Linux harness and Win32-under-Wine results, not Xbox
 acceptance; process-wide counters prove entry/routing, not per-ntdll completion.
+
+## R4S O3 fake proc
+
+`make -C x64/uwp-host/harness noproc-test` tests the bounded in-process
+provider with host procfs hidden, then invokes the readiness wrapper's exact
+`--noproc INSTALL -- COMMAND` interface for hello through our launcher, Wine's
+own loader and the uwph shim. The wrapper now accepts `--noproc` and uses an
+empty tmpfs for `/proc` for either noproc spelling. Its updated copy is retained
+as `harness/uwp_run-noproc.sh`; set `UWPH_UWP_RUN` to use that copy. The installed
+`/workspace/xbox-readiness/tests/uwp_run.sh` was updated locally as well.
+
+Snapshots cover self/maps, self/cmdline, cpuinfo; self/exe uses process executable
+identity for readlink, realpath and open. No snapshot reads host `/proc`.
+Linux maps enumerate ELF load segments via dl_iterate_phdr (anonymous/PE ranges
+not yet included); cmdline contains only the executable with a trailing NUL;
+cpuinfo advertises the x64 baseline, not console topology. Linux snapshots use
+sealed memfds and the existing private/native fd adapters and native FILE ABI.
+Win32 snapshots use in-process read-only file objects and VirtualQuery for maps;
+this path is build-checked with WINAPI_FAMILY_APP, not console-tested. A separate
+prestarted stock wineserver remains a concession. This is a bounded hello PASS,
+not full Linux proc fidelity or full UWP acceptance. Video:
+`/workspace/x64-run/videos/R4S-O3.mp4`.

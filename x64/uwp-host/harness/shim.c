@@ -128,3 +128,6 @@ uid_t getuid(void) { return uwph_getuid(); }
 char *realpath(const char *p, char *b) { char *r=uwph_realpath(p,b); if(!r) errno=uwph_errno; return r; }
 _Static_assert(sizeof(struct stat)==sizeof(struct uwph_stat),"stat ABI");
 _Static_assert(sizeof(sigset_t)==sizeof(uwph_sigset_t),"sigset ABI");
+
+ssize_t readlink(const char *p, char *b, size_t n)
+{ ssize_t r = uwph_readlink(p,b,n); if (r < 0) errno=uwph_errno; return r; }

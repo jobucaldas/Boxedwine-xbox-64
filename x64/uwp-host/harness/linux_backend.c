@@ -3,6 +3,9 @@
 #include "../src/linux_backend.h"
 #include <sys/syscall.h>
 #include <pthread.h>
+#include "../src/fake_proc.h"
+#include <stdlib.h>
+#include <string.h>
 #include "counters.h"
 extern void uwph_harness_backend_entry(int) __attribute__((weak));
 #define COUNT(op) do { if (uwph_harness_backend_entry) uwph_harness_backend_entry(op); } while (0)
@@ -64,6 +67,37 @@ static long fdcall(long nr, int fd, long b, long c, long d)
     UNLOCK();
     return result(r);
 }
+/* Returns native read-only snapshot fd, -2 for paths outside /proc. */
+static long proc_open(const char *path, int flags)
+{
+    char *data; size_t len;
+    if (!path || strncmp(path, "/proc/", 6)) return -2;
+    if (flags & (UWPH_O_ACCMODE | UWPH_O_CREAT | UWPH_O_TRUNC)) return -UWPH_EACCES;
+    if (!strcmp(path, "/proc/self/exe")) {
+        char exe[1024];
+        if (uwph_fake_proc_exe(exe, sizeof(exe)) < 0) return -uwph_errno;
+        return raw(SYS_openat, UWPH_AT_FDCWD, PTR(exe), flags, 0, 0, 0);
+    }
+    int rc = uwph_fake_proc_snapshot(path, &data, &len);
+    if (rc < 0) return -uwph_errno;
+    long fd = raw(SYS_memfd_create, PTR("uwph-proc"), 3, 0, 0, 0, 0);
+    if (fd >= 0) {
+        size_t done = 0;
+        while (done < len) {
+            long n = raw(SYS_write, fd, PTR(data + done), len - done, 0, 0, 0);
+            if (n <= 0) { raw(SYS_close, fd, 0, 0, 0, 0, 0); fd = n < 0 ? n : -UWPH_EIO; break; }
+            done += n;
+        }
+        if (fd >= 0) {
+            raw(SYS_lseek, fd, 0, 0, 0, 0, 0);
+            /* Seal writes/growth/shrink before handing the descriptor out. */
+            long r = raw(SYS_fcntl, fd, 1033, 15, 0, 0, 0);
+            if (r < 0) { raw(SYS_close, fd, 0, 0, 0, 0, 0); fd = r; }
+        }
+    }
+    free(data);
+    return fd;
+}
 int uwph_linux_openat(int dirfd, const char *path, int flags, unsigned mode)
 {
     WRLOCK();
@@ -71,7 +105,8 @@ int uwph_linux_openat(int dirfd, const char *path, int flags, unsigned mode)
      * an owned descriptor (or AT_FDCWD), never an arbitrary native fd. */
     int dir = path && path[0] == '/' ? UWPH_AT_FDCWD :
               dirfd == UWPH_AT_FDCWD ? dirfd : native(dirfd);
-    long r = dir == -1 ? -UWPH_EBADF : raw(SYS_openat,dir,PTR(path),flags,mode,0,0);
+    long r = proc_open(path, flags);
+    if (r == -2) r = dir == -1 ? -UWPH_EBADF : raw(SYS_openat,dir,PTR(path),flags,mode,0,0);
 #ifndef UWPH_HARNESS_NATIVE_FDS
     if (r >= 0) {
         int i; for (i=0;i<SLOTS && slots[i];i++);
@@ -183,7 +218,15 @@ uwph_FILE *uwph_linux_fopen(const char *path, const char *mode)
     int (*number)(FILE *) = uwph_linux_symbol("fileno");
     int (*destroy)(FILE *) = uwph_linux_symbol("fclose");
     WRLOCK();
-    FILE *f = fn(path, mode);
+    FILE *f;
+    long proc = proc_open(path, !strcmp(mode, "r") || !strcmp(mode, "rb") ? 0 : UWPH_O_WRONLY);
+    if (proc == -2) f = fn(path, mode);
+    else if (proc < 0) { errno = -proc; f = NULL; }
+    else {
+        FILE *(*wrap)(int, const char *) = uwph_linux_symbol("fdopen");
+        f = wrap(proc, mode);
+        if (!f) raw(SYS_close, proc, 0, 0, 0, 0, 0);
+    }
     uwph_errno = errno;
     if (f && stream_slot(number(f), 1) < 0) { destroy(f); f = NULL; }
     UNLOCK();

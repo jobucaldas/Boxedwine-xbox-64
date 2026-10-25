@@ -72,3 +72,10 @@ windows-file-test:
 evidence-replay: $(OUT)/backend_test
 	./evidence-replay.sh
 .PHONY: evidence-replay
+
+# O3 provider assertions run with host /proc hidden (not stock Wine proof).
+$(OUT)/fake_proc_test: ../tests/fake_proc.c $(OUT)/libuwph.a
+	$(CC) $(CFLAGS) $< $(OUT)/libuwph.a -ldl -o $@
+noproc-test:
+	./run-noproc.sh
+.PHONY: noproc-test

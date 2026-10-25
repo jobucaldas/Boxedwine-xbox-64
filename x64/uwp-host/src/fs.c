@@ -6,6 +6,7 @@
 #include "internal.h"
 #include <stdarg.h>
 #include <stdio.h>
+#include "fake_proc.h"
 
 struct mount { char prefix[64]; char host[512]; int flags; };
 static struct mount mounts[UWPH_MAX_MOUNTS];
@@ -123,11 +124,12 @@ static void fill_socket_stat(struct uwph_stat *st)
 
 /* ---- host file backend ---- */
 #ifdef UWPH_BACKEND_WIN32
-struct hfile { struct uwph_object base; HANDLE h; int64_t pos; uwph_lock_t lock; };
+struct hfile { struct uwph_object base; HANDLE h; char *snapshot; size_t snapshot_len; int64_t pos; uwph_lock_t lock; };
 
 static void hfile_destroy(struct uwph_object *o)
 {
-    CloseHandle(((struct hfile *)o)->h);
+    struct hfile *f = (struct hfile *)o;
+    if (f->snapshot) free(f->snapshot); else CloseHandle(f->h);
     free(o);
 }
 
@@ -159,6 +161,21 @@ static int host_open(const char *path, int flags)
 
     if ((flags & UWPH_O_ACCMODE) != UWPH_O_RDONLY || (flags & (UWPH_O_CREAT | UWPH_O_TRUNC | UWPH_O_DIRECTORY)))
         return UWPH_ENOSYS_INT();          /* write/create/dirs: next step */
+    char *snapshot = NULL; size_t snapshot_len = 0;
+    int proc = uwph_fake_proc_snapshot(path, &snapshot, &snapshot_len);
+    if (proc < 0 && strcmp(path, "/proc/self/exe")) return -1;
+    if (proc > 0) {
+        if (!(f = calloc(1, sizeof(*f)))) { free(snapshot); return UWPH_FAIL(UWPH_ENOMEM); }
+        uwph_obj_init(&f->base, hfile_destroy);
+        f->snapshot = snapshot; f->snapshot_len = snapshot_len;
+        InitializeSRWLock(&f->lock);
+        if ((fd = uwph_fd_alloc(UWPH_FD_FILE, &f->base, flags)) < 0) uwph_obj_unref(&f->base);
+        return fd;
+    }
+    if (!strcmp(path, "/proc/self/exe")) {
+        if (uwph_fake_proc_exe(host, sizeof(host)) < 0) return -1;
+        path = host;
+    } else
     if ((mf = uwph_fs_translate(path, host, sizeof(host))) < 0) return UWPH_FAIL(-mf);
     if (!utf8_to_wide(host, wpath, 1024)) return UWPH_FAIL(UWPH_ENAMETOOLONG);
     h = CreateFile2(wpath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
@@ -181,6 +198,13 @@ uwph_ssize_t uwph_file_read(struct uwph_object *o, void *buf, size_t len, int64_
     if (len > 0x7fffffff) len = 0x7fffffff;
     uwph_lock(&f->lock);
     at = off < 0 ? f->pos : off;
+    if (f->snapshot) {
+        size_t n = at >= (int64_t)f->snapshot_len ? 0 : f->snapshot_len - (size_t)at;
+        if (n > len) n = len;
+        if (n) memcpy(buf, f->snapshot + at, n);
+        if (off < 0) f->pos += n;
+        uwph_unlock(&f->lock); return n;
+    }
     ov.Offset = (DWORD)at;
     ov.OffsetHigh = (DWORD)(at >> 32);
     if (!ReadFile(f->h, buf, (DWORD)len, &got, &ov) && GetLastError() != ERROR_HANDLE_EOF) {
@@ -200,11 +224,12 @@ int64_t uwph_file_seek(struct uwph_object *o, int64_t off, int whence)
     uwph_lock(&f->lock);
     if (whence == UWPH_SEEK_CUR) base = f->pos;
     else if (whence == UWPH_SEEK_END) {
-        if (!GetFileInformationByHandleEx(f->h, FileStandardInfo, &si, sizeof(si))) {
+        if (f->snapshot) base = f->snapshot_len;
+        else if (!GetFileInformationByHandleEx(f->h, FileStandardInfo, &si, sizeof(si))) {
             uwph_unlock(&f->lock);
             return UWPH_FAIL(win_errno(GetLastError()));
         }
-        base = si.EndOfFile.QuadPart;
+        if (!f->snapshot) base = si.EndOfFile.QuadPart;
     } else if (whence != UWPH_SEEK_SET) { uwph_unlock(&f->lock); return UWPH_FAIL(UWPH_EINVAL); }
     if ((np = base + off) < 0) { uwph_unlock(&f->lock); return UWPH_FAIL(UWPH_EINVAL); }
     f->pos = np;
@@ -225,6 +250,11 @@ int uwph_file_fstat(struct uwph_object *o, struct uwph_stat *st)
     struct hfile *f = (struct hfile *)o;
     FILE_BASIC_INFO bi;
     FILE_STANDARD_INFO si;
+    if (f->snapshot) {
+        memset(st, 0, sizeof(*st)); st->st_mode = UWPH_S_IFREG | 0444;
+        st->st_nlink = 1; st->st_size = f->snapshot_len; st->st_blksize = 4096;
+        return 0;
+    }
     if (!GetFileInformationByHandleEx(f->h, FileBasicInfo, &bi, sizeof(bi)) ||
         !GetFileInformationByHandleEx(f->h, FileStandardInfo, &si, sizeof(si)))
         return UWPH_FAIL(win_errno(GetLastError()));
@@ -359,7 +389,21 @@ FS_STUB(int, remove, (const char *p), (void)p)
 FS_STUB(int, rename, (const char *a, const char *b), (void)a, (void)b)
 FS_STUB(int, link, (const char *a, const char *b), (void)a, (void)b)
 FS_STUB(int, symlink, (const char *a, const char *b), (void)a, (void)b)
-FS_STUB(uwph_ssize_t, readlink, (const char *p, char *b, size_t l), (void)p, (void)b, (void)l)
+UWPH_API uwph_ssize_t uwph_readlink(const char *p, char *b, size_t l)
+{
+    if (!strcmp(p, "/proc/self/exe")) {
+        char exe[1024];
+        int n = uwph_fake_proc_exe(exe, sizeof(exe));
+        if (n < 0) return -1;
+        if ((size_t)n > l) n = (int)l;
+        memcpy(b, exe, n); return n;
+    }
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    UWPH_NATIVE(uwph_ssize_t, "readlink", (const char *, char *, size_t));
+    UWPH_NATIVE_RETURN(fn(p, b, l));
+#endif
+    return UWPH_ENOSYS_INT();
+}
 FS_STUB(int, fchdir, (int fd), (void)fd)
 FS_STUB(int, fchmod, (int fd, uwph_mode_t m), (void)fd, (void)m)
 FS_STUB(int, chmod, (const char *p, uwph_mode_t m), (void)p, (void)m)
@@ -384,6 +428,13 @@ FS_STUB(int, inotify_rm_watch, (int fd, int wd), (void)fd, (void)wd)
 UWPH_API char *uwph_realpath(const char *path, char *resolved)
 {
     uwph_trace_hit(UWPH_TRACE_REALPATH);
+    if (!strcmp(path, "/proc/self/exe")) {
+        char exe[1024];
+        int n = uwph_fake_proc_exe(exe, sizeof(exe));
+        if (n < 0) return NULL;
+        if (!resolved && !(resolved = malloc((size_t)n + 1))) return UWPH_FAILP(UWPH_ENOMEM);
+        memcpy(resolved, exe, (size_t)n + 1); return resolved;
+    }
 #ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
     UWPH_NATIVE(char *, "realpath", (const char *, char *));
     UWPH_NATIVE_RETURN(fn(path, resolved));
