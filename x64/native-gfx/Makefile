@@ -36,3 +36,10 @@ FORCE:
 $(OUT)/teb_boundary.exe: tests/teb_boundary.c ../uwp-host/out/win/libuwph.a
 	@mkdir -p $(@D)
 	$(CC_WIN) $(CFLAGS) -I../uwp-host/include -o $@ $< ../uwp-host/out/win/libuwph.a -lbcrypt -lsynchronization -lwindowsapp
+
+.PHONY: clear-test
+clear-test: $(OUT)/clear_readback.exe
+
+$(OUT)/clear_readback.exe: tests/clear_readback.c d3dpass/host.c d3dpass/guest.c d3dpass/d3dpass.h ../uwp-host/out/win/libuwph.a
+	@mkdir -p $(@D)
+	$(CC_WIN) $(CFLAGS) -I../uwp-host/include -Id3dpass -o $@ tests/clear_readback.c d3dpass/host.c d3dpass/guest.c ../uwp-host/out/win/libuwph.a -ld3d11 -ldxgi -luuid -lbcrypt -lsynchronization -lwindowsapp
