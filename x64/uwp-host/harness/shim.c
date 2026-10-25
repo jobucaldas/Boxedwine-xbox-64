@@ -261,3 +261,22 @@ extern int uwph_linux_prctl_entry(int,unsigned long,unsigned long,unsigned long,
 __asm__(".text\n.globl prctl\n.type prctl,@function\nprctl:\n jmp uwph_linux_prctl_entry\n.size prctl,.-prctl\n");
 _Static_assert(sizeof(struct sigaction)==sizeof(struct uwph_sigaction),"sigaction ABI");
 _Static_assert(sizeof(stack_t)==sizeof(uwph_stack_t),"sigaltstack ABI");
+
+#ifdef UWPH_HARNESS_NATIVE_FDS
+/* Linux Wine reproduction only: process-local opt-in provider absence. */
+void *dlopen(const char *file, int mode)
+{
+    void *(*native_open)(const char *, int) = dlvsym(RTLD_NEXT, "dlopen", "GLIBC_2.2.5");
+    const char *deny = uwph_getenv("UWPH_DENY_DL");
+    const char *base = file ? strrchr(file, '/') : NULL;
+    base = base ? base + 1 : file;
+    if (deny && !strcmp(deny, "gnutls") && base &&
+        (!strcmp(base, "libgnutls.so") || !strncmp(base, "libgnutls.so.", 13))) {
+        fprintf(stderr, "UWPH_DENY_DL=gnutls: refused dlopen %s\n", file);
+        /* Let libc supply a normal dlerror, without touching installed libraries. */
+        return native_open("/uwph-test-denied/libgnutls.so", mode);
+    }
+    return native_open(file, mode);
+}
+
+#endif
