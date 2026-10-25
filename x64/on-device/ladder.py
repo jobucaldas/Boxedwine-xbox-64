@@ -33,15 +33,18 @@ def execute(command, cwd, timeout, env=None):
         return 'FAIL', 'could not execute adapter'
 
 
-def n10_standin(base, timeout):
-    """Only the packaged, fixed n10 probe may supply public probe sub-lines."""
+STANDIN = (('n10', 'platform-allow'), ('n11', 'loopback-dlls'))
+
+
+def standin(base, timeout):
+    """Only the packaged, fixed n10/n11 probes may supply public probe sub-lines."""
     payload = base / 'payload'
     if not (payload / 'rungs.exe').is_file():
         payload = base / 'out/payload'
     launcher = payload / 'combo/run_via_wine'
     if not launcher.is_file() or not Path('/usr/lib/wine/wine64').is_file():
-        return [], 'standin unavailable: launcher/payload or desktop Wine missing'
-    with tempfile.TemporaryDirectory(prefix='n10-standin-') as temp:
+        return {}, {r: 'standin unavailable: launcher/payload or desktop Wine missing' for r, _ in STANDIN}
+    with tempfile.TemporaryDirectory(prefix='n1x-standin-') as temp:
         root = Path(temp)
         env = os.environ.copy()
         env.update(WINEPREFIX=str(root / 'prefix'), WINEDEBUG='-all',
@@ -50,16 +53,19 @@ def n10_standin(base, timeout):
         state.mkdir()
         try:
             status, reason = execute(
-                [str(launcher.resolve()), str((payload / 'rungs.exe').resolve()),
-                 '--n10-standin', '--local-state', 'Z:' + str(state)], root, timeout,
-                env=env)
-            # Read only our bounded n10 public diagnostics, never adapter stdout.
+                [str(launcher.resolve()), str((payload / 'rungs.exe').resolve())]
+                + [f'--{r}-standin' for r, _ in STANDIN]
+                + ['--local-state', 'Z:' + str(state)], root, timeout, env=env)
+            # Read only our bounded n10/n11 public diagnostics, never adapter stdout.
             evidence = state / 'ladder-native.log'
-            lines = evidence.read_text(errors='replace').splitlines() if evidence.is_file() else []
-            lines = [line for line in lines if line.startswith('# n10 | standin ')]
-            # Never echo the adapter verdict word: a hosted n10 line must not read as PASS.
-            collected = 'collected' if status == 'PASS' and lines else f'not collected ({reason})'
-            return lines, f'standin {collected}; THROUGH our launcher -> stock Wine loader; no uwph or Xbox proof'
+            log = evidence.read_text(errors='replace').splitlines() if evidence.is_file() else []
+            lines, reasons = {}, {}
+            for r, _ in STANDIN:
+                lines[r] = [line for line in log if line.startswith(f'# {r} | standin ')]
+                # Never echo the adapter verdict word: a hosted line must not read as PASS.
+                collected = 'collected' if status == 'PASS' and lines[r] else f'not collected ({reason})'
+                reasons[r] = f'standin {collected}; THROUGH our launcher -> stock Wine loader; no uwph or Xbox proof'
+            return lines, reasons
         finally:
             try:
                 subprocess.run(['/usr/lib/wine/wineserver', '-k'], env=env,
@@ -137,14 +143,15 @@ def main():
             print(line, flush=True)
             log.write(line + '\n')
             log.flush()
-        lines, reason = n10_standin(base, 60)  # first run may create a Wine prefix
-        for line in lines:
+        lines, reasons = standin(base, 60)  # first run may create a Wine prefix
+        for ident, name in STANDIN:
+            for line in lines.get(ident, []):
+                print(line, flush=True)
+                log.write(line + '\n')
+            line = f'STAGE {ident} {name} SKIP: {reasons[ident]}; console verdict=SKIP'
             print(line, flush=True)
             log.write(line + '\n')
-        line = f'STAGE n10 platform-allow SKIP: {reason}; console verdict=SKIP'
-        print(line, flush=True)
-        log.write(line + '\n')
-        log.flush()
+            log.flush()
     # Diagnostic collection completes despite individual failures/skips.
     return 0
 

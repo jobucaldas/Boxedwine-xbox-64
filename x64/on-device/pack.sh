@@ -130,13 +130,13 @@ try:
         if name in roles:
             return roles[name]
         if name.endswith('rungs.exe'):
-            return 'n0-n7 (native ladder; console unverified)'
+            return 'n0-n11 (native ladder; console unverified)'
         if name.endswith('smoke.exe'):
             return 'b (build diagnostic)'
         if name.endswith('probe_native.exe'):
             return expected['probe_native.exe']
         if name == 'ladder':
-            return 'a-h/n0-n7 (hosted diagnostic)'
+            return 'a-h/n0-n11 (hosted diagnostic)'
         return 'all (installation, packaging, or instructions)'
     files = sorted(p.relative_to(kit).as_posix() for p in kit.rglob('*') if p.is_file())
     lines = [f'{name} | {role(name)}' for name in files]

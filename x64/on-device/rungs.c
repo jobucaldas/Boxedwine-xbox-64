@@ -9,6 +9,8 @@
  * crash or OS kill still leaves every earlier line. No credentials are read. */
 #define INITGUID
 #define COBJMACROS
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #include <windows.h>
 #include <appmodel.h>
 #include <d3d11.h>
@@ -695,7 +697,7 @@ static void rung_n7(void)
 }
 
 /* ---- n10: observe platform permissions; only the FromApp path executes. ---- */
-static FARPROC n10_kernel_proc(const char *name)
+static FARPROC kernel_proc(const char *name)
 {
     HMODULE m = GetModuleHandleA("kernelbase.dll");
     FARPROC p = m ? GetProcAddress(m, name) : NULL;
@@ -711,7 +713,7 @@ static void rung_n10(void)
     typedef PVOID (WINAPI *alloc_fn)(PVOID, SIZE_T, DWORD, DWORD);
     typedef BOOL (WINAPI *protect_fn)(PVOID, SIZE_T, DWORD, PDWORD);
     const char *where = g_device ? "console" : "standin";
-    alloc_fn alloc = (alloc_fn)(void *)n10_kernel_proc("VirtualAlloc");
+    alloc_fn alloc = (alloc_fn)(void *)kernel_proc("VirtualAlloc");
     SetLastError(ERROR_PROC_NOT_FOUND);
     void *rwx = alloc ? alloc(NULL, 64 * 1024, MEM_COMMIT | MEM_RESERVE,
                              PAGE_EXECUTE_READWRITE) : NULL;
@@ -724,8 +726,8 @@ static void rung_n10(void)
     note("n10 | %s VirtualFree RWX %s err=%lu", where,
          rwx ? (freed ? "OK" : "REFUSED") : "SKIP", free_err);
 
-    alloc_fn from_app = (alloc_fn)(void *)n10_kernel_proc("VirtualAllocFromApp");
-    protect_fn protect = (protect_fn)(void *)n10_kernel_proc("VirtualProtectFromApp");
+    alloc_fn from_app = (alloc_fn)(void *)kernel_proc("VirtualAllocFromApp");
+    protect_fn protect = (protect_fn)(void *)kernel_proc("VirtualProtectFromApp");
     SetLastError(ERROR_PROC_NOT_FOUND);
     void *code = from_app ? from_app(NULL, 4096, MEM_COMMIT | MEM_RESERVE,
                                     PAGE_READWRITE) : NULL;
@@ -766,6 +768,100 @@ static void rung_n10(void)
           where, flushed ? "OK" : "REFUSED", g_device ? (flushed ? "PASS" : "FAIL") : "SKIP");
 }
 
+/* ---- n11: in-app TCP loopback pair (as BoxedWine-uwp nativeSocketPair) and
+ * system DLL loads. Only the loopback round-trip decides the verdict. ---- */
+static int n11_socketpair(const char *where)
+{
+    WSADATA wd;
+    int rc = WSAStartup(MAKEWORD(2, 2), &wd);
+    note("n11 | %s WSAStartup 2.2 %s rc=%d", where, rc ? "REFUSED" : "OK", rc);
+    if (rc) return 0;
+    SOCKET listener = INVALID_SOCKET, client = INVALID_SOCKET, peer = INVALID_SOCKET;
+    struct sockaddr_in a = {0};
+    int len = sizeof(a), ok = 0, reuse = 1;
+    DWORD timeout = 2000;
+    char buf[4];
+    a.sin_family = AF_INET;
+    a.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    const char *step = "socket";
+    do {
+        listener = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+        if (listener == INVALID_SOCKET) break;
+        step = "setsockopt SO_REUSEADDR";
+        if (setsockopt(listener, SOL_SOCKET, SO_REUSEADDR, (char *)&reuse, sizeof(reuse))) break;
+        step = "bind 127.0.0.1:0";
+        if (bind(listener, (struct sockaddr *)&a, sizeof(a))) break;
+        step = "getsockname";
+        if (getsockname(listener, (struct sockaddr *)&a, &len) || !a.sin_port) break;
+        step = "listen";
+        if (listen(listener, 1)) break;
+        note("n11 | %s listener 127.0.0.1:%u OK", where, ntohs(a.sin_port));
+        step = "client socket";
+        client = socket(AF_INET, SOCK_STREAM, 0);
+        if (client == INVALID_SOCKET) break;
+        step = "connect";
+        if (connect(client, (struct sockaddr *)&a, sizeof(a))) break;
+        step = "accept";
+        peer = accept(listener, NULL, NULL);
+        if (peer == INVALID_SOCKET) break;
+        note("n11 | %s connect+accept OK", where);
+        /* Bounded: a missing peer must not hang the ladder. */
+        step = "client receive timeout";
+        if (setsockopt(client, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout))) break;
+        step = "peer receive timeout";
+        if (setsockopt(peer, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout))) break;
+        step = "send ping client->peer";
+        if (send(client, "ping", 4, 0) != 4) break;
+        step = "recv ping";
+        if (recv(peer, buf, 4, MSG_WAITALL) != 4 || memcmp(buf, "ping", 4)) break;
+        step = "send pong peer->client";
+        if (send(peer, "pong", 4, 0) != 4) break;
+        step = "recv pong";
+        if (recv(client, buf, 4, MSG_WAITALL) != 4 || memcmp(buf, "pong", 4)) break;
+        ok = 1;
+    } while (0);
+    int wsa = ok ? 0 : WSAGetLastError();
+    note("n11 | %s loopback round-trip 4B each way %s%s%s wsa=%d", where, ok ? "OK" : "FAIL at ",
+         ok ? "" : step, ok ? "" : ";", wsa);
+    if (peer != INVALID_SOCKET) closesocket(peer);
+    if (client != INVALID_SOCKET) closesocket(client);
+    if (listener != INVALID_SOCKET) closesocket(listener);
+
+    /* AF_UNIX: observe only; close at once if the platform hands one out. */
+    SOCKET unix_sock = socket(AF_UNIX, SOCK_STREAM, 0);
+    wsa = unix_sock == INVALID_SOCKET ? WSAGetLastError() : 0;
+    note("n11 | %s socket AF_UNIX SOCK_STREAM %s wsa=%d", where,
+         unix_sock == INVALID_SOCKET ? "REFUSED" : "ALLOWED", wsa);
+    if (unix_sock != INVALID_SOCKET) closesocket(unix_sock);
+    WSACleanup();
+    return ok;
+}
+
+static void rung_n11(void)
+{
+    typedef HMODULE (WINAPI *load_fn)(LPCWSTR);
+    typedef BOOL (WINAPI *free_fn)(HMODULE);
+    const char *where = g_device ? "console" : "standin";
+    int ok = n11_socketpair(where);
+    load_fn load = (load_fn)(void *)kernel_proc("LoadLibraryW");
+    free_fn unload = (free_fn)(void *)kernel_proc("FreeLibrary");
+    note("n11 | %s LoadLibraryW %s", where, load && unload ? "FOUND" : "MISSING");
+    static const WCHAR *dlls[] = {
+        L"d3d11.dll", L"dxgi.dll", L"d3d12.dll", L"xaudio2_9.dll", L"xinputuap.dll",
+        L"xinput1_4.dll", L"mmdevapi.dll", L"bcrypt.dll", L"crypt32.dll", L"ws2_32.dll"
+    };
+    for (unsigned i = 0; i < sizeof(dlls) / sizeof(dlls[0]); i++) {
+        SetLastError(0);
+        HMODULE m = load && unload ? load(dlls[i]) : NULL;
+        DWORD err = m ? 0 : load && unload ? GetLastError() : ERROR_PROC_NOT_FOUND;
+        note("n11 | %s LoadLibraryW %ls %s err=%lu", where, dlls[i], m ? "LOADED" : "REFUSED", err);
+        if (m) unload(m);
+    }
+    stage("n11", "loopback-dlls", !g_device ? "SKIP" : ok ? "PASS" : "FAIL",
+          "%s loopback=%s; AF_UNIX and DLL loads informational; console verdict=%s",
+          where, ok ? "OK" : "FAIL", g_device ? (ok ? "PASS" : "FAIL") : "SKIP");
+}
+
 #include "input/probe.inc"
 
 static void run_all(IUnknown *window)
@@ -782,6 +878,7 @@ static void run_all(IUnknown *window)
     rung_n7();
     rung_n8();
     rung_n10();
+    rung_n11();
     rung_n5(); /* last: the commit test may hit the app's memory limit */
     note("rungs done; run once as App and once as Game and keep both logs");
 }
@@ -943,16 +1040,17 @@ static HRESULT packaged_state_dir(void)
 
 int main(int argc, char **argv)
 {
-    int console = 0, n10_only = 0;
+    int console = 0, n10_only = 0, n11_only = 0;
     wcscpy(g_state, L"LocalState");
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--console")) console = 1;
         else if (!strcmp(argv[i], "--n10-standin")) { console = 1; n10_only = 1; }
+        else if (!strcmp(argv[i], "--n11-standin")) { console = 1; n11_only = 1; }
         else if (!strcmp(argv[i], "--big-file")) g_big_file = 1;
         else if (!strcmp(argv[i], "--local-state") && i + 1 < argc)
             MultiByteToWideChar(CP_ACP, 0, argv[++i], -1, g_state, MAX_PATH);
         else {
-            fprintf(stderr, "usage: rungs.exe [--console] [--n10-standin] [--local-state DIR] [--big-file]\n");
+            fprintf(stderr, "usage: rungs.exe [--console] [--n10-standin] [--n11-standin] [--local-state DIR] [--big-file]\n");
             return 2;
         }
     }
@@ -1003,7 +1101,8 @@ int main(int argc, char **argv)
             return 1;
         }
         if (n10_only) rung_n10();
-        else run_all(NULL);
+        if (n11_only) rung_n11();
+        if (!n10_only && !n11_only) run_all(NULL);
     }
     if (g_log) fclose(g_log);
     return 0;
