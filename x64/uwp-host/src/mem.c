@@ -272,3 +272,20 @@ UWPH_API int uwph_msync(void *addr, size_t len, int flags) { (void)addr; (void)l
 /* VirtualLock is not in the APP partition; locking is advisory for Wine */
 UWPH_API int uwph_mlock(const void *addr, size_t len)   { (void)addr; (void)len; return 0; }
 UWPH_API int uwph_munlock(const void *addr, size_t len) { (void)addr; (void)len; return 0; }
+
+/* Explicit loader transition; unlike the legacy mprotect emulation this never
+ * tracks RWX or falls back to desktop VirtualProtect. codeGeneration is needed
+ * for executable protection in an actual UWP package. */
+UWPH_API int uwph_protect(void *addr, size_t len, int prot)
+{
+    if (!len || ((uintptr_t)addr & 4095) ||
+        (prot & ~(UWPH_PROT_READ | UWPH_PROT_WRITE | UWPH_PROT_EXEC)))
+        return UWPH_FAIL(UWPH_EINVAL);
+    if ((prot & UWPH_PROT_WRITE) && (prot & UWPH_PROT_EXEC))
+        return UWPH_FAIL(UWPH_EACCES);
+#ifdef UWPH_BACKEND_WIN32
+    resolve_vprotect();
+    if (!vprotect_is_fromapp) return UWPH_FAIL(UWPH_ENOSYS);
+#endif
+    return uwph_mprotect(addr, len, prot);
+}

@@ -24,7 +24,7 @@ static struct { char name[512]; unsigned long calls[C_COUNT], backend[C_COUNT]; 
 static pthread_mutex_t lock=PTHREAD_MUTEX_INITIALIZER;
 static _Atomic unsigned long backend[C_COUNT], bypass[C_COUNT], recursion, unattributed, overflow;
 static _Thread_local int depth, origin=-1;
-static const char *names[]={"open","read","close","mmap","munmap"};
+static const char *names[]={"open","read","close","mmap","munmap","mprotect"};
 int count_begin(int op,void *caller)
 {
     if(depth++) { atomic_fetch_add(&recursion,1); depth--; return 0; }

@@ -17,7 +17,7 @@ assert all(r['classification'] in allowed and r['reason'] for r in rows)
 log=(out/'bind.log').read_text(); ntdll=data['artifacts']['unix_ntdll']['path']
 exports=subprocess.check_output(['nm','-D','--defined-only','out/libuwph_shim.so'],text=True)
 export_names={line.split()[-1].split('@')[0] for line in exports.splitlines()}
-selected={'open','read','close','mmap','munmap','_exit'}
+selected={'open','read','close','mmap','mprotect','munmap','_exit'}
 assert {s for s,r in policy.items() if r['classification']=='routed'}==selected-{'_exit'}
 for symbol in sorted(selected):
  assert symbol in export_names, 'missing shim export '+symbol
