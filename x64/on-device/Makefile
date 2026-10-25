@@ -2,7 +2,7 @@ CC_WIN ?= x86_64-w64-mingw32-gcc
 OUT := out
 CFLAGS := -O2 -std=c11 -Wall -Wextra -Werror
 
-.PHONY: all smoke-exe ladder package offline-smoke kit clean linux-appx linux-appx-test
+.PHONY: all smoke-exe ladder package verify-package offline-smoke kit clean linux-appx linux-appx-test
 all: smoke-exe
 
 # Loose layout fallback; no SDK packer or device activation is implied.
@@ -18,6 +18,14 @@ linux-appx-test: linux-appx
 
 kit: smoke-exe ladder $(OUT)/probe_d3d12.exe combo-binaries
 	./pack.sh --kit
+
+# An explicit PACKAGE_DIR checks an existing bundle without rebuilding it.
+PACKAGE_DIR ?= $(OUT)/kit
+ifeq ($(origin PACKAGE_DIR),file)
+verify-package: kit
+endif
+verify-package:
+	./verify-package.sh "$(PACKAGE_DIR)"
 
 smoke-exe: $(OUT)/smoke.exe
 

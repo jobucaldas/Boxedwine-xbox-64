@@ -14,6 +14,7 @@ grep -q '^STAGE combo .* PASS:' LocalState/ladder.log
 
 # Exercise the generated kit from an unrelated directory, with no source-relative paths.
 make --no-print-directory kit
+make --no-print-directory verify-package PACKAGE_DIR=out/kit
 kit_check=$(mktemp -d /tmp/b23-kit.XXXXXX)
 cp -a out/kit "$kit_check/kit"
 UWPH_COMBO_PREFIX="$PWD/../uwp-host/harness/prebuilt-prefix" \

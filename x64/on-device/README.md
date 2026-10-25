@@ -10,8 +10,15 @@ separate build diagnostic. Tomorrow's checklist:
 
     make -C x64/on-device package        # loose payload + test cert
     make -C x64/on-device kit            # package + hosted ladder -> out/kit.zip
-    make -C x64/on-device offline-smoke  # package, offline ladder, kit, Wine smoke
+    make -C x64/on-device verify-package # build kit; check XML and exact inventory
+    make -C x64/on-device offline-smoke  # package, offline ladder, verified kit, Wine smoke
     bash x64/on-device/check-doc.sh      # this README vs the built kit
+
+`verify-package` requires `xmllint` (Debian package `libxml2-utils`) and Python 3.
+It checks XML well-formedness, compares every shipped file with the kit inventory,
+and prints Identity, Version, and TargetDeviceFamily. Set the make variable
+`PACKAGE_DIR` to an existing extracted kit to verify it without rebuilding.
+These checks are build-only and do not validate an Appx schema or Xbox activation.
 
 - Loose payload: `x64/on-device/out/payload/` (`AppxManifest.xml`, `rungs.exe`, `smoke.exe`, `probe_d3d12.exe`, optional `probe_native.exe`,
   `Assets/*.png`, `PACKAGING-NOTES.txt`, and the hosted Linux `combo/` assets
