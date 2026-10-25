@@ -2600,3 +2600,69 @@ Wine ran only the explicitly labelled packaging-time prefix preparation;
 it is not the game acceptance proof. Linux only; Xbox untested. The generated
 surface-trace.tsv refresh was restored to its original content after the run;
 no enforcement gates or constraints changed. O2 was not implemented.
+
+## B33 O2
+
+Added `desk_probe.c` and its mingw build, plus `run-desk-probe.sh stock|nofork`. The probe checks desktop existence, display GUID, a visible 320x240 GDI window with pixel readback, a message-only child and its ancestor, Unicode clipboard roundtrip, and current display width. Systray presence is informational. Every mandatory check contributes to the exit status. The GUI subsystem avoids a probe-induced conhost launch while retaining redirected stdout. An initial console-subsystem experiment reproduced the same desktop failures but also attempted conhost; the final exact test below uses the GUI build and counts only explorer under nofork.
+
+Stock uses an installed Wine and separate server with a private writable copy of the prebuilt prefix. Nofork copies the prefix afresh and runs THROUGH `uwp_run.sh(nofork,wx,noproc) -> run_via_wine -> Wine own W^X loader -> shim -> uwph`, with `UWPH_INPROC_SERVER=1` and `WINESERVER=/bin/false`. Both use `WINEDEBUG=+process,err` and print the identical O1 NT-entry spawn metric. Prefix copies are removed on exit; full logs/reports remain at the evidence paths below. Stock Wine is an explicitly permitted baseline, not THROUGH-uwph proof. Prefix preparation is build-only. Linux proof only; Xbox untested. No constraints or verification gates changed.
+
+Final stock output:
+
+```text
+Reused read-only prebuilt-prefix; wineboot invocations this run: 0
+Build-only stock Wine preparation; no runtime acceptance claimed
+DESKTOP PROBE mode=stock DISPLAY=:0
+DESK desktop_window PASS
+DESK display_guid PASS
+DESK driver_window PASS
+DESK message_window PASS
+DESK clipboard PASS
+DESK display_modes PASS
+DESK systray INFO present=1
+DESK result PASS
+exit=0
+NtCreateUserProcess attempts: 11 (wine-internal: 10, guest: 1)
+spawn: L"C:\\windows\\system32\\wineboot.exe" L"\"C:\\windows\\system32\\wineboot.exe\" --init"
+spawn: L"C:\\windows\\system32\\winemenubuilder.exe" L"C:\\windows\\system32\\winemenubuilder.exe -a -r"
+spawn: L"C:\\windows\\system32\\services.exe" L"\"C:\\windows\\system32\\services.exe\""
+spawn: L"C:\\windows\\system32\\winedevice.exe" L"C:\\windows\\system32\\winedevice.exe"
+spawn: L"C:\\windows\\system32\\plugplay.exe" L"C:\\windows\\system32\\plugplay.exe"
+spawn: L"C:\\windows\\system32\\explorer.exe" L"\"C:\\windows\\system32\\explorer.exe\" /desktop"
+spawn: L"C:\\windows\\system32\\svchost.exe" L"C:\\windows\\system32\\svchost.exe -k LocalServiceNetworkRestricted"
+spawn: L"C:\\windows\\system32\\winedevice.exe" L"C:\\windows\\system32\\winedevice.exe"
+spawn: L"C:\\windows\\system32\\rpcss.exe" L"C:\\windows\\system32\\rpcss.exe"
+spawn: L"C:\\windows\\system32\\conhost.exe" L"\"C:\\windows\\system32\\conhost.exe\" --unix --width 0 --height 0 --server 0x30"
+spawn: L"Z:\\workspace\\wt\\B33\\x64\\pe\\tests\\desk_probe.exe" L"\"Z:\\workspace\\wt\\B33\\x64\\pe\\tests\\desk_probe.exe\" "
+00b0:err:ntoskrnl:ZwLoadDriver failed to create driver L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\winebth": c00000e5
+stock Wine baseline; separate wineserver allowed; explorer spawned normally
+evidence: /workspace/wt/B33/x64/uwp-host/harness/out/desk-probe/evidence-WBpgWShJ
+```
+
+Final nofork output:
+
+```text
+Reused read-only prebuilt-prefix; wineboot invocations this run: 0
+Build-only stock Wine preparation; no runtime acceptance claimed
+DESKTOP PROBE mode=nofork DISPLAY=:0
+DESK desktop_window PASS
+DESK display_guid FAIL
+DESK driver_window FAIL
+DESK message_window PASS
+DESK clipboard PASS
+DESK display_modes PASS
+DESK systray INFO present=0
+DESK result FAIL
+exit=1
+NtCreateUserProcess attempts: 1 (wine-internal: 1, guest: 0)
+spawn: L"C:\\windows\\system32\\explorer.exe" L"\"C:\\windows\\system32\\explorer.exe\" /desktop"
+0024:err:win:get_desktop_window failed to start explorer c0000017
+0024:err:winediag:nodrv_CreateWindow Application tried to create a window, but no driver could be loaded.
+0024:err:winediag:nodrv_CreateWindow L"The explorer process failed to start."
+THROUGH uwp_run.sh(nofork,wx,noproc) -> launcher -> Wine own W^X loader -> shim -> uwph; Wine server hosted in-process
+evidence: /workspace/wt/B33/x64/uwp-host/harness/out/desk-probe/evidence-XSKIdx6G
+```
+
+The requested exact test ran on a free Xvfb display and exited 0 (`/tmp/b33-exact.log`). `sh x64/pe/tests/build.sh` succeeded; the two expected FAIL greps and `wine-internal: 1` grep succeeded; `make -C x64/uwp-host test` passed (including 172 passed/0 failed shim checks and 7 passed/0 failed in-process verifier checks). Stock passed every required feature. Nofork returned 1 as expected, with explorer refused (`c0000017`), missing display GUID, and no driver window; clipboard/message/display-mode checks still passed. This is the B34–B36 acceptance oracle.
+
+Video: `/workspace/x64-run/videos/B33-O2.mp4` (13.2 seconds, private Xvfb + ffmpeg), showing both runs and the exact-test completion.
