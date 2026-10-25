@@ -13,16 +13,20 @@ separate build diagnostic. Tomorrow's checklist:
     make -C x64/on-device offline-smoke  # package, offline ladder, kit, Wine smoke
     bash x64/on-device/check-doc.sh      # this README vs the built kit
 
-- Loose payload: `x64/on-device/out/payload/` (`AppxManifest.xml`, `rungs.exe`, `smoke.exe`, optional `probe_native.exe`,
+- Loose payload: `x64/on-device/out/payload/` (`AppxManifest.xml`, `rungs.exe`, `smoke.exe`, `probe_d3d12.exe`, optional `probe_native.exe`,
   `Assets/*.png`, `PACKAGING-NOTES.txt`, and the hosted Linux `combo/` assets
   described under "B21 combo rung")
 - Test certificate: `x64/on-device/out/test-cert.cer` (CN=BoxedwineDev,
   matches manifest Publisher)
 - Private test key: `x64/on-device/out/test-cert.pfx` (empty password; this is
   a disposable dev identity. Never put it in the payload or share it.)
+- Checksums: `x64/on-device/out/SHA256SUMS`, rewritten by every `package`
+  or `kit` run. It covers every packaged file: each `out/payload/` file
+  (symlinks followed, as MakeAppx and the zip read them), `test-cert.cer`,
+  `test-cert.pfx`, and after `kit` also `kit.zip` and every extracted file.
+  Verify with `cd x64/on-device/out && sha256sum -c SHA256SUMS`.
 - Kit: `x64/on-device/out/kit.zip`, extracted as `x64/on-device/out/kit/`.
-  Verify it with `cd x64/on-device/out && sha256sum -c SHA256SUMS`; the
-  sidecar `out/SHA256SUMS` covers `kit.zip` and every extracted file. Top level:
+  Top level:
   - `README.md` (this file), `KIT-NOTES.txt` (build-only notes),
     `kit-manifest.txt` (every file and the rung it serves) and `SHA256SUMS`
     (in-kit checksums, excluding itself).
@@ -102,8 +106,13 @@ installed on a console yet.
    warning, which is expected only for your own console on your LAN, and sign in.
    From this Linux box, `./x64/on-device/deploy-devportal.sh info` does the same
    sign-in check over the REST API (see "Pack, sign and deploy from Linux").
-3. `./x64/on-device/deploy-devportal.sh install` from this box, or in the
-   browser **Home > My games & apps > Add**. Choose `BoxedwineDev.appx` and continue.
+3. `./x64/on-device/deploy-devportal.sh install` from this box (uploads
+   `x64/on-device/out/BoxedwineDev.appx` from `linux-appx`), or in the browser
+   **Home > My games & apps > Add**. Choose the package file
+   `BoxedwineDev.appx`, the signed output of the Linux `linux-appx` step (or the
+   MakeAppx/SignTool alternative) above, built from `x64/on-device/out/payload/`
+   (carried in `x64/on-device/out/kit.zip`; run `sha256sum -c SHA256SUMS` in
+   `x64/on-device/out` first). Then continue.
    There are no dependency packages. If it asks for a certificate, give it
    `test-cert.cer` (never the `.pfx`). Start the install and wait for it to
    finish.
@@ -185,7 +194,8 @@ Nothing is downloaded, and there is no stock-Wine fallback.
 `make -C x64/on-device package` runs `pack.sh`. It generates the OpenSSL test
 certificate on first use and checks the CER/PFX pair, the publisher and the
 x64 identity. It also creates the PNG assets the manifest references and
-stages `out/payload/`. LocalState, tokens and private keys are never staged.
+stages `out/payload/`, then writes `out/SHA256SUMS` over everything it
+packaged. LocalState, tokens and private keys are never staged.
 No signature or AppxBlockMap is produced by `package`; `linux-appx` packs and
 signs on Linux as shown above.
 
@@ -370,6 +380,22 @@ nonfinite values mapped to zero. Packet number is zero: this stateless mapper
 does not track changes. No Wine xinput integration is included. The probe uses
 the installed SDK-compatible MinGW Gamepad ABI declarations. Host mapping tests
 are native C tests, not THROUGH-uwph or stock Wine runtime evidence.
+
+## D3D12 probe rung (B46 O1)
+
+`make -C x64/on-device ladder package` also builds `out/probe_d3d12.exe` with
+MinGW from R4G's `x64/graphics/probe_d3d12.c` (same flags as
+`make -C x64/graphics`) and copies it to `payload/probe_d3d12.exe`;
+`kit-manifest.txt` lists it as `f/n2`. It is a standalone console PE: the
+manifest does not activate it and `rungs.exe` does not launch it, so it is a
+companion to n2, not a new ladder stage. d3d12.dll and dxgi.dll are loaded at
+runtime. Usage: `probe_d3d12.exe [--log PATH] [--no-window] [--frames N]`. The
+install directory is read-only, so pass `--log` with a LocalState path, or read
+`%LOCALAPPDATA%\probe_d3d12.log` / `%TEMP%\probe_d3d12.log`.
+
+| Rung | Probe | What it logs | Expected HRESULTs / exit |
+| --- | --- | --- | --- |
+| f/n2 | `probe_d3d12.exe` (D3D12 device, offscreen clear, optional HWND present) | `runtime: dxgi.dll=ok d3d12.dll=ok`; one `adapter[i]:` line per DXGI adapter (name, vendor/device id, VRAM, software flag); `device: created on adapter[i]` or `on default adapter`; `device: max feature level ...`; `offscreen: 64x64 RGBA8 ... mismatches=0`; `present: PASS`, or `present: SKIP` with no HWND (normal under UWP); last line `RESULT: PASS/FAIL adapter=... feature_level=... offscreen=... present=...`. | D3D12CreateDevice at FL 11_0 and every create/close/fence step S_OK (0x00000000); EnumAdapters1 ends with DXGI_ERROR_NOT_FOUND (0x887A0002), which is normal. A failure logs `step <name> failed hr=0x...` or `D3D12CreateDevice(default, 11_0) failed hr=0x...`; likely values: DXGI_ERROR_UNSUPPORTED 0x887A0004 (no FL 11_0), E_NOINTERFACE 0x80004002, E_OUTOFMEMORY 0x8007000E, DXGI_ERROR_DEVICE_REMOVED 0x887A0005, fence wait timeout 0x80070102. Exit 0 PASS; 1 FAIL after device creation; 2 FAIL with no runtime or device. **Off-device: SKIP.** The hosted ladder, `--offline` and `offline-smoke` never run it. The Linux run in `x64/graphics/tests/run-probe.sh` (run_via_wine, uwph, Wine's builtin vkd3d on lavapipe) is a SKIP/stand-in: not console PASS. Console PASS requires the run on the Xbox. |
 
 ## B21 combo rung
 

@@ -945,6 +945,7 @@ payload/combo/wine-wx/share/wine/nls/normnfkc.nls | all (installation, packaging
 payload/combo/wine-wx/share/wine/nls/normnfkd.nls | all (installation, packaging, or instructions)
 payload/combo/wine-wx/share/wine/nls/sortdefault.nls | all (installation, packaging, or instructions)
 payload/combo/wine-wx/share/wine/wine.inf | all (installation, packaging, or instructions)
+payload/probe_d3d12.exe | f/n2 (D3D12 diagnostic; standalone kit rung, console unverified)
 payload/probe_native.exe | n0 (desktop diagnostic; console integration pending)
 payload/rungs.exe | n0-n7 (native ladder; console unverified)
 payload/smoke.exe | b (build diagnostic)
