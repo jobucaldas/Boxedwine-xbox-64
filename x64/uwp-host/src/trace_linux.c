@@ -8,7 +8,8 @@
 #include <stdio.h>
 void *uwph_linux_symbol(const char *name)
 {
-    void *p = dlsym(RTLD_NEXT, name);
+    void *(*resolve)(void *, const char *) = dlvsym(RTLD_NEXT, "dlsym", "GLIBC_2.2.5");
+    void *p = resolve(RTLD_NEXT, name);
     if (!p) abort(); /* Missing required host ABI: never silently emulate it. */
     return p;
 }

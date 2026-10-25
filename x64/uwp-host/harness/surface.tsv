@@ -9,7 +9,7 @@ __assert_fail	unsupported	no exported O2 shim wrapper; retained Linux dependency
 __cxa_finalize	libc internal	retained host libc/runtime dependency; may contain hidden host calls; not UWP support
 __environ	libc internal	retained host libc/runtime dependency; may contain hidden host calls; not UWP support
 __errno_location	libc internal	retained host libc/runtime dependency; may contain hidden host calls; not UWP support
-__getdelim	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
+__getdelim	routed	B07 counted uwph entry; Linux native backend; bounded UWP backend (see NOTES-x64.md)
 __gmon_start__	libc internal	retained host libc/runtime dependency; may contain hidden host calls; not UWP support
 __isoc23_fscanf	routed	R4S-O2 traced set: ntdll relocation -> shim -> counted uwph entry -> Linux passthrough; Win32 backend covered by tests/traced.c; Win32 scanner is a bounded integer/%s/%c/%n subset (others ENOSYS)
 __isoc23_sscanf	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
@@ -18,7 +18,7 @@ _dl_find_object	unsupported	no exported O2 shim wrapper; retained Linux dependen
 _exit	explicit host fallback	shim flushes counters then raw Linux exit_group; not a uwph process implementation
 _setjmp	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 abort	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
-access	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
+access	routed	B07 counted uwph entry; Linux native backend; bounded UWP backend (see NOTES-x64.md)
 asctime	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 asprintf	routed	R4S-O2 traced set: ntdll relocation -> shim -> counted uwph entry -> Linux passthrough; Win32 backend covered by tests/traced.c
 calloc	libc internal	retained host libc/runtime dependency; may contain hidden host calls; not UWP support
@@ -27,22 +27,22 @@ clock_getres	unsupported	no exported O2 shim wrapper; retained Linux dependency;
 clock_gettime	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 close	routed	O2 selected wrapper; relocation diagnostic only; native-fd bypasses for read/close/file mmap; no full operation compatibility claim
 closedir	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
-connect	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
+connect	routed	B07 counted uwph entry; Linux native backend; bounded UWP backend (see NOTES-x64.md)
 creat	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 ctime	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 dladdr	routed	B06 counted uwph entry: native Linux passthrough; UWP static Unix-library registry only
 dlclose	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 dlerror	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 dlopen	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
-dlsym	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
-dup	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
+dlsym	routed	B07 counted uwph entry; Linux native backend; bounded UWP backend (see NOTES-x64.md)
+dup	routed	B07 counted uwph entry; Linux native backend; bounded UWP backend (see NOTES-x64.md)
 dup2	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 environ	libc internal	retained host libc/runtime dependency; may contain hidden host calls; not UWP support
 execv	routed	B06 counted uwph entry: native Linux passthrough; UWP counted ENOSYS (no arbitrary process replacement API)
 execve	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 execvp	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 exit	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
-fchdir	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
+fchdir	routed	B07 counted uwph entry; Linux native backend; bounded UWP backend (see NOTES-x64.md)
 fchmod	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 fclose	routed	R4S-O2 traced set: ntdll relocation -> shim -> counted uwph entry -> Linux passthrough; Win32 backend covered by tests/traced.c; Linux keeps the native FILE ABI
 fcntl	routed	R4S-O2 traced set: ntdll relocation -> shim -> counted uwph entry -> Linux passthrough; Win32 backend covered by tests/traced.c; harness native-fd mode only; F_DUPFD refused for private slots
@@ -51,7 +51,7 @@ feof	routed	R4S-O2 traced set: ntdll relocation -> shim -> counted uwph entry ->
 fgets	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 fgetxattr	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 fopen	routed	R4S-O2 traced set: ntdll relocation -> shim -> counted uwph entry -> Linux passthrough; Win32 backend covered by tests/traced.c; Linux keeps the native FILE ABI
-fork	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
+fork	routed	B07 counted uwph entry; Linux native backend; bounded UWP backend (see NOTES-x64.md)
 fprintf	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 fputs	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 fread	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
@@ -66,12 +66,12 @@ fsync	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks
 futimens	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 fwrite	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 getauxval	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
-getcwd	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
+getcwd	routed	B07 counted uwph entry; Linux native backend; bounded UWP backend (see NOTES-x64.md)
 getenv	routed	R4S-O2 traced set: ntdll relocation -> shim -> counted uwph entry -> Linux passthrough; Win32 backend covered by tests/traced.c
 getifaddrs	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 getmntent	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 getpeername	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
-getpid	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
+getpid	routed	B07 counted uwph entry; Linux native backend; bounded UWP backend (see NOTES-x64.md)
 getpwuid	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 getrandom	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 getrlimit	routed	B06 counted uwph entry: native Linux passthrough; UWP virtual NOFILE/STACK/AS/DATA queries
@@ -87,25 +87,25 @@ isatty	routed	B06 counted uwph entry: Linux owned-descriptor ioctl; UWP descript
 localtime	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 longjmp	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 lseek	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
-lstat	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
+lstat	routed	B07 counted uwph entry; Linux native backend; bounded UWP backend (see NOTES-x64.md)
 madvise	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 malloc	libc internal	retained host libc/runtime dependency; may contain hidden host calls; not UWP support
 memcmp	libc internal	retained host libc/runtime dependency; may contain hidden host calls; not UWP support
 memcpy	libc internal	retained host libc/runtime dependency; may contain hidden host calls; not UWP support
 memmove	libc internal	retained host libc/runtime dependency; may contain hidden host calls; not UWP support
 memset	libc internal	retained host libc/runtime dependency; may contain hidden host calls; not UWP support
-mkdir	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
+mkdir	routed	B07 counted uwph entry; Linux native backend; bounded UWP backend (see NOTES-x64.md)
 mkdtemp	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 mktime	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 mlock	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 mmap	routed	O2 selected wrapper; relocation diagnostic only; native-fd bypasses for read/close/file mmap; no full operation compatibility claim
-mprotect	routed	strict uwph_protect transition; rejects WRITE|EXEC; Linux harness backend
+mprotect	routed	B07 counted uwph entry; Linux native backend; bounded UWP backend (see NOTES-x64.md)
 msync	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 munlock	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 munmap	routed	O2 selected wrapper; relocation diagnostic only; native-fd bypasses for read/close/file mmap; no full operation compatibility claim
-nl_langinfo	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
+nl_langinfo	routed	B07 counted uwph entry; Linux native backend; bounded UWP backend (see NOTES-x64.md)
 open	routed	O2 selected wrapper; relocation diagnostic only; native-fd bypasses for read/close/file mmap; no full operation compatibility claim
-opendir	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
+opendir	routed	B07 counted uwph entry; Linux native backend; bounded UWP backend (see NOTES-x64.md)
 perror	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 pipe	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 pipe2	routed	B06 counted uwph entry: Linux raw pipe2 with private slots or native Wine descriptors; UWP in-process pipe objects
@@ -189,7 +189,7 @@ sysconf	routed	B06 counted uwph entry: native Linux passthrough; UWP documented 
 sysinfo	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 time	routed	R4S-O2 traced set: ntdll relocation -> shim -> counted uwph entry -> Linux passthrough; Win32 backend covered by tests/traced.c
 times	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
-umask	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
+umask	routed	B07 counted uwph entry; Linux native backend; bounded UWP backend (see NOTES-x64.md)
 uname	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 unsetenv	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 usleep	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage

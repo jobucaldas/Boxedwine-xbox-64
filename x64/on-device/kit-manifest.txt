@@ -12,6 +12,7 @@ payload/combo/libuwph_wine_shim.so | all (installation, packaging, or instructio
 payload/combo/run | all (installation, packaging, or instructions)
 payload/combo/run_via_wine | all (installation, packaging, or instructions)
 payload/combo/surface-trace.tsv | all (installation, packaging, or instructions)
+payload/combo/surface.tsv | all (installation, packaging, or instructions)
 payload/combo/verify_acceptance.py | all (installation, packaging, or instructions)
 payload/combo/verify_noproc.py | all (installation, packaging, or instructions)
 payload/combo/wine-wx/.stamp | all (installation, packaging, or instructions)

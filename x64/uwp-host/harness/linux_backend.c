@@ -307,3 +307,20 @@ int uwph_linux_native_fds(void)
     return 0;
 #endif
 }
+
+int uwph_linux_fchdir(int fd) { return fdcall(SYS_fchdir,fd,0,0,0); }
+int uwph_linux_dup(int fd)
+{
+    WRLOCK();
+    int n = native(fd);
+    long r = n < 0 ? -UWPH_EBADF : raw(SYS_dup,n,0,0,0,0,0);
+#ifndef UWPH_HARNESS_NATIVE_FDS
+    if (r >= 0) {
+        int slot;
+        for (slot=0; slot<SLOTS && slots[slot]; slot++);
+        if (slot==SLOTS) { raw(SYS_close,r,0,0,0,0,0); r=-UWPH_EMFILE; }
+        else { slots[slot]=r+1; r=BASE+slot; }
+    }
+#endif
+    UNLOCK(); return result(r);
+}
