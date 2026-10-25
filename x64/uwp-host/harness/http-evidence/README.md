@@ -45,3 +45,23 @@ The probe uses synchronous WinINet and PRECONFIG proxy selection. B22's trace
 connected to 198.18.0.1:80; this fixture reports no registry proxy. Session flags,
 proxy settings and asynchronous behavior are not claimed to match B22 exactly.
 This comparison does not establish the cause of B22's prior timeout.
+
+## B30 O2 follow-up
+
+O2 remains blocked. The fresh comparison in
+`/workspace/x64-run/lanes/B30/o2/probe/` again completes with HTTP 200 in both
+modes, but `routing-evidence.txt` again attributes the HTTPS connect to the
+external stock wineserver, with native client traffic on the transferred fd.
+No failing WinINet call was isolated that justifies a targeted uwph fix.
+The non-passthrough `uwph_socket(AF_INET/AF_INET6, ...)` currently returns
+`UWPH_ENOSYS`; this source limitation is not a demonstrated cause of B22's
+WinINet error 12029 and cannot be represented as a repaired transport.
+
+The B22 O2 `repro.sh` rerun exits 1 at its existing prefix prerequisite:
+`test -f /workspace/wt/B20/x64/uwp-host/harness/out/b20/pfx-wow64-uwph/system.reg`.
+That prefix and Steam.exe are unavailable in this workspace, so no new Steam
+manifest/download result is claimed. `B30-O2.mp4` records the HTTP comparison
+on a free Xvfb display (55 seconds), not a Steam execution. Exact tests pass
+after preparing the dedicated desktop smoke fixture from the existing stock
+fixture: 172 unit checks and 500 Windows desktop smoke checks. The latter use
+stock Wine to host uwph Windows code, not the Unix shim transport path.
