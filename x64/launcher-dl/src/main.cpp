@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
-// Anonymous Steam content client. No Valve binary loading or game API emulation.
+// Steam content client (anonymous, refresh-token or SteamClient QR login). No Valve binary loading or game API emulation.
 #include "pb.h"
 #include "vdf.h"
 #include "net.h"
@@ -14,6 +14,8 @@ unsigned ZSTD_isError(size_t);
 }
 #include <algorithm>
 #include <deque>
+#include <cstring>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -66,6 +68,22 @@ static std::string decompress(const std::string& s, size_t expected) {
     need(s.compare(0,4,"PK\3\4")==0,"unsupported chunk compression header="+hexLower(s.substr(0,8)));
     return unzip(s); // Unknown formats fail closed; never accept undecoded bytes.
 }
+struct Auth {
+    std::string account, token;
+    uint64_t steamid=0;
+    ~Auth(){ if(!token.empty()) SecureZeroMemory(token.data(),token.size()); }
+};
+static void readAuth(const char* path, Auth& a) {
+    std::ifstream f(std::filesystem::u8path(path),std::ios::binary);
+    need(bool(f),"open private SteamClient token input");
+    std::string platform,id;
+    need(bool(std::getline(f,platform))&&bool(std::getline(f,a.account))&&
+         bool(std::getline(f,id))&&bool(std::getline(f,a.token)),"invalid private token input");
+    need(platform=="SteamClient"&&!a.account.empty()&&a.account.size()<128&&
+         !id.empty()&&id.find_first_not_of("0123456789")==std::string::npos&&
+         !a.token.empty()&&a.token.size()<16384,"invalid SteamClient token fields");
+    a.steamid=std::stoull(id);
+}
 struct Msg {uint32_t id; Pb header,body;};
 class Client {
     std::unique_ptr<WebSocket> ws=makeWebSocket();
@@ -73,8 +91,17 @@ class Client {
     uint32_t session=0;
     std::deque<Msg> queue;
     ULONGLONG beat=0;
+    bool logged=false;
     void unpack(const std::string& s, int depth=0) {
-        need(depth<8,"nested Multi limit"); uint32_t id=le(s,0); need(id&0x80000000,"non-protobuf message"); id&=0x7fffffff;
+        need(depth<8,"nested Multi limit"); uint32_t id=le(s,0);
+        // Legacy account notifications may accompany a real-user logon. They
+        // are not responses used by this downloader; required replies still
+        // must be protobuf and pass their job/EResult/content checks.
+        if(!(id&0x80000000)){
+            need(id==782||id==798,"unsupported legacy CM message id="+std::to_string(id));
+            std::cout<<"CM ignored legacy notification id="<<id<<std::endl;return;
+        }
+        id&=0x7fffffff;
         size_t n=le(s,4); need(n<=s.size()-8,"header overflow");
         Pb h=proto(s.substr(8,n)),b=proto(s.substr(8+n));
         if(id==1){
@@ -86,11 +113,15 @@ class Client {
     }
 public:
     void send(uint32_t id,const PbW& body,uint64_t source=0,const std::string& method="") {
-        PbW h; h.f64(1,sid).u(2,session); if(source)h.f64(10,source); if(!method.empty())h.s(12,method);
+        PbW h; bool nonAuthed=id==9804||id==9805;
+        h.f64(1,nonAuthed?0:sid).u(2,nonAuthed?0:session);
+        if(id==9804)h.u(32,1);
+        if(source)h.f64(10,source);
+        if(!method.empty())h.s(12,method);
         std::string s; put32(s,id|0x80000000);put32(s,h.b.size());s+=h.b;s+=body.b;need(ws->send(s),"WebSocket send failed");
     }
     void pump(int timeoutMs=1000) {
-        if(GetTickCount64()-beat>10000){send(703,PbW());beat=GetTickCount64();}
+        if(logged&&GetTickCount64()-beat>10000){send(703,PbW());beat=GetTickCount64();}
         std::string s; int r=ws->recv(s,timeoutMs);need(r>=0,"CM connection closed");if(r)unpack(s);
     }
     Msg wait(uint32_t id,uint64_t target=0) {
@@ -99,7 +130,7 @@ public:
             need(GetTickCount64()-start<60000,"CM response timeout id="+std::to_string(id));pump();}
     }
     Msg request(uint32_t id,uint32_t reply,const PbW& b,const std::string& method="") {uint64_t j=job++;send(id,b,j,method);return wait(reply,j);}
-    void login(Http& http) {
+    void connect(Http& http) {
         HttpResult r; need(http.get("api.steampowered.com","/ISteamDirectory/GetCMListForConnect/v1/?cellid=0&cmtype=websockets&format=vdf",r)&&r.status==200,"CM directory: "+r.err);
         Kv root; need(VdfParser(r.body).parse(root),"CM directory VDF"); auto list=root.child("serverlist");need(list,"missing CM list");
         bool connected=false; std::string err;
@@ -107,8 +138,48 @@ public:
             std::cout<<"CM wss://"<<ep<<"/cmsocket/"<<std::endl;
             if(ws->connect(ep.substr(0,colon),443,"/cmsocket/",err)){connected=true;break;}ws=makeWebSocket();}
         need(connected,"CM connect: "+err);
-        PbW b;b.u(1,65580).u(7,20).s(6,"english").u(102,1); send(5514,b);beat=GetTickCount64();
-        Msg m=wait(751);need(m.body.u(1)==1,"anonymous logon EResult="+std::to_string(m.body.u(1)));std::cout<<"ANONYMOUS logged on"<<std::endl;
+    }
+    void login(Auth* auth=nullptr) {
+        if(auth) sid=auth->steamid ? auth->steamid : ((uint64_t(1)<<56)|(uint64_t(1)<<52)|uint64_t(1)<<32);
+        PbW b;b.u(1,65580).u(7,20).s(6,"english").u(102,1);
+        if(auth) b.s(50,auth->account).s(108,auth->token).u(8,0).u(100,0x423533);
+        send(5514,b);beat=GetTickCount64();
+        Msg m=wait(751);logged=m.body.u(1)==1;need(logged,"logon EResult="+std::to_string(m.body.u(1)));if(auth) { auth->steamid=sid; std::cout<<"SteamClient logged on"<<std::endl; }
+        else std::cout<<"ANONYMOUS logged on"<<std::endl;
+    }
+    void qr(Auth& auth) {
+        send(9805,PbW().u(1,65580));
+        PbW device;device.s(1,"Xbox Developer Mode launcher").u(2,1).u(3,20);
+        PbW begin;begin.s(1,"Xbox Developer Mode launcher").u(2,1).s(3,device.b).s(4,"Client");
+        auto m=request(9804,147,begin,"Authentication.BeginAuthSessionViaQR#1");
+        need(m.header.u(13)==1,"QR begin denied EResult="+std::to_string(m.header.u(13)));
+        uint64_t client=m.body.u(1);std::string requestId=m.body.s(3);
+        auto show=[](const std::string& url){
+            need(url.rfind("https://s.team/q/",0)==0&&url.size()<512&&
+                 url.find_first_of("\r\n") == std::string::npos,"invalid QR challenge URL");
+            std::cout<<url<<std::endl;
+        };
+        need(client&&!requestId.empty(),"QR response incomplete");show(m.body.s(2));
+        float interval=5;auto field=m.body.get(4);
+        if(field&&field->wt==5){uint32_t bits=field->v;std::memcpy(&interval,&bits,4);}
+        need(std::isfinite(interval)&&interval>=1&&interval<=30,"invalid QR poll interval");
+        ULONGLONG deadline=GetTickCount64()+180000;
+        while(GetTickCount64()<deadline){
+            ULONGLONG next=GetTickCount64()+DWORD(interval*1000);
+            while(GetTickCount64()<next) pump(100);
+            PbW poll;poll.u(1,client).s(2,requestId);
+            auto status=request(9804,147,poll,"Authentication.PollAuthSessionStatus#1");
+            need(status.header.u(13)==1,"QR poll denied EResult="+std::to_string(status.header.u(13)));
+            std::cerr<<"QR poll acknowledged"<<std::endl;
+            if(status.body.u(1))client=status.body.u(1);
+            if(!status.body.s(2).empty())show(status.body.s(2));
+            if(!status.body.s(3).empty()){
+                auth.token=status.body.s(3);auth.account=status.body.s(6);
+                need(!auth.account.empty()&&auth.token.size()<16384,"QR auth incomplete");
+                return; // Token remains in memory only; never emitted or persisted.
+            }
+        }
+        throw std::runtime_error("QR confirmation timed out");
     }
     ~Client(){ws->close();}
 };
@@ -131,21 +202,32 @@ static std::filesystem::path safePath(const std::filesystem::path& root,std::str
 int main(int argc,char** argv) {
     std::cout.setf(std::ios::unitbuf);
     try {
-        need(argc==2,"usage: steamdl.exe <fresh-output-directory> (anonymous app 1007 only)");
+        need(argc==2||argc==3||argc==4,"usage: steamdl.exe <fresh-output-directory> [--qr | --token-file <private-input>]");
+        bool owned=argc>2;bool qr=argc==3&&std::string(argv[2])=="--qr";
+        need(!owned||qr||(argc==4&&std::string(argv[2])=="--token-file"),"invalid authentication arguments");
+        uint32_t appid=owned?3405340:1007;
+        Auth auth;if(owned&&!qr)readAuth(argv[3],auth);
         auto out=std::filesystem::u8path(argv[1]);need(!std::filesystem::exists(out),"output must not exist (fresh download required)");std::filesystem::create_directories(out);
-        auto http=makeHttp();Client c;c.login(*http);
-        PbW app;app.u(1,1007);PbW req;req.s(2,app.b);
+        auto http=makeHttp();Client c;c.connect(*http);
+        if(qr)c.qr(auth);
+        c.login(owned?&auth:nullptr);
+        uint64_t appToken=0;
+        if(owned){PbW r;r.u(2,appid);auto t=c.request(8905,8906,r);
+            for(auto f:t.body.all(3)){auto p=proto(f->s);if(p.u(1)==appid)appToken=p.u(2);}}
+        PbW app;app.u(1,appid);if(appToken)app.u(2,appToken);PbW req;req.s(2,app.b);
         auto info=c.request(8903,8904,req);std::string vdf;
-        for(auto f:info.body.all(1)){Pb p=proto(f->s);if(p.u(1)==1007)vdf=p.s(5);}
+        for(auto f:info.body.all(1)){Pb p=proto(f->s);if(p.u(1)==appid)vdf=p.s(5);}
         Kv root;need(VdfParser(vdf).parse(root),"appinfo missing/invalid");const Kv* depots=root.child("depots");need(depots,"appinfo depots missing");
         std::ofstream evidence(out/"manifest-sha1.tsv",std::ios::binary);need(bool(evidence),"open evidence");
         size_t files=0,depotCount=0;uint64_t bytes=0;
         for(auto& d:depots->kids){if(d.key.empty()||d.key.find_first_not_of("0123456789")!=std::string::npos)continue;
             auto config=d.child("config");if(config){auto os=config->str("oslist");if(!os.empty()&&os.find("windows")==std::string::npos)continue;}
+            if(config){auto lang=config->str("language");if(!lang.empty()&&lang!="english")continue;}
+            need(d.str("dlcappid").empty(),"DLC depot requires separate ownership selection");
             auto manifests=d.child("manifests");auto pub=manifests?manifests->child("public"):nullptr;if(!pub)continue;
             uint32_t depot=std::stoul(d.key);uint64_t gid=std::stoull(pub->obj?pub->str("gid"):pub->val);depotCount++;
-            PbW keyReq;keyReq.u(1,depot).u(2,1007);auto kr=c.request(5438,5439,keyReq);need(kr.body.u(1)==1&&kr.body.u(2)==depot,"depot key denied");std::string key=kr.body.s(3);need(key.size()==32,"bad depot key");
-            PbW codeReq;codeReq.u(1,1007).u(2,depot).u(3,gid).s(4,"public");auto code=c.request(151,147,codeReq,"ContentServerDirectory.GetManifestRequestCode#1");need(code.header.u(13)==1&&code.body.u(1),"manifest request denied");
+            PbW keyReq;keyReq.u(1,depot).u(2,appid);auto kr=c.request(5438,5439,keyReq);need(kr.body.u(1)==1&&kr.body.u(2)==depot,"depot key denied");std::string key=kr.body.s(3);need(key.size()==32,"bad depot key");
+            PbW codeReq;codeReq.u(1,appid).u(2,depot).u(3,gid).s(4,"public");auto code=c.request(151,147,codeReq,"ContentServerDirectory.GetManifestRequestCode#1");need(code.header.u(13)==1&&code.body.u(1),"manifest request denied");
             std::string prefix="/depot/"+d.key;
             std::cout<<"CDN https://steampipe.akamaized.net"<<prefix<<" manifest="<<gid<<std::endl;
             std::string packed=get(*http,prefix+"/manifest/"+std::to_string(gid)+"/5/"+std::to_string(code.body.u(1)));
@@ -174,6 +256,6 @@ int main(int argc,char** argv) {
             }
         }
         need(depotCount>0&&files>0,"no files selected");evidence.close();need(bool(evidence),"close evidence");
-        std::cout<<"VERIFIED app=1007 depots="<<depotCount<<" files="<<files<<" bytes="<<bytes<<" transport=stock-Wine-WinHTTP cdn=steampipe.akamaized.net"<<std::endl;return 0;
+        std::cout<<"VERIFIED app="<<appid<<" depots="<<depotCount<<" files="<<files<<" bytes="<<bytes<<" transport=desktop-WinHTTP cdn=steampipe.akamaized.net"<<std::endl;return 0;
     }catch(const std::exception& e){std::cerr<<"FAIL "<<e.what()<<std::endl;return 1;}
 }
