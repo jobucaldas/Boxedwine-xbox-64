@@ -151,6 +151,10 @@ wine-test-inproc: wine-test-inproc-build
 FORCE:
 .PHONY: wine-test-inproc wine-test-inproc-build FORCE
 
+# B34 O1: explorer sources built as a separate, currently unused PE DLL.
+$(OUT)/wine-wx/.desk-stamp: prepare-wine-desk.sh wine-desktop-thread.patch $(OUT)/wine-wx/.stamp
+	./prepare-wine-desk.sh
+
 $(OUT)/test_bigfile: ../tests/test_bigfile.c $(OUT)/libuwph.a
 	$(CC) $(CFLAGS) $< $(OUT)/libuwph.a -ldl -o $@
 bigfile-test: $(OUT)/test_bigfile
