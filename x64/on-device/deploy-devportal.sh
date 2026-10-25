@@ -4,6 +4,7 @@
 #   export DP_URL=https://<console-ip>:11443 DP_USER=... DP_PASS=...   (never printed)
 #   ./deploy-devportal.sh info | install [out/BoxedwineDev.appx] | list | launch [App|BigFile]
 #                         stop | files | pull [ladder-native.log ...] [--out DIR] | pull-logs [DIR]
+#                         dumps | pull-dump FILE [--out DIR]
 #                         settings | set-setting NAME VALUE | screenshot | uninstall yes | reboot now
 # Optional: DP_TLS_SHA256 pins the console's self-signed TLS cert (printed by `info`).
 set -euo pipefail

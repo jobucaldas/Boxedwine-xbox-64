@@ -97,6 +97,12 @@ class H(BaseHTTPRequestHandler):
             self.ev(path=p, file=q.get('filename'), dir=q.get('path'))
             d = State.files.get(q.get('filename')) if q.get('packagefullname') == FULL else None
             return self.send(200, d, 'application/octet-stream') if d is not None else self.send(404, b'{}')
+        if m == 'GET' and p == '/api/debug/dump/usermode/dumps':
+            self.ev(path=p, method=m, status=200)
+            return self.send(200, json.dumps({'Dumps': [{'PackageFullName': FULL, 'FileName': 'mock.dmp'}]}).encode())
+        if m == 'GET' and p == '/api/debug/dump/usermode/crashdump':
+            self.ev(path=p, method=m, query=q, status=404)
+            return self.send(404, b'{}')
         if m == 'GET' and p == '/ext/settings':
             return self.send(200, json.dumps({'Settings': State.settings}).encode())
         if m == 'PUT' and p.startswith('/ext/settings/'):

@@ -100,6 +100,20 @@ test -s "$tmp/one/ladder-native.log" || die 'pull default file'
 grep -qx 'STAGE n10 mock PASS' "$tmp/pulled/ladder-native.log" && test -s "$tmp/pulled/ladder-App.log" || die 'pulled content'
 ok 'files + pull ladder-native.log + pull-logs (all logs)'
 dp pull ../escape && die 'path traversal accepted' || ok 'pull refuses path separators'
+dp dumps && grep -q 'mock.dmp' "$tmp/dp.out" || die 'dumps listing'
+ok 'dumps: documented GET returns 200 listing (mock only)'
+./deploy-devportal.sh pull-dump mock.dmp --out "$tmp/dumps" >"$tmp/dumps.out" 2>&1 || die 'pull-dump 404 exit'
+grep -qx 'not exposed on this device' "$tmp/dumps.out" || die 'pull-dump 404 message'
+test ! -e "$tmp/dumps" || die 'pull-dump 404 created output'
+python3 - "$tmp/events.json" <<'PYDUMP' || die 'dump endpoint/query or fallback'
+import json, sys
+ev = [e for e in json.load(open(sys.argv[1])) if '/dump/' in e.get('path', '')]
+assert ev == [
+    {'path': '/api/debug/dump/usermode/dumps', 'method': 'GET', 'status': 200},
+    {'path': '/api/debug/dump/usermode/crashdump', 'method': 'GET',
+     'query': {'packageFullName': 'Joao.Boxedwine.DevMode_0.1.0.0_x64__mockpublisherid', 'fileName': 'mock.dmp'}, 'status': 404}], ev
+PYDUMP
+ok 'pull-dump: 404 not exposed on this device, exit 0, no file or fallback (mock only)'
 dp settings && grep -q 'DefaultApplicationType.*game/app-type candidate' "$tmp/dp.out" || die 'settings'
 dp set-setting DefaultApplicationType Game && grep -q '"value": "Game"' "$tmp/events.json" || die 'set-setting'
 ok 'settings list + set-setting (PUT /ext/settings/NAME)'
