@@ -109,8 +109,11 @@ python3 "$HERE/seed-login.py" --prefix "$PFX" --helper "$OUT/bin/dpapi_protect.e
 grep -qx 'seeded=1' "$EVID/seed.log" || { log "FATAL: seed-login failed"; exit 1; }
 
 # --- 6. webhelper sampler -------------------------------------------------------------
-# Keep the exact required global process count, including any ambient matches.
-( while :; do pgrep -fc -i steamwebhelper || :; sleep 1; done ) > "$EVID/webhelper_samples" 2>/dev/null &
+# João's no-browser rule: the required number of RUNNING steamwebhelper processes is 0.
+# Count processes whose program name (comm; Wine sets it to the exe basename) is steamwebhelper*,
+# not any command line that merely mentions the word (the old `pgrep -f` also matched ambient
+# shells/tails and reported 1 with no helper running, B50 O2).
+( while :; do ps -eo comm= | grep -ci '^steamwebhelper' || :; sleep 1; done ) > "$EVID/webhelper_samples" 2>/dev/null &
 SAMPLER=$!
 PIDS+=($SAMPLER)
 SAMPLER_RAW=$SAMPLER
@@ -206,9 +209,15 @@ grep -ahoE 'CreateProcessInternalW app L"[^"]*"' "$EVID/steam-wine.log" | sed 's
   echo "--- cmdlines (probe + Megabonk)"; grep -ahoE 'CreateProcessInternalW app .*cmdline .*' "$EVID/probe-wine.log" "$EVID/game-wine.log" | sort -u; } >> "$EVID/processes.txt"
 
 MAXS=$(sort -n "$EVID/webhelper_samples" | tail -1)
+# Spawn ATTEMPTS (Wine +process logs CreateProcessInternalW before the call; steamwebhelper.exe is
+# physically absent, checked in step 3) are recorded separately for the notes. They are not processes.
 NCP=$(cat "$EVID/steam-wine.log" "$EVID/probe-wine.log" "$EVID/game-wine.log" 2>/dev/null | grep -ai 'CreateProcessInternalW' | grep -aci 'steamwebhelper')
-echo $(( ${MAXS:-0} + NCP )) > "$EVID/webhelper_count"
-log "webhelper samples=$(wc -l < "$EVID/webhelper_samples") max=${MAXS:-0} createprocess=$NCP"
+echo "$NCP" > "$EVID/webhelper_spawn_attempts"
+# Gate value: max running steamwebhelper processes seen (required 0). Fail closed if no samples were taken.
+if [ -s "$EVID/webhelper_samples" ]; then echo "${MAXS:-0}" > "$EVID/webhelper_count"; else echo "nosamples" > "$EVID/webhelper_count"; fi
+# Also re-assert the CEF/webhelper binaries never appeared in the prefix during the run.
+[ -z "$(find "$PFX" -iname 'steamwebhelper*' -o -iname 'libcef*' | head -1)" ] || echo "cef-present" > "$EVID/webhelper_count"
+log "webhelper samples=$(wc -l < "$EVID/webhelper_samples") running_max=${MAXS:-0} spawn_attempts=$NCP count=$(cat "$EVID/webhelper_count")"
 
 # which of our flags Steam's logs call unknown/unrecognised
 { echo "flags: $FLAGS"
