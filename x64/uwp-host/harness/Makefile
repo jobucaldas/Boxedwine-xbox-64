@@ -41,8 +41,8 @@ wine-surface-check: out/libuwph_shim.so
 # Separate backend object: native fd interoperability is exclusive to Wine proof.
 $(OUT)/wine_linux_backend.o: linux_backend.c counters.h $(HEADERS)
 	$(CC) $(CFLAGS) -DUWPH_HARNESS_NATIVE_FDS -c $< -o $@
-$(OUT)/libuwph_wine_shim.so: shim.c counters.c counters.h $(OUT)/wine_linux_backend.o $(OUT)/libuwph.a $(OUT)/shim.map
-	$(CC) $(CFLAGS) -DUWPH_HARNESS_NATIVE_FDS -shared shim.c counters.c $(OUT)/wine_linux_backend.o $(OUT)/libuwph.a -ldl -Wl,--version-script=$(OUT)/shim.map -Wl,-z,defs -o $@
+$(OUT)/libuwph_wine_shim.so: inproc_server.c ../wineserver/server_thread.c ../wineserver/out/libwineserver.a shim.c counters.c counters.h $(OUT)/wine_linux_backend.o $(OUT)/libuwph.a $(OUT)/shim.map
+	$(CC) $(CFLAGS) -DUWPH_HARNESS_NATIVE_FDS -shared inproc_server.c ../wineserver/server_thread.c ../wineserver/out/libwineserver.a shim.c counters.c $(OUT)/wine_linux_backend.o $(OUT)/libuwph.a -ldl -Wl,--version-script=$(OUT)/shim.map -Wl,-z,defs -o $@
 $(OUT)/run_via_wine: ../../pe/launcher/run_via_wine.c
 	$(CC) -O2 -Wall -Wextra -Werror $< -o $@
 wine-test: $(OUT)/libuwph_wine_shim.so $(OUT)/run_via_wine
@@ -70,3 +70,13 @@ evidence-replay: $(OUT)/backend_test
 prebuilt-prefix:
 	./prepare-wine.sh --prebuilt-prefix
 .PHONY: prebuilt-prefix
+
+../wineserver/out/libwineserver.a: FORCE
+	$(MAKE) -C ../wineserver lib
+$(OUT)/libuwph_inproc_server.so: inproc_server.c ../wineserver/server_thread.c ../wineserver/out/libwineserver.a
+	$(CC) $(CFLAGS) -shared $^ -Wl,-z,defs -o $@
+wine-test-inproc-build: $(OUT)/libuwph_wine_shim.so $(OUT)/libuwph_inproc_server.so $(OUT)/run_via_wine
+wine-test-inproc: wine-test-inproc-build
+	./run-wine.sh --inproc-server
+FORCE:
+.PHONY: wine-test-inproc wine-test-inproc-build FORCE

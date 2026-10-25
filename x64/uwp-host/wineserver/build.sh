@@ -43,6 +43,7 @@ if [ "${1:-}" = prepare ]; then
     for patchfile in "$HERE"/patches/*.patch; do
         patch --batch -d "$dest" -p1 < "$patchfile"
     done
+    cp "$HERE/patches/server_tmpdir.h" "$dest/server_tmpdir.h"
     exit 0
 fi
 exec make -C "$HERE" WINE_SRC="$WINE_SRC" WINE_BUILD="$WINE_BUILD" ${1:+OUT="$1"} lib

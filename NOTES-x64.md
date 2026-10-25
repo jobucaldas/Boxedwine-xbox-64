@@ -861,3 +861,41 @@ process was terminated. Status is BLOCKED, not DONE. Final output and details:
 `/workspace/x64-run/lanes/R4W/R4W-O6.result`; proof video:
 `/workspace/x64-run/videos/R4W-O6.mp4` (under 60 seconds). Final normal
 shutdown leaves no registry-save errors. No commit or remote operation.
+
+## R4W O7 loader integration — BLOCKED on matching Wine protocol
+
+`make -C x64/uwp-host/harness wine-test-inproc-build` links the O6 archive
+and server thread host into the Wine routing shim and a separate control-only
+library. `run-wine.sh --inproc-server` copies the read-only packaged prefix into
+a fresh writable evidence directory and never backgrounds a stock server.
+A gated constructor starts only in wine64 after Wine's normal loader re-exec
+(`WINELOADERNOEXEC`), waits for readiness before ntdll connects, and marks the
+owner so descendants connect to that server. Launcher/control execution remains
+separate from THROUGH-uwph attribution. Process exit tears down the server
+thread; no destructor join is attempted while ntdll may still be connected.
+
+The prerequisite rerun initially produced O6's expected echo/join but failed
+the global server-absence check. Investigation found a more substantial issue:
+the installed Debian ntdll uses Debian's `fixes/temporary-directory.patch`, while
+the original private server copies used upstream `/tmp/.wine-UID`. Thus earlier
+O6/O7 runs could silently connect the client to a different stock server. O7
+now applies the server portion of Debian's own patch and its helper header to
+private copies only, preserving attribution. No installed binary/source is
+modified. After this correction, the O6 client and both O7 modes connect to the
+hosted server but fail closed with `version mismatch 855/1`.
+
+Correction to O5 above: identical Wine release strings do NOT prove protocol
+identity. The archive/source header reports 855, but installed ntdll expects 1.
+No protocol constant or version check has been changed to mask this mismatch.
+The O6 prerequisite remains failed (readiness PASS, protocol error, join rc=0,
+client/absence combined FAIL). O7's exact make target returns 2; independent
+`verify_wine.py` returns 1: `control-hello_k32: nonzero exit`. The verifier is
+unchanged, including its wineboot check and its hard-coded separate-server
+summary (the latter is not a measurement of this mode).
+
+Final traces show the constructor/server thread in the same loader PID and no
+exec of wineserver/wineserver64. Neither PE reaches its hello output against the
+hosted server: this is attempted THROUGH-uwph integration, not successful guest
+execution proof. Earlier hello successes used a separate server and are not O7
+acceptance. O8 event creation and O9 jail changes were not implemented. Video:
+`/workspace/x64-run/videos/R4W-O7.mp4` (free Xvfb display, failed exact test).

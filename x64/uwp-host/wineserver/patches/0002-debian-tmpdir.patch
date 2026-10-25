@@ -1,0 +1,23 @@
+# Debian Wine 10.0~repack-6 fixes/temporary-directory.patch (server portion)
+# Michael Gilbert <mgilbert@debian.org>; Wine LGPL-2.1-or-later
+--- a/request.c
++++ b/request.c
+@@ -592,6 +592,8 @@ static void create_dir( const char *name
+     if (st->st_mode & 077) fatal_error( "%s must not be accessible by other users\n", name );
+ }
+ 
++#include "server_tmpdir.h"
++
+ /* create the server directory and chdir to it */
+ static char *create_server_dir( int force )
+ {
+@@ -643,8 +645,7 @@ static char *create_server_dir( int forc
+     if (asprintf( &base_dir, "%s/.wineserver", config_dir ) == -1)
+         fatal_error( "out of memory\n" );
+ #else
+-    if (asprintf( &base_dir, "/tmp/.wine-%u", getuid() ) == -1)
+-        fatal_error( "out of memory\n" );
++    base_dir = server_tmpdir( config_dir );
+ #endif
+     create_dir( base_dir, &st2 );
+ 

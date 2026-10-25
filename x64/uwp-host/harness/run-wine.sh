@@ -2,6 +2,14 @@
 # Owned Linux-box harness only; no Wine source/loader modification.
 set -euo pipefail
 cd "$(dirname "$0")"
+inproc=0
+for arg in "$@"; do
+    case "$arg" in
+        --inproc-server) inproc=1 ;;
+        --no-build) ;; # Builds are always performed by the Make targets.
+        *) echo "Unknown argument: $arg" >&2; exit 2 ;;
+    esac
+done
 root=$(realpath ../../..)
 work=$PWD/out/wine-o4
 mkdir -p "$work"
@@ -15,6 +23,15 @@ for item in identity['artifacts'].values():
     assert hashlib.sha256(pathlib.Path(item['path']).read_bytes()).hexdigest()==item['sha256'], 'Wine identity changed; run prepare-wine.sh'
 PY
 # Never use ~/.wine. Only copy an already initialized, explicit fixture.
+if (( inproc )); then
+    source_prefix=$PWD/prebuilt-prefix
+    [[ -d $source_prefix ]] || { echo 'Run make prebuilt-prefix at packaging time' >&2; exit 1; }
+    run=$(mktemp -d "$work/run-XXXXXXXX")
+    cp -a --reflink=auto "$source_prefix" "$run/prefix"
+    chmod -R u+w "$run/prefix"
+    export WINEPREFIX=$run/prefix
+    printf 'Copied read-only prebuilt prefix: %s\n' "$source_prefix" > "$run/fixture.txt"
+else
 source_prefix=${UWPH_FIXTURE_PREFIX:-/workspace/megabonk/pfx-stock}
 if [[ ! -d $work/prefix ]]; then
     for f in system.reg user.reg userdef.reg .update-timestamp; do
@@ -31,12 +48,17 @@ if [[ ! -d $work/prefix ]]; then
 fi
 export WINEPREFIX=$work/prefix
 run=$(mktemp -d "$work/run-XXXXXXXX")
+fi
 cp out/wine/identity.json "$run/identity.json"
-cp "$work/fixture.txt" "$run/fixture.txt"
+if (( ! inproc )); then cp "$work/fixture.txt" "$run/fixture.txt"; fi
 cp out/wine/direct-syscalls.tsv "$run/direct-syscalls.tsv"
 cp surface.tsv "$run/surface.tsv"
 echo "O4 evidence: $run"
 cat "$run/fixture.txt"
+if (( inproc )); then
+    export UWPH_INPROC_SERVER=1
+    unset UWPH_INPROC_OWNER
+else
 server=/usr/lib/wine/wineserver64
 # Explicit separate stock Linux server, no preload/report inherited. Its process
 # is not uwph/UWP evidence; keep it alive only for this owned prefix/test.
@@ -49,7 +71,9 @@ cleanup() {
 trap cleanup EXIT
 sleep .2
 kill -0 "$server_pid"
-# Prevent automatic server startup from inheriting preload if our server dies.
+fi
+# Fallback hint only: Debian Wine tries its installed server before WINESERVER.
+# The in-process proof must therefore also inspect exec traces for server spawns.
 export WINESERVER=/bin/false
 export WINE_LOADER=/usr/lib/wine/wine64
 export WINEDEBUG=+loaddll,+process
@@ -60,6 +84,7 @@ for mode in control routed; do
         name=$mode-$pe
         rm -f "$run/$name.report"
         extra=()
+        if (( inproc )); then extra=(LD_PRELOAD="$PWD/out/libuwph_inproc_server.so"); fi
         if [[ $mode == routed ]]; then
             extra=(LD_PRELOAD="$PWD/out/libuwph_wine_shim.so" LD_DEBUG=bindings)
         fi
