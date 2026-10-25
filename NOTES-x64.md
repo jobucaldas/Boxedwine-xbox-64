@@ -3014,3 +3014,11 @@ not run under this O1-only order. Video:
 `/workspace/x64-run/videos/B35-O1.mp4` (6.2 seconds, Xvfb + ffmpeg; no Encom).
 No security constraints, verifier defaults, surface gates, or remotes were
 changed; no commit or push was performed.
+
+## B70 O1
+
+2026-10-25, stock Wine 10.0 on the Linux box only (not THROUGH-uwph, not Xbox). Added our mingw-x86_64 WinHTTP directory/WSS diagnostic and a fresh-prefix runner. The runner also reruns the earlier readiness net_probe.exe in the SAME prefix when present; it deletes only its own temporary prefix on exit. No credentials, Valve binary changes, certificate exceptions, or O2 environment fixes.
+
+Evidence `/workspace/x64-run/lanes/B70/o1/https_probe.log`: `winhttp_status=200 err=0`, `wss_status=101`, `wss_upgrade=1 err=0` against a websockets :443 endpoint selected from the live directory response. Both API and CM certificates pass `CertGetCertificateChain` (`chain_error_bits=0x00000000`) and SSL hostname/server policy (`error=0x00000000`). `adapters_status=0 bytes=2128`; DNS returns IPv4 `198.18.0.1`. `readiness-net.log`: `SUMMARY net_probe pass=7 fail=0`. `curl-control.log`: HTTP 200, TLS verify 0, remote IP 198.18.0.1. TLS verification remains enabled; requests use their original DNS hostnames (preserving Host/SNI), with NO_PROXY explicitly selected in our diagnostic.
+
+Root-cause boundary: the claimed general “Wine HTTPS failure” does not reproduce in either WinHTTP probe. These results rule out a universally broken Wine crypt32 root store or fake-IP IPv4 route for these hosts in this fresh prefix. They do NOT rule out a Valve-specific trust store, TLS/ALPN configuration, mapped-IPv6 path, proxy handling, or prefix/bitness-dependent adapter failure. Prior unmodified steamcmd evidence, extracted without account identifiers to `prior-valve-failure.txt`, has `GetCMListForConnect -- web API call failed (status = 0)` and `CalcUnIPThisBox - GetAdaptersAddresses returned 13`; neither appears in our x64 diagnostic. Error 13 is ERROR_INVALID_DATA, but correlation is not proof it causes the HTTP failure. Exact Valve-stack root cause remains UNDETERMINED: O1 diagnosis is BLOCKED at that boundary, not an invented TLS fix. No O2 changes made. Exact test and video are recorded in `/workspace/x64-run/lanes/B70/exact-test.txt` and `/workspace/x64-run/videos/B70-O1.mp4`.
