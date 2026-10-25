@@ -23,15 +23,8 @@ typedef NTSTATUS (*d3dpass_entry_t)(void *params);
 enum d3dpass_funcs {
     d3dpass_create_device,                /* D3D11CreateDevice */
     d3dpass_create_factory,               /* CreateDXGIFactory1 */
-    d3dpass_unknown_addref,               /* IUnknown::AddRef */
-    d3dpass_unknown_release,              /* IUnknown::Release */
-    d3dpass_device_create_texture2d,      /* ID3D11Device::CreateTexture2D */
-    d3dpass_device_create_rtv,            /* ID3D11Device::CreateRenderTargetView */
-    d3dpass_device_get_immediate_context, /* ID3D11Device::GetImmediateContext */
-    d3dpass_context_clear_rtv,            /* ID3D11DeviceContext::ClearRenderTargetView */
-    d3dpass_context_copy_resource,        /* ID3D11DeviceContext::CopyResource */
-    d3dpass_context_map,                  /* ID3D11DeviceContext::Map */
-    d3dpass_context_unmap,                /* ID3D11DeviceContext::Unmap */
+    d3dpass_unknown_release,              /* dispose unadopted host reference */
+    d3dpass_generated,                    /* generated typed COM dispatch */
     d3dpass_funcs_count
 };
 
@@ -45,30 +38,6 @@ struct create_device_params {
 };
 struct create_factory_params { d3dpass_handle factory; HRESULT hr; };
 struct unknown_params { d3dpass_handle obj; ULONG ref; };
-struct create_texture2d_params {
-    d3dpass_handle device;
-    const D3D11_TEXTURE2D_DESC *desc;
-    const D3D11_SUBRESOURCE_DATA *data;
-    d3dpass_handle texture;               /* out */
-    HRESULT hr;
-};
-struct create_rtv_params {
-    d3dpass_handle device, resource;
-    const D3D11_RENDER_TARGET_VIEW_DESC *desc;
-    d3dpass_handle view;                  /* out */
-    HRESULT hr;
-};
-struct get_immediate_context_params { d3dpass_handle device, context; };
-struct clear_rtv_params { d3dpass_handle context, view; float color[4]; };
-struct copy_resource_params { d3dpass_handle context, dst, src; };
-struct map_params {
-    d3dpass_handle context, resource;
-    uint32_t subresource, map_type, map_flags;
-    D3D11_MAPPED_SUBRESOURCE mapped;      /* out; pData points at host memory */
-    HRESULT hr;
-};
-struct unmap_params { d3dpass_handle context, resource; uint32_t subresource; };
-
 /* Host side (host.c): add "d3dpass.so" to the uwph static registry. */
 int d3dpass_host_register(void);
 

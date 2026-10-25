@@ -1,7 +1,6 @@
-/* Minimal, same-thread O3 wrapper implementation. Unsupported slots are NULL;
- * callers must use only the documented subset, until O4 fills the vtables. */
+/* Same-thread wrapper pool and uwph dispatch for generated COM thunks. */
 #define COBJMACROS
-#include "d3dpass.h"
+#include "runtime.h"
 #include "uwph/dl.h"
 #include <string.h>
 struct d3dpass_stats d3dpass_stats;
@@ -30,90 +29,49 @@ NTSTATUS d3dpass_unix_call(enum d3dpass_funcs code,void *params)
     if(!table || (unsigned)code>=d3dpass_funcs_count) return (NTSTATUS)0xc000000d;
     return (NTSTATUS)uwph_host_call(thread_teb,&host_state,dispatch,&d);
 }
-/* A bounded pool avoids any guest CRT call while synthetic guest TLS is set.
- * Wrapper lifetime is independent of the host's internal COM references. */
+/* Same-thread bounded pool: no guest CRT/TLS access during synthetic state. */
 struct wrapper { const void *vtbl; d3dpass_handle handle; ULONG refs; const IID *iid; };
-static struct wrapper pool[64];
-static d3dpass_handle handle(void *p) { return p ? ((struct wrapper *)p)->handle : 0; }
-static void *wrap(d3dpass_handle h,const void *vt,const IID *iid)
+static struct wrapper pool[512];
+static int wrap_error;
+void *d3dpass_unwrap(const void *obj)
+{
+    return obj ? (void *)(uintptr_t)((const struct wrapper *)obj)->handle : NULL;
+}
+NTSTATUS d3dpass_marshal_error(void)
+{
+    ++d3dpass_stats.unimplemented;
+    return (NTSTATUS)0xc000000d;
+}
+int d3dpass_take_wrap_error(void) { int error=wrap_error; wrap_error=0; return error; }
+void *d3dpass_wrap_iid(uintptr_t h,REFIID iid)
 {
     if(!h) return NULL;
-    /* Each returned host handle already owns one reference. Adopt it into the
-     * live wrapper without taking another host AddRef (same-thread O3 only). */
-    for(unsigned i=0;i<64;++i)
-        if(pool[i].refs && pool[i].handle==h && pool[i].vtbl==vt) {
+    const void *vt=d3dpass_vtable(iid);
+    for(unsigned i=0;i<512;++i)
+        if(pool[i].refs && pool[i].handle==h &&
+           (pool[i].vtbl==vt || IsEqualGUID(iid,&IID_IUnknown))) {
             ++pool[i].refs; return &pool[i];
         }
-    for(unsigned i=0;i<64;++i) if(!pool[i].refs) {
+    if(vt) for(unsigned i=0;i<512;++i) if(!pool[i].refs) {
         pool[i]=(struct wrapper){vt,h,1,iid}; return &pool[i];
     }
-    struct unknown_params p={h,0}; d3dpass_unix_call(d3dpass_unknown_release,&p); return NULL;
+    /* Wrapping also occurs after device creation in guest state, so failed
+     * adoption releases the host reference through the boundary. */
+    struct unknown_params p={h,0};
+    d3dpass_unix_call(d3dpass_unknown_release,&p); wrap_error=1; return NULL;
 }
-static ULONG STDMETHODCALLTYPE addref(void *obj)
-{
-    struct wrapper *w=obj; struct unknown_params p={w->handle,0};
-    d3dpass_unix_call(d3dpass_unknown_addref,&p); return ++w->refs;
-}
-static ULONG STDMETHODCALLTYPE release(void *obj)
-{
-    struct wrapper *w=obj; struct unknown_params p={w->handle,0};
-    d3dpass_unix_call(d3dpass_unknown_release,&p); return --w->refs;
-}
-static HRESULT STDMETHODCALLTYPE query(void *obj,REFIID iid,void **out)
+ULONG d3dpass_reference(void *obj,int delta)
 {
     struct wrapper *w=obj;
-    if(!out) return E_POINTER;
-    *out=NULL;
-    if(IsEqualGUID(iid,&IID_IUnknown)||IsEqualGUID(iid,w->iid)) { addref(obj); *out=obj; return S_OK; }
-    ++d3dpass_stats.unimplemented; return E_NOINTERFACE;
+    w->refs+=delta;
+    return w->refs;
 }
-/* Shared first three COM slots have identical x64 signatures. */
-#define UNKNOWN(T) .QueryInterface=(HRESULT (STDMETHODCALLTYPE *)(T *,REFIID,void **))query, .AddRef=(ULONG (STDMETHODCALLTYPE *)(T *))addref, .Release=(ULONG (STDMETHODCALLTYPE *)(T *))release
-static const ID3D11Texture2DVtbl texture_vt={UNKNOWN(ID3D11Texture2D)};
-static const ID3D11RenderTargetViewVtbl view_vt={UNKNOWN(ID3D11RenderTargetView)};
-static const IDXGIFactory1Vtbl factory_vt={UNKNOWN(IDXGIFactory1)};
-static const ID3D11DeviceContextVtbl context_vt;
-static HRESULT STDMETHODCALLTYPE texture(ID3D11Device *d,const D3D11_TEXTURE2D_DESC *desc,const D3D11_SUBRESOURCE_DATA *data,ID3D11Texture2D **out)
+NTSTATUS d3dpass_generated_call(unsigned method,void *args)
 {
-    if(!out) return E_POINTER;
-    *out=NULL; struct create_texture2d_params p={handle(d),desc,data,0,E_FAIL};
-    d3dpass_unix_call(d3dpass_device_create_texture2d,&p);
-    if(SUCCEEDED(p.hr)) { *out=wrap(p.texture,&texture_vt,&IID_ID3D11Texture2D); if(!*out) return E_OUTOFMEMORY; } return p.hr;
+    wrap_error=0;
+    struct generated_params p={method,args};
+    return d3dpass_unix_call(d3dpass_generated,&p);
 }
-static HRESULT STDMETHODCALLTYPE rtv(ID3D11Device *d,ID3D11Resource *r,const D3D11_RENDER_TARGET_VIEW_DESC *desc,ID3D11RenderTargetView **out)
-{
-    if(!out) return E_POINTER;
-    *out=NULL; struct create_rtv_params p={handle(d),handle(r),desc,0,E_FAIL};
-    d3dpass_unix_call(d3dpass_device_create_rtv,&p);
-    if(SUCCEEDED(p.hr)) { *out=wrap(p.view,&view_vt,&IID_ID3D11RenderTargetView); if(!*out) return E_OUTOFMEMORY; } return p.hr;
-}
-static void STDMETHODCALLTYPE immediate(ID3D11Device *d,ID3D11DeviceContext **out)
-{
-    if(!out) return;
-    struct get_immediate_context_params p={handle(d),0}; d3dpass_unix_call(d3dpass_device_get_immediate_context,&p);
-    *out=wrap(p.context,&context_vt,&IID_ID3D11DeviceContext);
-}
-static void STDMETHODCALLTYPE clear(ID3D11DeviceContext *c,ID3D11RenderTargetView *v,const FLOAT color[4])
-{
-    struct clear_rtv_params p={handle(c),handle(v),{color[0],color[1],color[2],color[3]}};
-    d3dpass_unix_call(d3dpass_context_clear_rtv,&p);
-}
-static void STDMETHODCALLTYPE copy(ID3D11DeviceContext *c,ID3D11Resource *dst,ID3D11Resource *src)
-{
-    struct copy_resource_params p={handle(c),handle(dst),handle(src)}; d3dpass_unix_call(d3dpass_context_copy_resource,&p);
-}
-static HRESULT STDMETHODCALLTYPE map(ID3D11DeviceContext *c,ID3D11Resource *r,UINT sub,D3D11_MAP type,UINT flags,D3D11_MAPPED_SUBRESOURCE *out)
-{
-    if(!out) return E_POINTER;
-    struct map_params p={.context=handle(c),.resource=handle(r),.subresource=sub,.map_type=type,.map_flags=flags,.hr=E_FAIL};
-    d3dpass_unix_call(d3dpass_context_map,&p); *out=p.mapped; return p.hr;
-}
-static void STDMETHODCALLTYPE unmap(ID3D11DeviceContext *c,ID3D11Resource *r,UINT sub)
-{
-    struct unmap_params p={handle(c),handle(r),sub}; d3dpass_unix_call(d3dpass_context_unmap,&p);
-}
-static const ID3D11DeviceContextVtbl context_vt={UNKNOWN(ID3D11DeviceContext),.ClearRenderTargetView=clear,.CopyResource=copy,.Map=map,.Unmap=unmap};
-static const ID3D11DeviceVtbl device_vt={UNKNOWN(ID3D11Device),.CreateTexture2D=texture,.CreateRenderTargetView=rtv,.GetImmediateContext=immediate};
 HRESULT d3dpass_D3D11CreateDevice(D3D_DRIVER_TYPE type,UINT flags,const D3D_FEATURE_LEVEL *levels,UINT count,ID3D11Device **device,D3D_FEATURE_LEVEL *level,ID3D11DeviceContext **context)
 {
     if(!device) return E_POINTER;
@@ -121,11 +79,11 @@ HRESULT d3dpass_D3D11CreateDevice(D3D_DRIVER_TYPE type,UINT flags,const D3D_FEAT
     struct create_device_params p={.driver_type=type,.flags=flags,.level_count=count,.levels=levels,.hr=E_FAIL};
     d3dpass_unix_call(d3dpass_create_device,&p);
     if(FAILED(p.hr)) return p.hr;
-    *device=wrap(p.device,&device_vt,&IID_ID3D11Device);
-    ID3D11DeviceContext *c=wrap(p.context,&context_vt,&IID_ID3D11DeviceContext);
+    *device=d3dpass_wrap_iid(p.device,&IID_ID3D11Device);
+    ID3D11DeviceContext *c=d3dpass_wrap_iid(p.context,&IID_ID3D11DeviceContext);
     if(level) *level=p.level;
-    if(!*device || !c) { if(*device) release(*device); if(c) release(c); *device=NULL; return E_OUTOFMEMORY; }
-    if(context) *context=c; else release(c);
+    if(!*device || !c) { if(*device) IUnknown_Release((IUnknown *)*device); if(c) IUnknown_Release((IUnknown *)c); *device=NULL; return E_OUTOFMEMORY; }
+    if(context) *context=c; else IUnknown_Release((IUnknown *)c);
     return p.hr;
 }
 HRESULT d3dpass_CreateDXGIFactory1(REFIID iid,void **out)
@@ -134,5 +92,5 @@ HRESULT d3dpass_CreateDXGIFactory1(REFIID iid,void **out)
     *out=NULL;
     if(!IsEqualGUID(iid,&IID_IDXGIFactory1)) return E_NOINTERFACE;
     struct create_factory_params p={0,E_FAIL}; d3dpass_unix_call(d3dpass_create_factory,&p);
-    if(SUCCEEDED(p.hr)) { *out=wrap(p.factory,&factory_vt,&IID_IDXGIFactory1); if(!*out) return E_OUTOFMEMORY; } return p.hr;
+    if(SUCCEEDED(p.hr)) { *out=d3dpass_wrap_iid(p.factory,&IID_IDXGIFactory1); if(!*out) return E_OUTOFMEMORY; } return p.hr;
 }

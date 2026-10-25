@@ -55,3 +55,51 @@ not real hardware. Nobody has run this on an Xbox yet, so there are no Xbox resu
 The local gaming-info declaration follows the [Windows SDK structure documentation](https://learn.microsoft.com/windows/win32/api/gamingdeviceinformation/ns-gamingdeviceinformation-gaming_device_model_information).
 The Series model IDs are documented in [DirectX and UWP on Xbox Series X/S](https://walbourn.github.io/directx-and-uwp-on-xbox-series-x-s/).
 The off-device test cannot exercise this export; console validation remains pending.
+
+## Generated COM boundary and call measurement (O4)
+
+```
+make -C x64/native-gfx gen check
+```
+
+`tools/gen_com_thunks.py` reads MinGW's `d3d11.h`, `d3d11_1.h`, `dxgi.h`,
+`dxgi1_2.h`, and `unknwn.h`. It emits checked-in `generated/guest.c`,
+`generated/host.c`, and `generated/packets.h`. `--include DIR` selects another
+MinGW header tree. There are no downloaded or manually copied vtable signatures.
+The generator covers the twelve requested interfaces plus their typed interface
+dependencies (46 interfaces total). It excludes unrelated video/crypto APIs.
+Each generated vtable slot has a typed function; each host stub calls the typed
+host vtable with the host TEB restored. AddRef/Release also use generated stubs;
+the wrapper pool tracks adopted references separately from driver references.
+
+`check` compares every generated file with a fresh generation, prints the
+requested generated/header method counts and checks their exact slot order.
+Compiled static assertions also compare vtable sizes against the installed
+headers. It builds and runs the unchanged O3 clear/readback test and the new
+benchmark through the linked uwph registry and `uwph_host_call`. The benchmark
+also checks Device1/Context1, IID-directed outputs, and vertex-buffer interface
+array round trips before measuring.
+
+`bench_thunk.exe` warms both paths, then measures 1,000,000 calls to
+`IASetPrimitiveTopology` per path on the same device context. Topology alternates
+between line and triangle lists. The thunk loop uses synthetic guest PEB/TLS and
+the generated boundary; the direct baseline runs only with restored host state.
+QueryPerformanceCounter runs in host state outside both loops. The thunk timing
+includes one guest-entry/exit pair around the loop. The test verifies exactly
+1,000,000 measured boundary crossings, the final topology, and restored guest
+fields. It prints `THUNK_NS=<n> DIRECT_NS=<m>` in nanoseconds per call. These are
+**off-device Wine builtin stand-in measurements, never Xbox timings**.
+
+This remains a same-thread prototype with a bounded 512-wrapper pool. Interface
+arrays use explicit count/direction rules because C vtable declarations omit
+those semantics; unknown patterns abort generation. Arrays above 4096 entries
+(including special preserve-binding sentinel counts) fail closed rather than
+passing wrapper addresses to the driver. IID outputs outside the generated
+interface set return E_NOINTERFACE. Exhaustion is reported as E_OUTOFMEMORY for
+HRESULT-returning methods; void methods can return NULL, and callers must check.
+Opaque private-data buffers, external COM objects/callbacks, reentrancy,
+thread-safe identity/lifetime handling, and on-device swapchain/handle adaptation
+still need integration before general game use. Typed-pointer generation alone
+does not establish those semantics. Swapchain methods are emitted but their
+CoreWindow adaptation belongs to O5 and is not tested here. No Xbox DLL or UWP
+package was exercised.

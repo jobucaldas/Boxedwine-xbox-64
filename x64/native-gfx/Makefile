@@ -8,6 +8,10 @@ CC_WIN ?= x86_64-w64-mingw32-gcc
 WINE   ?= wine
 CFLAGS ?= -O2 -g -std=gnu11 -Wall -Wextra -Werror -Wno-unused-parameter -Wno-cast-function-type
 
+THUNK_SOURCES = d3dpass/host.c d3dpass/guest.c generated/host.c generated/guest.c
+THUNK_HEADERS = d3dpass/d3dpass.h d3dpass/runtime.h generated/packets.h
+
+
 .PHONY: all probe run-probe clean
 
 all: probe
@@ -40,6 +44,19 @@ $(OUT)/teb_boundary.exe: tests/teb_boundary.c ../uwp-host/out/win/libuwph.a
 .PHONY: clear-test
 clear-test: $(OUT)/clear_readback.exe
 
-$(OUT)/clear_readback.exe: tests/clear_readback.c d3dpass/host.c d3dpass/guest.c d3dpass/d3dpass.h ../uwp-host/out/win/libuwph.a
+$(OUT)/clear_readback.exe: tests/clear_readback.c $(THUNK_SOURCES) $(THUNK_HEADERS) ../uwp-host/out/win/libuwph.a
 	@mkdir -p $(@D)
-	$(CC_WIN) $(CFLAGS) -I../uwp-host/include -Id3dpass -o $@ tests/clear_readback.c d3dpass/host.c d3dpass/guest.c ../uwp-host/out/win/libuwph.a -ld3d11 -ldxgi -luuid -lbcrypt -lsynchronization -lwindowsapp
+	$(CC_WIN) $(CFLAGS) -I../uwp-host/include -Id3dpass -o $@ tests/clear_readback.c $(THUNK_SOURCES) ../uwp-host/out/win/libuwph.a -ld3d11 -ldxgi -luuid -lbcrypt -lsynchronization -lwindowsapp
+
+.PHONY: gen check
+gen:
+	python3 tools/gen_com_thunks.py
+
+$(OUT)/bench_thunk.exe: tests/bench_thunk.c $(THUNK_SOURCES) $(THUNK_HEADERS) ../uwp-host/out/win/libuwph.a
+	@mkdir -p $(@D)
+	$(CC_WIN) $(CFLAGS) -I../uwp-host/include -Id3dpass -o $@ tests/bench_thunk.c $(THUNK_SOURCES) ../uwp-host/out/win/libuwph.a -ld3d11 -ldxgi -luuid -lbcrypt -lsynchronization -lwindowsapp
+
+check: clear-test $(OUT)/bench_thunk.exe
+	python3 tools/gen_com_thunks.py --check
+	WINEDEBUG=-all timeout 90 $(WINE) $(OUT)/clear_readback.exe
+	WINEDEBUG=-all timeout 90 $(WINE) $(OUT)/bench_thunk.exe
