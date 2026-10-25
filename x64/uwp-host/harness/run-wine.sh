@@ -148,7 +148,13 @@ server=/usr/lib/wine/wineserver64
 env -u LD_PRELOAD -u UWPH_REPORT "$server" -f -p > "$run/server.log" 2>&1 &
 server_pid=$!
 sleep .2
-kill -0 "$server_pid"
+# uwp_run noproc prestarts this prefix's server outside its namespace; a second
+# wineserver then exits 2 (lock held). Reuse it; any other exit still fails.
+if ! kill -0 "$server_pid" 2>/dev/null; then
+    server_rc=0; wait "$server_pid" || server_rc=$?
+    [[ $server_rc == 2 ]] || { echo "wineserver exited $server_rc" >&2; exit 1; }
+    echo 'Reusing prestarted stock wineserver for this prefix (retained concession, outside jail)'
+fi
 fi
 case_args=(); if (( inproc )); then case_args=(--inproc-server); fi
 status=0
@@ -159,7 +165,7 @@ for mode in control routed; do
         # Each guest goes through the fork-free --nofork path (also used inside
         # uwpjail --nofork); it writes $run/$name.log itself.
         rc=0
-        timeout --kill-after=2s 12s strace -f -e trace=execve -o "$run/$name.exec" \
+        timeout --kill-after=2s 12s strace -f -e trace=execve,openat -o "$run/$name.exec" \
             "$PWD/run-wine.sh" --nofork "${case_args[@]}" --run "$run" --case "$name" || rc=$?
         echo "$rc" > "$run/$name.exit"
         echo "$name exit=$rc ($([[ $mode == routed ]] && echo 'selected calls THROUGH W^X ntdll -> shim -> uwph' || echo 'stock Wine / launcher-only control'))"

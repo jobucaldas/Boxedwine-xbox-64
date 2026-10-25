@@ -4,6 +4,10 @@
 # Prints `MEGABONK reached=<stage>`; stage is the furthest of
 # loader|unityplayer|gfx-init (none if Wine never loaded a DLL).
 # Screenshots are diagnostic only; presentation is not instrumented.
+# B28: the prefix is a fresh copy of the B19 packaged prebuilt-prefix and Wine's
+# own server is hosted in the game process (UWPH_INPROC_SERVER=1). That server
+# validates .update-timestamp and pre-creates __wineboot_event, so ntdll's
+# run_wineboot waits on it instead of spawning wineboot.exe under nofork.
 # Requires DISPLAY (a private Xvfb). Linux proof only; Xbox untested.
 set -euo pipefail
 cd "$(dirname "$(realpath "$0")")"
@@ -23,25 +27,28 @@ wrapper=${UWPH_UWP_RUN:-/workspace/xbox-readiness/tests/uwp_run.sh}
 [[ -f $game/Megabonk.exe && -f $game/GameAssembly.dll ]]
 
 make -s out/libuwph_wine_shim.so out/run_via_wine out/wine-wx/.stamp
+# Packaging-time step (stock wineboot, outside the jail); reused when current.
+make -s prebuilt-prefix
 out=$here/out
 work=$out/megabonk
 mkdir -p "$work"
 exec 9>"$work/lock"
 flock -n 9
-if [[ ! -d $work/prefix ]]; then
-    cp -a --reflink=auto /workspace/megabonk/pfx-stock "$work/prefix"
-fi
+# Re-stage every run (one copy kept) so game writes never age the packaged state.
+( source ./prefix-hygiene.sh; refuse_dereferenced_prefix "$here/prebuilt-prefix" )
+if [[ -d $work/prefix ]]; then chmod -R u+w "$work/prefix"; rm -rf "$work/prefix"; fi
+cp -a --reflink=auto "$here/prebuilt-prefix" "$work/prefix"
+chmod -R u+w "$work/prefix"
 run=$(mktemp -d "$work/run-XXXXXXXX")
+printf 'Copied read-only prebuilt prefix: %s\n' "$here/prebuilt-prefix" > "$run/fixture.txt"
 echo "run=$run"
 echo "constraints=$constraints (all three required; enforcement evidence in wine.log)"
 echo "IL2CPP: $(ls "$game"/GameAssembly.dll) present; no Mono JIT runtime is shipped"
 
-export WINEPREFIX=$work/prefix EXTRA_RW=$out WINEDLLOVERRIDES=wineboot.exe=d
-# Retained concession (as run-acceptance.sh): stock Linux server outside the jail.
-/usr/lib/wine/wineserver64 -p 180 || true
-export WINESERVER=/bin/false
-cleanup() { /usr/lib/wine/wineserver64 -k >/dev/null 2>&1 || true; }
-trap cleanup EXIT
+# Hosted in-process server (linked into the shim); uwp_run.sh then skips its
+# stock-server concession. WINESERVER is only a never-taken fallback.
+unset WINEDLLOVERRIDES UWPH_INPROC_OWNER
+export WINEPREFIX=$work/prefix EXTRA_RW=$out UWPH_INPROC_SERVER=1 WINESERVER=/bin/false
 
 rc=0
 timeout --kill-after=5s "${secs}s" "$wrapper" "$constraints" "$game" -- env \
@@ -104,5 +111,6 @@ echo "CreateProcess attempts: $(grep -c 'CreateProcessInternalW' "$log" || true)
 grep -m5 'err:\|Operation not permitted' "$log" || true
 tail -n 3 "$player" | sed 's/^/player: /'
 echo "evidence: $run (wine.log, player.log, shot-*.png)"
-echo "THROUGH uwp_run.sh($constraints) -> launcher -> Wine own W^X loader -> shim -> uwph; separate stock wineserver"
+echo "wineboot spawn failures: $(grep -c 'failed to start wineboot' "$log" || true)"
+echo "THROUGH uwp_run.sh($constraints) -> launcher -> Wine own W^X loader -> shim -> uwph; Wine server hosted in-process"
 echo "MEGABONK reached=$stage"

@@ -1,7 +1,12 @@
+#define _GNU_SOURCE
 /*
  * Threads: per-thread host state, pthread subset, futex, tgkill.
  */
 #include "internal.h"
+#include "fake_proc.h"
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+#include <sched.h>
+#endif
 
 /* fn(arg) on stack_top; SysV on both builds (rdi=fn, rsi=arg, rdx=stack) */
 __asm__(".text\n"
@@ -40,6 +45,8 @@ static int new_tid(void)
 {
 #ifdef UWPH_BACKEND_WIN32
     return (int)GetCurrentThreadId();
+#elif defined(UWPH_BACKEND_LINUX_PASSTHROUGH)
+    return uwph_linux_gettid();
 #else
     static volatile int next = 1000;
     return __atomic_fetch_add(&next, 1, __ATOMIC_RELAXED);
@@ -69,6 +76,17 @@ struct uwph_thread *uwph_thread_current(void)
         register_thread(self);
     }
     return self;
+}
+
+int uwph_thread_ids(int *ids, int capacity)
+{
+    int n = 0;
+    uwph_thread_current();
+    uwph_lock(&reg_lock);
+    for (int i = 0; i < MAX_THREADS && n < capacity; i++)
+        if (registry[i]) ids[n++] = registry[i]->tid;
+    uwph_unlock(&reg_lock);
+    return n;
 }
 
 struct uwph_thread *uwph_thread_find(int tid)
@@ -166,7 +184,7 @@ UWPH_API int uwph_pthread_setspecific(uwph_pthread_key_t k, const void *v)
     return 0;
 }
 
-static void run_key_dtors(struct uwph_thread *t)
+static __attribute__((unused)) void run_key_dtors(struct uwph_thread *t)
 {
     for (int i = 0; i < 128; i++)
         if (t->keys[i] && key_dtors[i]) { void *v = t->keys[i]; t->keys[i] = NULL; key_dtors[i](v); }
@@ -424,6 +442,61 @@ UWPH_API long uwph_futex(int *uaddr, int op, int val, const struct uwph_timespec
     }
 #endif
 }
+#elif defined(UWPH_BACKEND_LINUX_PASSTHROUGH)
+static void linux_thread_cleanup(void *arg)
+{
+    struct uwph_thread *t = arg;
+    unregister_thread(t); self = NULL; free(t);
+}
+static void *linux_thread_entry(void *arg)
+{
+    struct uwph_thread *t = arg;
+    self = t; t->tid = new_tid(); register_thread(t);
+    void *ret;
+    pthread_cleanup_push(linux_thread_cleanup, t);
+    ret = t->start(t->arg);
+    pthread_cleanup_pop(1);
+    return ret;
+}
+int uwph_proc_pthread_create(void *out, const void *attr, void *(*start)(void *), void *arg)
+{
+    UWPH_NATIVE(int, "pthread_create", (pthread_t *, const pthread_attr_t *, void *(*)(void *), void *));
+    struct uwph_thread *t = calloc(1, sizeof(*t));
+    if (!t) return UWPH_EAGAIN;
+    t->start = start; t->arg = arg;
+    int rc = fn((pthread_t *)out, attr, linux_thread_entry, t);
+    if (rc) free(t);
+    return rc;
+}
+UWPH_API int uwph_pthread_create(uwph_pthread_t *out, const uwph_pthread_attr_t *a,
+                                 void *(*start)(void *), void *arg)
+{
+    pthread_attr_t attr;
+    pthread_attr_init(&attr);
+    int rc = a && a->stack ? pthread_attr_setstack(&attr, a->stack, a->stack_size) : 0;
+    if (!rc) rc = uwph_proc_pthread_create(out, &attr, start, arg);
+    pthread_attr_destroy(&attr);
+    return rc;
+}
+UWPH_API int uwph_pthread_join(uwph_pthread_t t, void **ret)
+{
+    UWPH_NATIVE(int, "pthread_join", (pthread_t, void **));
+    return fn((pthread_t)t, ret);
+}
+UWPH_API void uwph_pthread_exit(void *ret)
+{
+    UWPH_NATIVE(void, "pthread_exit", (void *));
+    fn(ret); __builtin_unreachable();
+}
+UWPH_API int uwph_sched_yield(void) { return sched_yield(); }
+UWPH_API int uwph_sched_getcpu(void) { return sched_getcpu(); }
+UWPH_API int uwph_sched_getaffinity(uwph_pid_t pid, size_t size, void *mask)
+{ return sched_getaffinity(pid, size, mask); }
+UWPH_API int uwph_sched_setaffinity(uwph_pid_t pid, size_t size, const void *mask)
+{ return sched_setaffinity(pid, size, mask); }
+UWPH_API long uwph_futex(int *uaddr, int op, int val, const struct uwph_timespec *timeout,
+                         int *uaddr2, int val3)
+{ return uwph_linux_futex(uaddr, op, val, timeout, uaddr2, val3); }
 #else
 UWPH_API int uwph_pthread_create(uwph_pthread_t *out, const uwph_pthread_attr_t *a,
                                  void *(*start)(void *), void *arg)
