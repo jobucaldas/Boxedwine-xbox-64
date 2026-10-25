@@ -2296,6 +2296,8 @@ Exact O2 command passed, exit 0; complete output:
 These remain Linux THROUGH-uwph client/probe proofs, with separate stock-Wine
 Windows smoke; no Xbox-device claim, Steam login, or client modification.
 
+B32 O2: run-isolated.sh uses a private user/PID namespace whose user runs as mapped uid 0 (host uid mapped by unshare -Urpf); this is namespace-local, not host root or Xbox privilege.
+
 ## B29 O1
 
 **BLOCKED, exact test exit 2.** `make clean` now removes the whole
