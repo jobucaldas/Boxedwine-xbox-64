@@ -79,12 +79,13 @@ routing of smoke.exe, UWP activation, or Xbox behaviour.
 ## Hosted ladder (O2)
 
 `make -C x64/on-device ladder && ./x64/on-device/out/ladder --offline` prints
-sixteen STAGE lines (a–h, n0–n7) and overwrites `LocalState/ladder.log`, flushing each
-line. Use `--local-state PATH` to pick another LocalState directory. Each stage
-times out after 20 seconds by default (`--timeout 1..60`). A stage FAIL or SKIP
+twenty-four STAGE lines (a–h, p1–p6, n0–n8) and overwrites `LocalState/ladder.log`, flushing each
+line. Use `--local-state PATH` to pick another LocalState directory. Adapter stages
+time out after 20 seconds by default (`--timeout 1..60`); the offline combo
+has a 60-second bound with 20 seconds per guest. A stage FAIL or SKIP
 doesn't stop the run, and the exit code stays 0. An unwritable log is an error.
-Offline mode runs only stage a, which is the public uwph Linux backend test.
-Stages b–h and n0–n7 stay SKIP. This is a hosted Python tool, so it doesn't run on the
+Offline mode runs stage a (public uwph Linux backend) and the combo rung.
+Stages b–h and n0–n8 stay SKIP. This is a hosted Python tool, so it doesn't run on the
 console.
 
 LocalState layout (Git-ignored):
@@ -232,3 +233,89 @@ Activation API reference: [IFrameworkView.Load](https://learn.microsoft.com/en-u
 4. Review the files before sharing. Omit credentials, tokens, private keys
    (`.pfx`), `LocalState/private/`, and owned game payloads. Review diagnostic
    captures/dumps for private data; send only the relevant reviewed evidence.
+
+## Readiness ladder p1–p6 (B02 O1)
+
+These stages run before n0 in the packaged CoreApplication. No child process,
+Wine, or PE loader is needed: p1–p4 and p6 are PE probe sources linked into
+`rungs.exe`. Execution requires verified Xbox UWP activation and LocalState.
+The hosted ladder emits six SKIPs, including when adapters exist. Build and
+offline output are not console evidence.
+
+| Rung | Probe | Native action / current limitation |
+| --- | --- | --- |
+| p1 | seh_probe | Runs frame-based x64 SEH: AV, divide by zero, illegal instruction, breakpoint, software exception, 10,000 AV recoveries and stack growth. Limits: replaces VEH; guard-page and concurrent VEH checks remain uncovered. |
+| p2 | thread_probe | Runs 64 workers, TLS, exact CS/SRW counters, event ping-pong, timer, mutex, semaphore and condition-variable timeout. Validates creation and bounds every wait; closes completed worker handles and retains static resources if a worker times out. |
+| p3 | fs_probe | Runs CreateFile2 save/read, case-insensitive reopen, 1MB CreateFileMappingFromApp/MapViewOfFileFromApp mapping, flush/readback, delete and free-space assertions in verified LocalState. Desktop known-folder redirection and install-directory writes remain uncovered. |
+| p4 | net_probe | Runs Winsock startup and ephemeral same-process TCP bind/listen/connect/accept/payload assertions, using nonblocking sockets and bounded select waits. External DNS/TLS/WebSocket, fixed-port and cross-app checks remain uncovered; no Steam endpoints or requests. Container denial reports FAIL with socket errors. |
+| p5 | jit_probe | SKIP: original VirtualProtect/VirtualAlloc and RWX dual-map test is not rebuilt against app-safe APIs. No original JIT PE executes. A future full port must use VirtualProtectFromApp. |
+| p6 | uwph Windows smoke | Runs unchanged `x64/uwp-host/tests/smoke.c` plus unixside and Windows backend in-process, THROUGH-uwph. Creates `smoke-input.txt` in LocalState; full self-test assertions determine exit status. |
+
+Copied readiness sources are under `readiness/`, originally from
+`/workspace/xbox-readiness/src/pe`; the SEH/thread/filesystem/network ports are compiled. Originals
+remain unchanged. These ports and the uwph self-test compile with
+`WINAPI_FAMILY=2` and implicit API declarations rejected. This is a header
+check, not Windows SDK certification or console activation proof. Detailed
+probe assertions go to stdout; the final exit status goes to ladder-native.log.
+Unsupported tests remain explicit SKIPs rather than desktop API fallbacks.
+
+The SEH port uses MinGW's x64 frame scope-table primitive, with ordinary
+`__C_specific_handler` dispatch; it installs no vectored handler. App-safe
+mapping references: [CreateFileMappingFromApp](https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-createfilemappingfromapp),
+[MapViewOfFileFromApp](https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-mapviewoffilefromapp).
+Frame handling: [Microsoft x64 exception handling](https://learn.microsoft.com/en-us/cpp/build/exception-handling-x64).
+
+Desktop regression: `./x64/on-device/readiness/check.sh` builds a separate
+fault-instrumented test PE and runs it THROUGH our launcher and Wine's own
+loader, with a disposable prefix and a 25-second per-process timeout. It
+checks the four ports plus failures creating the first worker, ping-pong
+worker, release event and either ping-pong event. Injected failures must
+return probe failure without hanging. Production `rungs.exe` contains no
+fault wrappers. These are desktop diagnostics, not UWP/console PASS evidence.
+
+## Gamepad rung n8 (B03 O1)
+
+| Rung | Probe | Native action / current limitation |
+| --- | --- | --- |
+| n8 | Windows.Gaming.Input.Gamepad | Verified Xbox UWP activation only: RoGetActivationFactory, fresh Gamepads vector each second for 10 seconds, count and every mapped XINPUT_STATE logged. Zero controllers is valid; API errors FAIL. Off-device always SKIP. Device read is build-only until console validation. |
+
+`make -C x64/on-device input-test && ./x64/on-device/out/input_test`
+checks 28 mapping cases on the host. Buttons map to XInput, unsupported paddles
+are ignored, triggers round to 0..255, and sticks round using 32768 for negatives
+and 32767 for positives. No deadzone is applied. Inputs are clamped, with
+nonfinite values mapped to zero. Packet number is zero: this stateless mapper
+does not track changes. No Wine xinput integration is included. The probe uses
+the installed SDK-compatible MinGW Gamepad ABI declarations. Host mapping tests
+are native C tests, not THROUGH-uwph or stock Wine runtime evidence.
+
+## B21 combo rung
+
+`STAGE combo hello+hello_k32-nofork,noproc,wx` runs the existing B21 hellos
+through the packaged launcher, bundled W^X Wine loader, shim and uwph on Linux.
+`offline-smoke` requires this rung to PASS, including noproc reports and all
+20 ntdll-to-uwph bindings/counters; constraints remain `nofork,noproc,wx`.
+`package` and `kit` carry both PE guests plus the Linux runner, launcher, shim,
+W^X loader tree and verifiers in `payload/combo/`. The Linux loader tree retains
+B21's links to matching installed Debian Wine 10.0 DLLs/data: these are hosted
+diagnostics, not a Windows/UWP runtime. Build-time `prebuilt-prefix` preparation
+uses stock Wine. For a source or extracted kit run, set
+`UWPH_COMBO_PREFIX=/absolute/path/to/x64/uwp-host/harness/prebuilt-prefix`
+(the B21 fixture prepared by `make -C x64/uwp-host/harness prebuilt-prefix`).
+Run `UWPH_COMBO_PREFIX=... /path/to/kit/ladder --offline`, or invoke
+`/path/to/kit/payload/combo/run` with the same environment. The kit can live
+anywhere; it does not require a source checkout. The host must supply Debian
+Wine 10.0, Python, bubblewrap and the readiness constraint wrapper plus its
+`bin/uwpjail` and `fakesys` support at `/workspace/xbox-readiness`;
+`UWPH_UWP_RUN` can select another compatible wrapper. Offline stage a still
+requires the source harness; only combo is runnable independently of it.
+`offline-smoke` supplies the fixture and checks combo in a relocated kit.
+The routed run copies that explicit fixture, disables wineboot,
+and retains a separate stock Linux wineserver concession. Logs/reports remain
+in `${TMPDIR:-/tmp}/kit-combo.*/`; the temporary prefix is deleted, and no
+prefix is packaged.
+
+On device, PASS means both hellos exit 0 through an in-process Wine W^X loader
+and uwph with `nofork,noproc,wx`, TEB/thread checks and routing counters verified;
+until that native combo adapter exists, report SKIP (the Linux runner cannot run
+inside UWP). Hosted online mode accepts `LocalState/adapters/combo` under the
+same exit-code/routing contract as the other loader adapters.

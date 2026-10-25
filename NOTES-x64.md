@@ -652,6 +652,121 @@ uwp-host build/surface check. No uwp-host runtime, launcher or stock Wine
 execution is exercised; UI routing evidence and Linux-box video are deferred
 to their respective later orders. See x64/ui/README.md for the exact checks.
 
+## R4S O1 trace
+
+`x64/uwp-host/harness/surface-trace.tsv` records the unsupported ntdll.so
+imports actually called by routed hello, hello_k32 and the existing owned
+`/workspace/steam-owned/games/megabonk/Megabonk.exe` invocation. Priority is
+aggregate observed entry count (descending, symbol name breaks ties), not an
+implementation commitment. Top 20: snprintf, fopen, __isoc23_fscanf, fclose,
+pthread_getspecific, pthread_sigmask, feof, stat, write, pthread_mutex_lock,
+pthread_mutex_unlock, writev, getenv, asprintf, sigaddset, fcntl, setlocale,
+time, getuid, realpath. No imports are implemented by O1.
+
+Reproduce on this Linux host with
+`/workspace/x64-run/lanes/R4S/evidence/run.sh`, then
+`python3 /workspace/x64-run/lanes/R4S/evidence/aggregate.py`.
+The retained trace.py, per-target JSON/logs, prefix copy and server log live in
+that evidence directory. The existing shim and our run_via_wine launcher are
+built by the harness; Wine identity/hash inventory is in
+`x64/uwp-host/harness/out/wine/identity.json`. GDB launches only our owned
+launcher and follows its exec into Wine's own loader. It arms breakpoints at
+all 159 unsupported PLT entries and both decoded syscall instructions, rebasing
+and rearming across Wine's startup reexec. The remaining unsupported function
+import, longjmp (GLOB_DAT rather than PLT), has a separate pending function
+breakpoint and is not hit. Counts include startup reexec; each
+breakpoint records an actual entry, not an LD_DEBUG binding or static reference.
+The TSV is the hit set, not a claim that unlisted imports are supported.
+
+Each target hits 64 unsupported import names before the same child gate.
+Both direct sites (ntdll-relative 0x3ad92, 0x3b05d) are armed and **not hit**;
+the libc `syscall` import is separately hit once per target. GDB catches
+fork/vfork/clone/clone3 syscall entry and kills the owned inferior at its first
+clone entry, before a child is created. The backtrace shows libc fork called
+from ntdll NtCreateUserProcess; Wine's process log names wineboot.exe --init.
+This is a trace up to the child gate, not guest completion or Megabonk gameplay.
+No Wine source, loader, gate, or syscall bytes are patched on disk.
+
+Routing proof before that gate: debugger reads of the existing shim's counters
+show ntdll caller wrapper/backend pairs open=3, read=108, close=6, mmap=44,
+munmap=1 for each target, with bypass={0,0,0,0,0}. Reads do not call functions
+in the inferior. These selected calls go THROUGH ntdll -> existing shim ->
+public uwph -> Linux passthrough backend. The 64 unsupported imports retain
+Linux dependencies; they are not THROUGH uwph. An explicit separate, unshimmed
+stock Linux wineserver services only a copied initialized fixture. This is
+Linux-host routing evidence, not in-process UWP or Xbox-device acceptance.
+No stock-Wine-only PE run is substituted for the routed trace. The wineboot
+child gate remains intact. Video: /workspace/x64-run/videos/R4S-O1.mp4.
+
+Exact test after routed hello trace:
+`test -s x64/uwp-host/harness/surface-trace.tsv && wc -l x64/uwp-host/harness/surface-trace.tsv`
+prints `67 x64/uwp-host/harness/surface-trace.tsv` (header, 64 hit imports,
+two explicitly unhit direct sites).
+
+## R4S O2 traced set
+
+The O1 top 20 (snprintf … realpath, see the O1 list above) are implemented
+behind public uwph entries with per-symbol counters (`uwph/trace.h`) on all
+backends and exported by the harness shim; surface.tsv routed 5 -> 25,
+unsupported 160 -> 140. Linux passthrough uses raw syscalls for
+stat/write/writev/fcntl/time and host libc via RTLD_NEXT for the native-ABI
+objects (FILE, pthread keys/mutexes, sigset, locale, env). Win32/UWP uses
+existing uwph objects plus CRT vsnprintf/setlocale; its fscanf is a bounded
+integer/string scanner. `tests/traced.c` (run three times by `make test`: stub,
+Win32 under wine64, passthrough) checks each symbol and its counter.
+
+THROUGH: routed hello and hello_k32 via run_via_wine -> Wine's own loader ->
+ntdll.so -> shim -> uwph complete with every traced counter nonzero (e.g.
+hello: fopen 223, __isoc23_fscanf 222, pthread_mutex_lock 1855, write 295).
+Counts are process-wide uwph entries. The wine-test gate is still BLOCKED by
+the pre-existing wineboot attempt (same in stock control). Linux-host evidence
+only; no Xbox/UWP device acceptance. Video: /workspace/x64-run/videos/R4S-O2.mp4.
+
+### R4S O2 reviewer fixes
+
+Win32 integer scanning now stores Linux x64 `l` conversions with explicit
+64-bit width, including `%ln`. The regression initializes all destination high
+bits and scans hex, signed, and unsigned values above the 32-bit range.
+Linux diagnostic FILE bridges now translate private descriptors: fdopen retains
+the slot, fopen registers one, fileno returns it, and fclose releases it without
+a second native close. Failed fdopen leaves the descriptor owned by its caller.
+Borrowed native standard streams are not adopted into private descriptor slots.
+Composition regressions cover fdopen/fileno, fopen/fileno/read, fclose invalidation,
+and slot reuse. Exact test passes (stub traced 60, Win32 traced 63, passthrough
+traced 70; smoke 55/566). Backend/shim checks pass. Fresh launcher runs retain all
+20 counters, while the unchanged wineboot gate still blocks both controls and
+routed runs. These are Linux harness and Win32-under-Wine results, not Xbox
+acceptance; process-wide counters prove entry/routing, not per-ntdll completion.
+
+## R4S O3 fake proc
+
+`make -C x64/uwp-host/harness noproc-test` tests the bounded in-process
+provider with host procfs hidden, then invokes the readiness wrapper's exact
+`--noproc INSTALL -- COMMAND` interface for hello through our launcher, Wine's
+own loader and the uwph shim. The wrapper now accepts `--noproc` and uses an
+empty tmpfs for `/proc` for either noproc spelling. Its updated copy is retained
+as `harness/uwp_run-noproc.sh`; set `UWPH_UWP_RUN` to use that copy. The installed
+`/workspace/xbox-readiness/tests/uwp_run.sh` was updated locally as well.
+
+Snapshots cover self/maps, self/cmdline, cpuinfo; self/exe uses process executable
+identity for readlink, realpath and open. No snapshot reads host `/proc`.
+Linux maps enumerate ELF load segments via dl_iterate_phdr (anonymous/PE ranges
+not yet included); cmdline contains only the executable with a trailing NUL;
+cpuinfo advertises the x64 baseline, not console topology. Linux snapshots use
+sealed memfds and the existing private/native fd adapters and native FILE ABI.
+Win32 snapshots use in-process read-only file objects and VirtualQuery for maps;
+this path is build-checked with WINAPI_FAMILY_APP, not console-tested. A separate
+prestarted stock wineserver remains a concession. This is a bounded hello PASS,
+not full Linux proc fidelity or full UWP acceptance. Video:
+`/workspace/x64-run/videos/R4S-O3.mp4`.
+
+O3 review fixes: provider handling is independent of negative errno, including
+unsupported host-existing `/proc/version` for both open and fopen. Linux captures
+an absolute AT_EXECFN identity at initialization, before chdir; the hidden-proc
+provider test launches relatively and checks readlink, realpath and ELF open after
+chdir("/"). The acceptance script deletes the previous report and requires a new
+process report with positive ntdll open/read/close/mmap/munmap routing, zero bypass,
+recursion, unattributed calls and module overflow before printing THROUGH PASS.
 ## R4X O1 RWX sites
 
 Source inventory only, Wine version 10.0 (`/tmp/wine-src/VERSION`). The initial
@@ -1213,6 +1328,75 @@ runtime proof and no stock Wine execution in O3. Recording
 `/workspace/x64-run/videos/R4W-O3.mp4` shows the blocked exact test only.
 No runtime code was changed, no commits created and no remotes accessed.
 
+## B18
+
+O1 (2026-10-25): remaining RWX inventory after R4X. Linux/off-device proof is
+THROUGH our launcher -> Wine's own private loader/Unix + PE ntdll -> shim ->
+public uwph for the selected host calls. An explicit separate stock Linux
+wineserver remains; this is not in-process-server or on-console acceptance.
+No RWX exception was added to uwpjail, the shim, or uwph.
+
+The pre-fix inventory (`/workspace/x64-run/lanes/B18/O1-fast-{hello,d3d11,megabonk}.*`,
+hello is `O1-hello.*`) used `uwpjail --wx` with
+`strace -f -e trace=mmap,mprotect`. The initial all-success stack-unwinding runs
+(`O1-{d3d11,megabonk}.*`) timed out during initialization and are not graphics
+acceptance. Supplemental `O1-caller-d3d11.strace` uses
+`-k --status=failed` to identify the denied kernel request as
+`libc.__GI___mmap64 -> libvulkan_lvp.so+0x1f6287` (Mesa lavapipe).
+The shim now immediately logs refused calls with PID, operation, caller module
+and offset: those calls never enter the kernel and cannot appear in strace.
+Counts must include both sources; MAP_DENYWRITE on an RX file mapping is not
+PROT_WRITE and is excluded.
+
+The two Megabonk requests initially looked like Unity requests but are Wine
+missing-import stubs. `O1-gdb-megabonk.log` records the launched process under
+the same jail/launcher/private loader/shim with read-only stack inspection:
+Wine syscall frame saved guest SP -> PE ntdll+0x42e0c -> `allocate_stub`
+(`addr2line`, Wine loader.c:454), then Unix NtAllocateVirtualMemory -> map_view
+-> anon_mmap_alloc. The debug run also tries anon_mmap_fixed because GDB changes
+address layout; its four attempts are supplemental, not summed into the baseline
+counts. `O1-origin-megabonk.log` independently shows the two 64 KiB
+NtAllocateVirtualMemory calls with protection 0x40 (PAGE_EXECUTE_READWRITE).
+These are loader-generated unresolved-import stubs, not a Unity JIT.
+
+`wine-loader-stub-wx.patch` fixes that owner: each stub starts RW, is filled,
+protected RX, flushed with NtFlushInstructionCache, then published. No shared
+page containing earlier executable stubs is reopened writable. Allocation or
+protection failure keeps Wine's failure sentinel; the original maximum stub
+count stays intact. Cost: at least one page per unresolved import instead of
+packing stubs in one 64 KiB pool. `prepare-wine-wx.sh` now rebuilds and installs
+private PE ntdll.dll as well as Unix ntdll.so; installed Wine is untouched.
+Wine PE build dependencies and matching installed locale.nls are included in
+that private build. The focused `stub_probe.exe` imports two nonexistent
+version.dll functions, never invokes them, and verifies separate RX allocations.
+
+Inventory (counts are RWX requests per run: shim `UWPH_RWX` lines, which never
+reach the kernel, plus kernel-denied `PROT_WRITE|PROT_EXEC` lines in strace;
+the two sources do not overlap). Pre-fix = `O1-hello.*` and
+`O1-fast-{d3d11,megabonk}.*`; post-fix = `O1-v3-{hello,stub,d3d11,megabonk}.*`
+(fresh prefix copies, rebuilt ntdll from 01:07); callers from
+`O1-caller-d3d11.strace`, `O1-caller3-megabonk.strace` (`strace -k
+--status=failed`) and `O1-gdb-megabonk.log`.
+
+| caller | count | fixed | reachable-on-console |
+|---|---|---|---|
+| Wine PE ntdll `allocate_stub` (loader.c:454, missing-import stubs) -> NtAllocateVirtualMemory(PAGE_EXECUTE_READWRITE) -> Unix ntdll anon_mmap_alloc (`ntdll.so+0x5dc1a`) | Megabonk 2 before, 0 after; stub_probe 0 after (two stubs, both RX) | yes: `wine-loader-stub-wx.patch` (RW, fill, RX, flush, publish) | yes: any game with an unresolved import (Megabonk has them) |
+| Mesa lavapipe `util/u_execmem.c` init_heap, 10 MiB mmap prot 7 (`libvulkan_lvp.so+0x1f6287`), reached via DXVK -> winevulkan | d3d11_probe 1 before, 1 after | no (third-party, denied by the jail; u_execmem returns NULL and Mesa uses its non-rtasm path; readback still 0,128,255,255) | no: Linux-host Mesa software Vulkan; not in the console package |
+| Mesa libgallium `u_execmem` same 10 MiB heap (`libgallium-25.0.7...so+0x83ab47`), reached via wined3d GL/llvmpipe | Megabonk 1 before, 1 after | no (third-party, denied, non-fatal; Megabonk reaches Unity `LocalizationPrewarmer:Start`) | no: Linux-host Mesa software GL; not in the console package |
+| DXVK 3.1.1 d3d11.dll/dxgi.dll (PE, CPU side) | 0 | n/a | yes (no RWX seen) |
+| Unity: UnityPlayer.dll + GameAssembly.dll (Megabonk is IL2CPP/AOT, no JIT) | 0 in the 45 s window | n/a | yes (no RWX seen) |
+| hello.exe, launcher `run_via_wine`, shim, uwph, Wine image mapping (R4X patch) | 0 | n/a (R4X) | yes |
+
+Post-fix runs: hello exit 0; stub_probe exit 0 ("PASS: two missing-import
+stubs published on separate RX allocations"); d3d11_probe exit 0 with DXVK
+native d3d11 ("d3d11 probe done"); Megabonk killed by the 45 s timeout while
+running (no crash). Earlier `O1-fixed-*`/`O1-final-*` d3d11/Megabonk runs
+crashed explorer.exe in `RtlUnicodeToMultiByteN`. They used a PE ntdll.dll
+built before the locale.nls fix and are superseded. The current build passes
+d3d11 on both fresh and reused prefixes, with and without strace.
+Not covered: winevulkan with a real GPU ICD, and Unity paths after the menu.
+The console graphics path is unchanged here; any console Vulkan/D3D driver
+needs its own inventory.
 ## R4W O5 Wine 10.0 server as a static library (build-only)
 
 `x64/uwp-host/wineserver/` (`Makefile`, `build.sh`, `README.md`) builds Wine
@@ -1518,3 +1702,238 @@ runs-before.txt,runs-after.txt,xvfb.log,ffmpeg.log}`. Free-display Xvfb recordin
 shows the failed exact test and explicitly labels the old verifier evidence.
 No DONE-R4W.inproc marker was created, because O9 requires all acceptance gates.
 No runtime, verifier, jail, remotes, or prior evidence was changed.
+## B21 O1
+
+Reproduced on x64-spike @5f28e621 (R4S+R4X+R4W merged) in worktree
+/workspace/wt/B21: `x64/uwp-host/harness/run-acceptance.sh` still fails, rc=1,
+`hello_k32 constraints=nofork,noproc,wx exit=13`, Wine prints
+`wine: failed to load start.exe: c000000d`. (Setup notes: in a fresh worktree
+the very first run fails earlier, rc=2, because the Makefile rule for
+`out/wine_linux_backend.o` has no `mkdir -p $(@D)`; also `out/wine-o4/prefix`
+must be copied from `/workspace/megabonk/pfx-stock` as run-wine.sh does.)
+
+**Failing call.** Rerunning the same invocation with `WINEDEBUG=+virtual,+module`:
+
+    err:virtual:map_fixed_area mmap error Permission denied for 0x140000000-0x140006000, unix_prot 0x7
+    err:virtual:try_map_free_area mmap() error Permission denied, range 0x100000000-0x100006000, unix_prot 0x7.
+    err:virtual:map_view anon mmap error Permission denied, size 0x16000, unix_prot 0x7
+    (same three again for start.exe, 0x43000 / 0x53000)
+    wine: failed to load start.exe: c000000d
+
+- Offending request: anonymous `mmap(0x140000000, 0x6000,
+  PROT_READ|PROT_WRITE|PROT_EXEC (0x7), MAP_FIXED|MAP_PRIVATE|MAP_ANONYMOUS)`
+  for the hello_k32.exe image view at its preferred base, then the same RWX
+  prot for the free-area retries (size 0x6000, then 0x16000 with alignment
+  slack). Errno EACCES. Wine then falls back to start.exe
+  (env.c:1973), whose image view hits the same RWX map, and gives up with
+  STATUS_INVALID_PARAMETER.
+- Call site (Wine 10.0, dlls/ntdll/unix/virtual.c): `map_image_view()` line
+  3019 `vprot = SEC_IMAGE|SEC_FILE|VPROT_COMMITTED|VPROT_READ|VPROT_EXEC|VPROT_WRITECOPY`
+  -> `map_view()` -> `map_fixed_area()` (anon mmap, ERR at line 1990), then
+  `map_free_area()`/`try_map_free_area()` (line 1325) and the `map_view()`
+  anon fallback (line 2072); `get_unix_prot()` turns that vprot into 0x7.
+- Who rejects it: **the uwph shim, not the seccomp filter.** `shim.c:56`
+  (`mmap` wrapper, added by R4X O2) returns EACCES for any WRITE|EXEC before a
+  backend or kernel call. `strace -f -e trace=mmap,mprotect -e status=failed`
+  around the jailed run shows no RWX mmap reaching the kernel (only Wine's
+  normal address-space probes failing with ENOMEM). So with the same shim, a
+  run without `wx` (`nofork,noproc`) fails the same way today (exit 13,
+  same ERR lines). R4S's "passes without wx" result predates the R4X merge.
+  uwpjail `--wx` would reject the same mmap (prot & 6 == 6 -> EACCES) if the
+  shim allowed it.
+- Why: `run-acceptance.sh` exports `WINE_LOADER=/usr/lib/wine/wine64`, the
+  **stock** Debian loader + ntdll.so. R4X's fix (`wine-image-wx.patch`, hunk
+  @@ -3016, drops VPROT_EXEC from exactly this vprot and sets per-section RX
+  later) only exists in the private `out/wine-wx` tree built by
+  prepare-wine-wx.sh, which run-wine.sh/run_hello use but run-acceptance.sh
+  does not.
+- Diagnostic only (not a fix, acceptance script unchanged): the same jailed
+  hello_k32 run with `WINE_LOADER=out/wine-wx/lib/wine/wine64` (stamp
+  6a05b8a0... matches this tree's prepare-wine-wx.sh) exits 0 and prints
+  `hello from a native x86-64 PE (kernel32 only)` under nofork,noproc,wx.
+
+O2 implication: no new mapping change seems to be needed for hello_k32. The
+acceptance run has to reach Wine's loader with the W^X ntdll.so. O2 forbids
+editing run-acceptance.sh, and `run_via_wine` only uses its built-in
+`/usr/lib/wine/wine64` default when `WINE_LOADER` is unset, so the driver
+needs to choose where that selection should live.
+
+Evidence: /workspace/x64-run/lanes/B21/O1-evidence/ (run-acceptance.log,
+trace-stock-wx.log, trace-stock-nofork-noproc.log, trace-wxntdll-wx.log,
+strace-failed-mmap.txt, scripts). Video /workspace/x64-run/videos/B21-O1.mp4
+(20 s, private Xvfb). Linux box only, THROUGH our launcher -> Wine's own loader ->
+shim -> uwph inside uwp_run.sh/uwpjail; not Xbox proof.
+
+## B21 O2
+
+Fix for the B21 O1 failure: `run-acceptance.sh` (unchanged) now passes under
+its default `nofork,noproc,wx`. Both hellos exit 0. The constraint, the shim's
+W^X refusal and the acceptance script are untouched.
+
+- **Where the fix lives: the launcher's loader choice.** O1 showed the RWX
+  request came from the stock ntdll.so (`map_image_view` vprot with
+  VPROT_EXEC|VPROT_WRITECOPY). R4X's `wine-image-wx.patch` already gives Wine's
+  own loader the W^X mapping order (map RW, read/relocate sections, then
+  per-section R/RW/RX through mprotect -> uwph_protect, never RWX). The harness
+  build of `run_via_wine` now bundles that loader
+  (`-DRUN_VIA_WINE_WX_LOADER=<out>/wine-wx/lib/wine/wine64`, and the Makefile
+  rule depends on `out/wine-wx/.stamp`). When the uwph shim is loaded
+  (detected through its `uwph_shim_report` export; its mmap wrapper always
+  refuses WRITE|EXEC) and the requested loader is the stock
+  `/usr/lib/wine/wine64`, the launcher execs the bundled W^X loader and prints
+  `[launcher] W^X enforced by uwph shim: stock ... maps PE images RWX; using
+  bundled W^X loader ...`. The acceptance output shows this line. Any other
+  WINE_LOADER is used exactly as given. Runs without the shim (run-wine.sh
+  stock controls, inproc-server controls) are unchanged.
+  `RUN_VIA_WINE_EXACT_LOADER=1` turns the swap off for negative controls.
+  Plain `cc run_via_wine.c` builds (on-device scripts) are unchanged. In the
+  UWP app this is the same role: the launcher execs the W^X Wine bundled in
+  the app's storage.
+- **Stale verifier.** R4X added an `mprotect` counter, so every shim report has
+  six `total` rows. `verify_noproc.py` (R4S) still required exactly five ops
+  and failed every post-merge run. It now requires all six, each with backend
+  > 0, bypass 0 and ntdll attribution. That is stricter than before (as in
+  verify_wine.py) and proves the RW->RX flips went through uwph.
+- Also fixed: `out/wine_linux_backend.o` rule now does `mkdir -p` (O1 fresh
+  worktree rc=2).
+
+Results (Linux box, THROUGH uwp_run.sh/uwpjail nofork,noproc,wx -> run_via_wine
+-> Wine's own loader with W^X ntdll.so -> shim -> uwph; separate stock wineserver;
+Xbox untested): run-acceptance rc=0. hello_k32 `hello from a native x86-64 PE
+(kernel32 only)`, hello TEB/malloc/threads ok. hello_k32 had 84 uwph_protect calls
+and hello had 129. Refused RWX mmap/mprotect requests: 0. 20/20 traced bindings.
+`make -C x64/uwp-host test` rc=0 (70 passed). run-windows-smoke.sh rc=0 (500
+passed). run-noproc.sh rc=0. Negative control `RUN_VIA_WINE_EXACT_LOADER=1
+run-acceptance.sh` -> hello_k32 exit 13, `failed to load start.exe: c000000d`.
+Stability: 16/16 consecutive acceptance passes. One earlier run inside the
+recording xterm had hello_k32 exit=1 (it died early, 1 uwph_protect call). Its
+log was overwritten and it was not reproduced in 17 retries (including inside
+xterm), so the cause is unknown. Video /workspace/x64-run/videos/B21-O2.mp4.
+## B20 O1
+
+Question: which WoW64 mode the installed Debian Wine (wine-10.0, Debian
+10.0~repack-6: wine64 amd64 + wine32:i386) gives us, and a syswow64 prefix.
+All of this is **stock Wine, outside uwpjail** (no uwph routing in O1).
+
+Install layout: there is no `/usr/lib/wine/i386-windows`; Debian puts 32-bit PE
+dlls in `/usr/lib/i386-linux-gnu/wine/i386-windows` (810 files) next to an
+`i386-unix` tree (32-bit ELF .so). 64-bit side has
+`/usr/lib/x86_64-linux-gnu/wine/x86_64-windows/{wow64,wow64cpu,wow64win}.dll`
+and an `x86_64-unix/ntdll.so` containing the WoW64 code paths
+(`load_wow64_ntdll`, "starting %s in experimental wow64 mode"). No
+`/usr/share/doc/wine*` docs beyond copyright/examples; `WINEARCH` only accepts
+win32/win64 (no `WINEARCH=wow64` switch). This is a classic
+`--enable-win64` + separate i386 build, not an `--enable-archs` build.
+
+Prefix: `WINEPREFIX=x64/uwp-host/harness/out/b20/pfx-wow64 wineboot -i`
+(~27 s) -> `#arch=win64`; `drive_c/windows/syswow64/ntdll.dll` exists
+(PE32 i386 Wine builtin, 3372656 bytes), syswow64/cmd.exe etc. likewise.
+
+Mode found, default: **old-style WoW64 (separate i386 loader process)**.
+`/usr/bin/wine` prefers `/usr/lib/wine/wine` (32-bit). Running
+`C:\windows\syswow64\cmd.exe` gives a Linux process whose exe is
+`/usr/lib/wine/wine`, ELF 32-bit i386, mapping
+`i386-linux-gnu/wine/i386-unix/ntdll.so`. Even when started via `wine64`
+(with WINELOADER pointed at a dir with no 32-bit sibling) the 64-bit ntdll.so
+still finds and execs `/usr/lib/wine/wine`. So 32-bit = a separate 32-bit
+Linux ELF process: unusable under Xbox `--nofork`/single 64-bit process.
+
+Mode available: **new-style in-process WoW64 works with these same stock
+binaries** when no 32-bit loader is reachable. In a private mount namespace
+(`unshare -rm`, bind-mount an empty file over `/usr/lib/wine/wine` and
+`wineserver32`; nothing system-wide changed) `wine64 C:\windows\syswow64\cmd.exe`
+prints `err:environ:init_peb starting ... in experimental wow64 mode` and:
+- with `WINEDLLPATH` unset -> `failed to load \??\C:\windows\syswow64\ntdll.dll
+  error c0000135` — the 64-bit ntdll looks for 32-bit PE in
+  `x86_64-linux-gnu/wine/i386-windows`, which Debian doesn't ship.
+  **This is exactly the B10 failure text**, so B10's blocker is the PE search
+  path, not only the missing prefix syswow64.
+- with `WINEDLLPATH=/usr/lib/i386-linux-gnu/wine` -> 32-bit cmd.exe runs
+  (`ver` + echo work) inside ONE Linux process, exe `/usr/lib/wine/wine64`
+  (ELF x86-64), mapping x86_64-unix/ntdll.so, x86_64-windows/{ntdll,wow64,
+  wow64cpu,wow64win}.dll and i386-windows/{ntdll,kernel32,cmd}.dll. No
+  i386-unix .so and no 32-bit ELF loaded. (wineserver is still its usual
+  separate process, same as for 64-bit apps.)
+
+Consequence for Xbox/uwph: the uwph route already runs wine64 only, so it lands
+in experimental in-process WoW64 automatically; it needs (a) a prefix with
+syswow64 (this one) and (b) the i386-windows PE dlls on WINEDLLPATH (on Xbox:
+package `i386-windows/` alongside x86_64-windows; no i386-unix needed). "Experimental"
+caveat: Wine 10 marks this mode experimental; 32-bit GL/Vulkan/thunks via
+wow64win are less mature than old-style. O2 should set WINEDLLPATH in the uwph
+run. Video /workspace/x64-run/videos/B20-O1.mp4 (19 s): prefix check,
+old-style 32-bit process, in-process wow64 cmd.exe. Probe scripts:
+/workspace/x64-run/lanes/B20/o1-*.sh.
+
+## B20 O2
+
+Same SteamSetup.exe as B10 (/workspace/steam-owned/SteamSetup.exe), `/S`, no
+login, no token, no Steam patching. Reproduction scripts + small evidence:
+`x64/uwp-host/harness/steam-evidence/b20-o2/`; raw logs under
+`harness/out/b20/o2/` (gitignored) and /workspace/x64-run/lanes/B20.
+
+**Stock Wine (control):** default Debian `wine SteamSetup.exe /S` into the O1
+prefix `out/b20/pfx-wow64` -> rc 0, installs
+`Program Files (x86)/Steam/Steam.exe` (4379496 bytes) + bin/, public/,
+uninstall.exe. Old-style WoW64 (no "experimental wow64" marker; per O1 the
+32-bit PE runs in a separate i386 `/usr/lib/wine/wine` process).
+Note: the file is **`Steam.exe`** (capital S, as Valve ships it); the O2 exact
+test checks `.../Steam/steam.exe`, which fails on case-sensitive ext4. Nothing
+was renamed or linked to satisfy it.
+
+**THROUGH uwph:** `run_via_wine` -> private W^X loader (`out/wine-wx`, no
+32-bit `wine` sibling, so ntdll.so picks new-style in-process WoW64) +
+`libuwph_wine_shim.so` preloaded, separate stock wineserver64, wineboot
+disabled (same constraints as B10). Fresh prefix `out/b20/pfx-wow64-uwph`
+(setup-only stock `wineboot -i`).
+- Installer, WINEDLLPATH=/usr/lib/i386-linux-gnu/wine: B10's c0000135 is gone;
+  SteamSetup.exe runs "in experimental wow64 mode" and **exits 0 having
+  installed Steam.exe** in the routed prefix. Its post-install
+  steamservice.exe fails (`WS2_32.dll failed to initialize`), and
+  winex11.so wasn't found for the 32-bit side (see below). 417834 shim-routed
+  open/read/close/mmap/munmap/mprotect calls over 19 per-pid reports.
+- Client run 1, same WINEDLLPATH: Steam.exe exits 66 after ~10 s:
+  `CRYPT32.dll failed to initialize`. Cause: for a 32-bit builtin, ntdll.so
+  loads the 64-bit unix side from `<dll dir>/../x86_64-unix/<name>.so`, i.e.
+  `/usr/lib/i386-linux-gnu/wine/x86_64-unix/crypt32.so`, which Debian doesn't
+  have (also bcrypt.so, ws2_32.so, winex11.so). Debian's 64-bit
+  x86_64-unix .so files do export the wow64 thunks (`__wine_unix_call_wow64_funcs`).
+- Fix (harness-side, symlinks only): `out/b20/wow64-dlls/{i386-windows ->
+  Debian i386 PE dlls, x86_64-unix -> wine-wx x86_64-unix}` as WINEDLLPATH.
+  This is also the **Xbox package layout**: ship `i386-windows/` next to the
+  64-bit `x86_64-unix/`; no i386-unix and no 32-bit ELF needed.
+- Client run 2 with the overlay: Steam.exe (32-bit) runs the full 180 s cap
+  (exit 124), draws its "Updating Steam... Checking for available updates"
+  window, loads winhttp/wininet/cryptnet and asks
+  `https://cdn.steamstatic.com/client/steam_client_win32`. After 60 s:
+  `Download failed: http error 0` -> "Steam needs to be online" dialog until
+  the cap. Wine log: `wininet:open_http_connection create_netconn failed:
+  12029` (cannot connect); secur32/schannel was never reached. **Same failure
+  under the stock-Wine old-style control** (stock-installed prefix, 120 s), so
+  this is this box's egress (host curl to the same URL gets 200), not
+  uwph/WoW64. Not chased further; logging in is out of scope anyway.
+
+Child processes (Windows names, routed): installer: SteamSetup.exe 1,
+conhost.exe 2, explorer.exe 1, winemenubuilder.exe 2, steamservice.exe 1
+(fails init). Client: Steam.exe 1, conhost.exe 1, explorer.exe 1;
+steamwebhelper.exe 0 (never reached, because the client package never
+downloaded). Each Windows process is a separate **x86-64 wine64** Linux process
+(strace: wine64 execve 5 installer / 4 client), with **zero i386 ELF
+execs**: 32-bit code stays inside the 64-bit process. So old-style WoW64 is
+NOT required. The remaining Xbox single-process issue is Wine's ordinary
+one-Linux-process-per-Windows-process model (explorer/conhost/steamservice,
+and later Chromium steamwebhelper), not 32-bit support.
+
+Missing imports: no unresolved guest import seen. Missing exports/modules
+logged as warnings: ole32!DllCanUnloadNow, kernel32!CreateMutexWW (installer
+probe), winemac.drv, CRYPTBASE.dll, CLBCATQ.dll, Steam crashhandler.dll
+(optional). `surface-trace-steam.tsv` (rewritten from B10's placeholder, 62
+data rows) lists these per phase, plus child processes, Linux execs, shim
+counters, last log lines and the bootstrap errors; generator
+`steam-evidence/b20-o2/o2-trace.py`. Last substantive client line:
+`[...] Error: Steam needs to be online to update.`; literal last Wine line is
+the normal ntdll PROCESS_DETACH.
+
+Video /workspace/x64-run/videos/B20-O2.mp4 (60 s, Xvfb :122): routed client
+run 2, the 32-bit Steam updater window under uwph. Run 1 (installer + crypt32
+failure) is kept as /workspace/x64-run/lanes/B20/B20-O2-run1.mp4.

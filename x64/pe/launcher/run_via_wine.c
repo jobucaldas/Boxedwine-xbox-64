@@ -10,7 +10,19 @@
  * Build (native Linux):  cc -O2 -o run_via_wine run_via_wine.c
  * Usage:                 ./run_via_wine <guest.exe> [args...]
  * Env:                   WINE_LOADER may override the loader path.
+ *
+ * W^X bundle (uwp-host harness build, -DRUN_VIA_WINE_WX_LOADER="..."): when
+ * the uwph shim is loaded it refuses every PROT_WRITE|PROT_EXEC request, and
+ * the stock loader's ntdll.so maps PE images RWX, so the stock loader cannot
+ * run there. In that case the stock loader is swapped for the bundled W^X
+ * loader (R4X wine-image-wx.patch: map RW, relocate, then per-section RX),
+ * and the swap is printed. Any other WINE_LOADER is used exactly as given;
+ * RUN_VIA_WINE_EXACT_LOADER=1 disables the swap (negative controls).
  */
+#ifdef RUN_VIA_WINE_WX_LOADER
+#define _GNU_SOURCE
+#include <dlfcn.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -27,6 +39,24 @@ int main(int argc, char **argv)
      * Wine loader shipped in the app's install dir; here it is the distro one. */
     const char *loader = getenv("WINE_LOADER");
     if (!loader) loader = "/usr/lib/wine/wine64";
+
+#ifdef RUN_VIA_WINE_WX_LOADER
+    /* uwph_shim_report is exported only by the uwph shim (shim.map), whose
+     * mmap wrapper refuses WRITE|EXEC: W^X is enforced in this process tree. */
+    const char *exact = getenv("RUN_VIA_WINE_EXACT_LOADER");
+    if (dlsym(RTLD_DEFAULT, "uwph_shim_report") && !(exact && *exact == '1') &&
+        !strcmp(loader, "/usr/lib/wine/wine64")) {
+        if (access(RUN_VIA_WINE_WX_LOADER, X_OK)) {
+            fprintf(stderr, "[launcher] W^X enforced but bundled W^X loader %s is missing\n",
+                    RUN_VIA_WINE_WX_LOADER);
+            return 127;
+        }
+        fprintf(stderr, "[launcher] W^X enforced by uwph shim: stock %s maps PE images RWX; "
+                "using bundled W^X loader %s (RW map/relocate, then RX)\n",
+                loader, RUN_VIA_WINE_WX_LOADER);
+        loader = RUN_VIA_WINE_WX_LOADER;
+    }
+#endif
 
     /* argv for the loader: loader, guest.exe, [guest args...], NULL */
     char **av = calloc(argc + 1, sizeof(*av));

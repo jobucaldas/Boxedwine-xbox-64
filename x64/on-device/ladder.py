@@ -10,6 +10,7 @@ STAGES = (
     ('a', 'uwph-smoke'), ('b', 'hello'), ('c', 'hello_k32'),
     ('d', 'wx-jit'), ('e', 'wineserver-in-process'), ('f', 'd3d12-dzn'),
     ('g', 'SteamAPI_Init'), ('h', 'Megabonk'),
+    ('combo', 'hello+hello_k32-nofork,noproc,wx'),
 )
 
 
@@ -58,6 +59,11 @@ def main():
                     ['make', '-C', str(repo / 'x64/uwp-host/harness'), 'backend-test'],
                     repo, args.timeout)
                 reason += '; THROUGH public uwph Linux backend; not Xbox proof'
+            elif letter == 'combo' and args.offline:
+                status, reason = execute(
+                    [str((base if (base / 'payload/combo/run').is_file()
+                          else base / 'out') / 'payload/combo/run')], location, 60)
+                reason += '; nofork,noproc,wx THROUGH launcher -> bundled W^X Wine loader -> uwph; Linux only'
             elif args.offline:
                 status, reason = 'SKIP', 'offline: device/loader adapter disabled'
             elif not adapter.is_file():
@@ -69,13 +75,16 @@ def main():
             print(line, flush=True)
             log.write(line + '\n')
             log.flush()
-        native = [('n0', 'probe-native')] + [
+        native = [(f'p{i}', name) for i, name in enumerate(
+            ('seh_probe', 'thread_probe', 'fs_probe', 'net_probe', 'jit_probe', 'uwph-self-test'), 1)] + [('n0', 'probe-native')] + [
             ('n1', 'd3d11-device'), ('n2', 'd3d12-device'),
             ('n3', 'corewindow-swapchain'), ('n4', 'audio'),
-            ('n5', 'game-memory'), ('n6', 'gaming-device-model'), ('n7', 'big-file')]
+            ('n5', 'game-memory'), ('n6', 'gaming-device-model'), ('n7', 'big-file'), ('n8', 'gamepad')]
         for ident, name in native:
             if args.offline:
                 status, reason = 'SKIP', 'offline: native console APIs require UWP activation; no Xbox proof'
+            elif ident.startswith('p') or ident == 'n8':
+                status, reason = 'SKIP', 'run packaged rungs.exe with verified Xbox UWP activation; hosted adapters cannot attest readiness'
             elif ident == 'n7' and not args.big_file:
                 status, reason = 'SKIP', 'requires --big-file'
             else:
