@@ -1937,3 +1937,50 @@ the normal ntdll PROCESS_DETACH.
 Video /workspace/x64-run/videos/B20-O2.mp4 (60 s, Xvfb :122): routed client
 run 2, the 32-bit Steam updater window under uwph. Run 1 (installer + crypt32
 failure) is kept as /workspace/x64-run/lanes/B20/B20-O2-run1.mp4.
+
+
+## B24 O1 — fresh RWX caller investigation (blocked)
+
+Restored the missing B12 run-megabonk.sh locally; K_TIMEOUT now selects its
+existing timeout (45 seconds for the exact command). No runtime policy changed.
+Fresh B24 run: harness/out/megabonk/run-QFSDJnAt, wine.log and report.778103;
+raw evidence copied to /workspace/x64-run/lanes/B24/evidence/first-run/.
+THROUGH uwp_run.sh -> our launcher -> Wine own private W^X loader -> shim ->
+uwph Linux backend, with a separate stock Linux wineserver outside the jail.
+This is Linux routed proof, not stock-Wine-only, build-only, or Xbox proof.
+Video: /workspace/x64-run/videos/B24-O1.mp4 (private Xvfb, <=60 seconds).
+
+Fresh wine.log lines:
+```
+1:uwpjail: seccomp wx=1 nofork=1 (34 insns)
+2:[launcher] exec /workspace/wt/B24/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64 -> /workspace/steam-owned/games/megabonk/Megabonk.exe (handing guest to Wine's loader)
+4:0024:err:environ:run_wineboot failed to start wineboot c0000017
+```
+Fresh report lines:
+```
+5:total mmap 8997 0
+7:total mprotect 1530 0
+```
+The report's ntdll.so mmap calls/backend counts are 1080/1080 and mprotect
+1530/1530. Zero matches for UWPH_RWX, unix_prot, or Permission denied in the
+fresh wine.log. The existing shim report_wx logs module + return offset before
+rejecting PROT_WRITE|PROT_EXEC, so a refused shim mmap would be visible even
+though it never reaches kernel strace. Run exited 1; MEGABONK reached=unityplayer.
+
+Historical B12 final-evidence/wine.log (not fresh B24 evidence):
+```
+96:0024:err:virtual:map_view anon mmap error Permission denied, size 0x20000, unix_prot 0x7
+97:0024:err:virtual:map_view anon mmap error Permission denied, size 0x20000, unix_prot 0x7
+```
+These identify Wine Unix ntdll's map_view diagnostic, but give no exact mmap
+return offset. Fresh B24 did not reproduce that RWX denial, so no fresh module
++ call site can honestly be named. c0000017 persists without the historical
+RWX message; its asserted causal relationship is unproven. O1 BLOCKED on
+reproducing the denied request on the current merged baseline; O2 not attempted.
+
+Exact-test repeat: run-OleHKkKS/report.781582 also has zero UWPH_RWX,
+unix_prot, or Permission denied matches, mmap=8997, mprotect=1530,
+c0000017 for wineboot/explorer, and MEGABONK reached=unityplayer.
+Full exact-test output: /workspace/x64-run/lanes/B24/evidence/exact-test.txt
+(command completed with status 0; harness reports guest exit=1).
+Video verified by ffprobe: 30.400000 seconds. bash -n and git diff --check pass.
