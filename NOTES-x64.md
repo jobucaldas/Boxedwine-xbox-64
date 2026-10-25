@@ -3043,3 +3043,32 @@ not run under this O1-only order. Video:
 `/workspace/x64-run/videos/B35-O1.mp4` (6.2 seconds, Xvfb + ffmpeg; no Encom).
 No security constraints, verifier defaults, surface gates, or remotes were
 changed; no commit or push was performed.
+
+## B73
+O1 (2026-10-25), stock Wine 10.0 on the box only; NOT THROUGH-uwph, not a console proof.
+BLOCKED by its dependency: B72-O2 never produced `logon=1`. steamhost's interface gate
+(PIN.txt `osw_tables_build=1745623383` != pinned client build 1792618285) refuses every
+IClientEngine/IClientUser slot call. The newest published OpenSteamClient tables do not
+match the pinned build. Re-deriving the slots would be new reverse engineering, and relaxing
+the gate would risk the InvalidateCredentials/DestroyCachedCredentials neighbours on João's
+account, so neither was done.
+
+Added so the stage is ready once the gate can pass:
+- `steamhost64.exe --logon --wait N --serve S`: after `logon=1`, steamhost stays the master
+  for S seconds with the same RunFrame + BGetCallback pump (callbacks are discarded), then
+  prints `serve_done=1`. No new slots are called.
+- `run.sh --game [--game-secs 60]`: starts steamhost in the background and waits for its
+  `activeprocess_pid_is_self=` line. Only on `logon=1` + `serving=` does it run
+  `steamapi_probe.exe` against Megabonk's unmodified `steam_api64.dll` (probe.log) and then
+  Megabonk from a symlink farm under out/ (-force-d3d11, 60 s, Xvfb, recorded to
+  B73-O1.mp4). Player.log is copied and redacted like wine.log. Otherwise it writes
+  `logon.txt` BLOCKED and records a 5 s clip of the gate output.
+  Exit codes: 6 = gate, 9 = no logon, 11 = steam_api did not init.
+
+Exact test: run.sh exits 6 (`iface_pin=mismatch`, `logon=not_attempted`). The token was not
+read (seed-login.py did not run). webhelper_count=0. The eyJ check is clean and the prefix
+was deleted. Evidence: /workspace/x64-run/lanes/B73/o1. Video
+/workspace/x64-run/videos/B73-O1.mp4 is 5 s of the gate output, not the game menu.
+Unblock options (João's call; unchanged from B72): OSC tables for a pinnable build, an
+authorised table dump, or Valve's steam.exe route (B71 is currently BLOCKED: it stays
+Logged Off without the webhelper).
