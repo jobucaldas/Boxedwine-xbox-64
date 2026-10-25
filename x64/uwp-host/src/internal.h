@@ -97,6 +97,7 @@ int uwph_fs_abspath(const char *path, char *out, size_t len);
 enum uwph_inet_op { INET_BIND = 1, INET_CONNECT = 2, INET_LISTEN = 3, INET_ACCEPT = 4, INET_SHUTDOWN = 5, INET_GETSOCKNAME = 6, INET_GETPEERNAME = 7,
                    INET_SEND = 10, INET_RECV = 11, INET_SENDTO = 12, INET_RECVFROM = 13 };
 int uwph_inet_socket(int domain, int type, int proto);
+int uwph_inet_socketpair(int domain, int type, int proto, int sv[2]);   /* loopback listener */
 int uwph_is_inet(int fd);
 int uwph_inet_poll(struct uwph_object *o);
 int uwph_inet_sockopt(int fd, int set, int level, int name, void *val, uwph_socklen_t *len);

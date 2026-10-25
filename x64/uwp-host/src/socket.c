@@ -347,6 +347,9 @@ UWPH_API int uwph_socketpair(int domain, int type, int proto, int sv[2])
     struct endpoint *a, *b;
     int fa, fb, fl = UWPH_O_RDWR | (type & (UWPH_SOCK_NONBLOCK | UWPH_SOCK_CLOEXEC));
     (void)proto;
+#ifdef UWPH_BACKEND_WIN32
+    if (domain == UWPH_AF_INET) return uwph_inet_socketpair(domain, type, proto, sv);
+#endif
     if (domain != UWPH_AF_UNIX) return UWPH_FAIL(UWPH_EAFNOSUPPORT);
     if ((type & 0xf) != UWPH_SOCK_STREAM) return UWPH_FAIL(UWPH_EPROTONOSUPPORT);
     if (make_pair(1, UWPH_SOCK_STREAM, &a, &b) < 0) return -1;

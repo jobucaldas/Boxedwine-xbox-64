@@ -623,6 +623,33 @@ static void test_inet(void)
     a.port = (uint16_t)((60000 >> 8) | (60000 << 8));
     CHECK(uwph_bind(listener, addr, sizeof(a)) == -1 && uwph_errno == UWPH_EACCES, "inet_bind_60000 EACCES");
     uwph_close(listener);
+    {   /* AF_INET socketpair: loopback listener fallback (Winsock has none) */
+        int sv[2] = {-1, -1}, nb[2] = {-1, -1}, val = 0;
+        unsigned port0, port1;
+        uwph_socklen_t vlen = sizeof(val);
+        ok = uwph_socketpair(UWPH_AF_INET, UWPH_SOCK_STREAM, 0, sv) == 0 &&
+            uwph_send(sv[0], "pair", 4, 0) == 4 && uwph_recv(sv[1], b, sizeof(b), 0) == 4 && !memcmp(b, "pair", 4) &&
+            uwph_write(sv[1], "back", 4) == 4 && uwph_read(sv[0], b, sizeof(b)) == 4 && !memcmp(b, "back", 4);
+        len = sizeof(a);
+        ok = ok && uwph_getsockname(sv[0], addr, &len) == 0 && a.ip[0] == 127;
+        port0 = (unsigned)((a.port >> 8) | ((a.port & 0xff) << 8));
+        len = sizeof(a);
+        ok = ok && uwph_getsockname(sv[1], addr, &len) == 0;
+        port1 = (unsigned)((a.port >> 8) | ((a.port & 0xff) << 8));
+        ok = ok && port0 && port0 < 57344 && port1 && port1 < 57344 &&
+            uwph_getsockopt(sv[0], UWPH_SOL_SOCKET, UWPH_SO_TYPE, &val, &vlen) == 0 && val == UWPH_SOCK_STREAM;
+        if (sv[0] >= 0) uwph_close(sv[0]);
+        pollfd = (struct uwph_pollfd){sv[1], UWPH_POLLIN, 0};
+        ok = ok && uwph_poll(&pollfd, 1, 1000) == 1 && uwph_recv(sv[1], b, sizeof(b), 0) == 0;
+        if (sv[1] >= 0) uwph_close(sv[1]);
+        ok = ok && uwph_socketpair(UWPH_AF_INET, UWPH_SOCK_STREAM | UWPH_SOCK_NONBLOCK, 0, nb) == 0 &&
+            uwph_recv(nb[1], b, sizeof(b), 0) == -1 && uwph_errno == UWPH_EAGAIN;
+        if (nb[0] >= 0) { uwph_close(nb[0]); uwph_close(nb[1]); }
+        ok = ok && uwph_socketpair(UWPH_AF_INET, UWPH_SOCK_DGRAM, 0, nb) == -1 && uwph_errno == UWPH_EPROTONOSUPPORT &&
+            uwph_socketpair(UWPH_AF_INET6, UWPH_SOCK_STREAM, 0, nb) == -1 && uwph_errno == UWPH_EAFNOSUPPORT;
+        printf("inet_socketpair ports %u/%u (below 57344)\n", port0, port1);
+        CHECK(ok, "inet_socketpair %s", ok ? "PASS" : "FAIL");
+    }
 }
 #endif
 

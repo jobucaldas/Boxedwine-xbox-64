@@ -85,6 +85,79 @@ int uwph_inet_socket(int domain, int type, int proto)
     return own_socket(socket(domain == UWPH_AF_INET6 ? AF_INET6 : AF_INET, type & 15, proto),
                       type & (UWPH_SOCK_NONBLOCK | UWPH_SOCK_CLOEXEC));
 }
+/* Native TCP socket bound to 127.0.0.1 on a port below 57344 (Xbox known
+ * issue: traffic on 57344-65535 can be silently dropped; port 0 may hand out
+ * any ephemeral port in 49152-65535). Rejected sockets stay open until a
+ * usable port is found so the next bind gets a different port. */
+static SOCKET loopback_bound(struct sockaddr_in *a)
+{
+    SOCKET rejected[16], s = INVALID_SOCKET;
+    int nrejected = 0, n, e = 0;
+    for (;;) {
+        memset(a, 0, sizeof(*a));
+        a->sin_family = AF_INET;
+        a->sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+        n = sizeof(*a);
+        s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+        if (s == INVALID_SOCKET) { e = WSAGetLastError(); break; }
+        if (bind(s, (struct sockaddr *)a, sizeof(*a)) || getsockname(s, (struct sockaddr *)a, &n)) {
+            e = WSAGetLastError(); closesocket(s); s = INVALID_SOCKET; break;
+        }
+        if (ntohs(a->sin_port) < 57344) break;
+        if (nrejected == (int)(sizeof(rejected) / sizeof(rejected[0]))) {
+            closesocket(s); s = INVALID_SOCKET; e = WSAEADDRNOTAVAIL; break;
+        }
+        rejected[nrejected++] = s;
+    }
+    while (nrejected) closesocket(rejected[--nrejected]);
+    if (s == INVALID_SOCKET) WSASetLastError(e);
+    return s;
+}
+static int same_addr(const struct sockaddr_in *a, const struct sockaddr_in *b)
+{
+    return a->sin_port == b->sin_port && a->sin_addr.s_addr == b->sin_addr.s_addr;
+}
+/* socketpair(AF_INET, SOCK_STREAM) has no Winsock equivalent: listen on
+ * 127.0.0.1, connect, accept. Pattern adapted from BoxedWine-uwp
+ * (GPL-2, platform/windows/platform.cpp Platform::nativeSocketPair), without
+ * its SO_REUSEADDR (on Winsock that lets another socket take the port); the
+ * accepted peer must be our own client, and both ports stay below 57344. */
+int uwph_inet_socketpair(int domain, int type, int proto, int sv[2])
+{
+    struct sockaddr_in listen_addr, client_addr, peer_addr;
+    SOCKET listener, client = INVALID_SOCKET, server = INVALID_SOCKET;
+    int fl = type & (UWPH_SOCK_NONBLOCK | UWPH_SOCK_CLOEXEC), n, e = 0, nodelay = 1;
+    if (!sv) return UWPH_FAIL(UWPH_EFAULT);
+    if (domain != UWPH_AF_INET) return UWPH_FAIL(UWPH_EAFNOSUPPORT);
+    if ((type & 15) != UWPH_SOCK_STREAM) return UWPH_FAIL(UWPH_EPROTONOSUPPORT);
+    if (proto && proto != IPPROTO_TCP) return UWPH_FAIL(UWPH_EPROTONOSUPPORT);
+    InitOnceExecuteOnce(&startup_once, startup, NULL, NULL);
+    if (startup_error) return UWPH_FAIL(socket_errno(startup_error));
+    if ((listener = loopback_bound(&listen_addr)) == INVALID_SOCKET) return fail_socket();
+    if (listen(listener, 1) || (client = loopback_bound(&client_addr)) == INVALID_SOCKET ||
+        connect(client, (struct sockaddr *)&listen_addr, sizeof(listen_addr))) goto fail;
+    for (int tries = 0; tries < 4; tries++) {
+        n = sizeof(peer_addr);
+        server = accept(listener, (struct sockaddr *)&peer_addr, &n);
+        if (server == INVALID_SOCKET) goto fail;
+        if (n == sizeof(peer_addr) && same_addr(&peer_addr, &client_addr)) break;
+        closesocket(server);    /* someone else's connection: not our pair */
+        server = INVALID_SOCKET;
+    }
+    if (server == INVALID_SOCKET) { WSASetLastError(WSAECONNREFUSED); goto fail; }
+    closesocket(listener);
+    setsockopt(client, IPPROTO_TCP, TCP_NODELAY, (char *)&nodelay, sizeof(nodelay));
+    setsockopt(server, IPPROTO_TCP, TCP_NODELAY, (char *)&nodelay, sizeof(nodelay));
+    if ((sv[0] = own_socket(client, fl)) < 0) { closesocket(server); return -1; }
+    if ((sv[1] = own_socket(server, fl)) < 0) { e = uwph_errno; uwph_close(sv[0]); return UWPH_FAIL(e); }
+    return 0;
+fail:
+    e = WSAGetLastError();
+    closesocket(listener);
+    if (client != INVALID_SOCKET) closesocket(client);
+    if (server != INVALID_SOCKET) closesocket(server);
+    return UWPH_FAIL(socket_errno(e));
+}
 static int poll_socket(SOCKET s, short events, int timeout)
 {
     WSAPOLLFD p = {s, events, 0};
