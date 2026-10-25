@@ -263,15 +263,24 @@ _Static_assert(sizeof(struct sigaction)==sizeof(struct uwph_sigaction),"sigactio
 _Static_assert(sizeof(stack_t)==sizeof(uwph_stack_t),"sigaltstack ABI");
 
 #ifdef UWPH_HARNESS_NATIVE_FDS
-/* Linux Wine reproduction only: process-local opt-in provider absence. */
+/* Linux Wine reproduction only: process-local opt-in provider absence/replacement. */
 void *dlopen(const char *file, int mode)
 {
     void *(*native_open)(const char *, int) = dlvsym(RTLD_NEXT, "dlopen", "GLIBC_2.2.5");
     const char *deny = uwph_getenv("UWPH_DENY_DL");
     const char *base = file ? strrchr(file, '/') : NULL;
     base = base ? base + 1 : file;
-    if (deny && !strcmp(deny, "gnutls") && base &&
-        (!strcmp(base, "libgnutls.so") || !strncmp(base, "libgnutls.so.", 13))) {
+    const char *provider = uwph_getenv("UWPH_TLS_PROVIDER");
+    int is_gnutls = base && (!strcmp(base, "libgnutls.so") || !strncmp(base, "libgnutls.so.", 13));
+    /* B44 O2 stand-in for the Win32 backend's "libgnutls.so.30" registry
+     * entry: route Wine's request to the uwph-built provider only (absolute
+     * path, no search-path or host fallback). */
+    if (is_gnutls && provider && *provider) {
+        void *h = provider[0] == '/' ? native_open(provider, mode) : NULL;
+        fprintf(stderr, "UWPH_TLS_PROVIDER: dlopen %s -> %s (%s)\n", file, provider, h ? "loaded" : "failed");
+        return h ? h : native_open("/uwph-test-denied/libgnutls.so", mode);
+    }
+    if (deny && !strcmp(deny, "gnutls") && is_gnutls) {
         fprintf(stderr, "UWPH_DENY_DL=gnutls: refused dlopen %s\n", file);
         /* Let libc supply a normal dlerror, without touching installed libraries. */
         return native_open("/uwph-test-denied/libgnutls.so", mode);
