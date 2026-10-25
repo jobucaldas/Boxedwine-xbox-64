@@ -79,3 +79,8 @@ $(OUT)/fake_proc_test: ../tests/fake_proc.c $(OUT)/libuwph.a
 noproc-test:
 	./run-noproc.sh
 .PHONY: noproc-test
+
+# O4 strict acceptance: wx is included by default when supported by uwpjail.
+acceptance-test:
+	./run-acceptance.sh
+.PHONY: acceptance-test

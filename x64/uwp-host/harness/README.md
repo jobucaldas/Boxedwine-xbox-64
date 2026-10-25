@@ -373,3 +373,29 @@ requires every traced counter to be nonzero in routed hello/hello_k32 runs.
 Those counts are process-wide uwph entries, not ntdll-attributed like the five
 O2 selected families. The overall wine-test gate stays BLOCKED by the existing
 wineboot attempt, as it is in the stock control runs.
+
+## R4S O4 acceptance
+
+`make acceptance-test` runs both owned hellos through this harness's launcher,
+Wine's own loader, and the native-fd uwph shim under
+`/workspace/xbox-readiness/tests/uwp_run.sh nofork,noproc,wx`. The default includes
+wx because the installed jail supports it. An initialized explicit fixture is
+required, as in O3. A separate stock Linux wineserver remains outside the jail.
+No Xbox device acceptance is implied.
+
+The original strict noproc verifier still requires positive ntdll counts for
+open/read/close/mmap/munmap with zero bypass/recursion/unattributed/overflow.
+The added verifier requires all capped O1 priorities 1–20 to have positive uwph
+entry counters and real ntdll relocation bindings to the shim. These trace
+counters are process-wide, not per-caller counts; binding evidence establishes
+ntdll routing. Remaining O1 imports and direct syscalls remain excluded.
+
+O4 outcome: BLOCKED. Available wx seccomp causes hello_k32 exit 13 with
+`wine: failed to load start.exe: c000000d`. `UWPH_CONSTRAINTS=nofork,noproc
+./run-acceptance.sh` passes both hellos and all 20 traced entries as a diagnostic;
+that override does not satisfy the default wx gate. Full `make -C
+x64/uwp-host test` passes (Windows unit tests run under stock Wine, separately
+from the routed Linux guest proof). External status surface/noproc rows are in
+`/workspace/xbox-readiness/STATUS.md`; logs in
+`/workspace/x64-run/lanes/R4S/O4-*.log`; free-Xvfb/ffmpeg video in
+`/workspace/x64-run/videos/R4S-O4.mp4` (4.6 seconds).
