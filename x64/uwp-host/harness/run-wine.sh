@@ -3,6 +3,15 @@
 # the private W^X ntdll.so from prepare-wine-wx.sh (R4X O2), because the shim
 # refuses WRITE|EXEC and stock ntdll maps PE images RWX.
 set -euo pipefail
+# Packaging has already copied the prefix and evidence outside the nofork jail.
+# Rewrite this invocation into the existing single-guest path using builtins.
+if [[ $# == 2 && ( ${1:-}:${2:-} == --inproc-server:--no-build || ${1:-}:${2:-} == --no-build:--inproc-server ) ]]; then
+    [[ $0 == */* ]] && cd -- "${0%/*}"
+    IFS= read -r staged_run < out/inproc-staged.txt
+    set -- --nofork --inproc-server --run "$staged_run" --case routed-hello
+    # The single-guest path below must not cd relative to $0 a second time.
+    exec "$PWD/run-wine.sh" "$@"
+fi
 # --nofork --run DIR --case MODE-PE [--inproc-server]: one guest, fork-free for
 # uwpjail --nofork (no clone without CLONE_THREAD). Builtins and parameter
 # expansion only; the final process is started by plain exec. The caller (the
@@ -43,10 +52,11 @@ if [[ ${1:-} == --nofork ]]; then
     exec "$PWD/out/run_via_wine" "$root/x64/pe/tests/$pe.exe" > "$run/$name.log" 2>&1
 fi
 cd "$(dirname "$0")"
-inproc=0
+inproc=0 stage=0
 for arg in "$@"; do
     case "$arg" in
         --inproc-server) inproc=1 ;;
+        --stage-inproc) inproc=1; stage=1 ;;
         --no-build) ;; # Builds are always performed by the Make targets.
         *) echo "Unknown argument: $arg" >&2; exit 2 ;;
     esac
@@ -108,6 +118,12 @@ PY
 if (( ! inproc )); then cp "$work/fixture.txt" "$run/fixture.txt"; fi
 cp out/wine/direct-syscalls.tsv "$run/direct-syscalls.tsv"
 cp surface.tsv "$run/surface.tsv"
+if (( stage )); then
+    printf '%s\n' "$run" > out/inproc-staged.txt.tmp
+    mv out/inproc-staged.txt.tmp out/inproc-staged.txt
+    echo "Staged in-process run: $run"
+    exit 0
+fi
 echo "O4 evidence: $run"
 cat "$run/fixture.txt"
 if (( ! inproc )); then
