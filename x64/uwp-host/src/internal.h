@@ -22,6 +22,8 @@
 # ifndef WIN32_LEAN_AND_MEAN
 #  define WIN32_LEAN_AND_MEAN
 # endif
+# include <winsock2.h>
+# include <ws2tcpip.h>
 # include <windows.h>
 #else
 # include <pthread.h>
@@ -90,6 +92,16 @@ extern uwph_cond_t uwph_io_cond;
 int uwph_unix_poll_locked(struct uwph_object *o, int kind);   /* revents mask */
 /* absolute, normalised Unix path for an AF_UNIX name (relative to cwd) */
 int uwph_fs_abspath(const char *path, char *out, size_t len);
+
+#ifdef UWPH_BACKEND_WIN32
+enum uwph_inet_op { INET_BIND = 1, INET_CONNECT = 2, INET_LISTEN = 3, INET_ACCEPT = 4, INET_SHUTDOWN = 5, INET_GETSOCKNAME = 6, INET_GETPEERNAME = 7,
+                   INET_SEND = 10, INET_RECV = 11, INET_SENDTO = 12, INET_RECVFROM = 13 };
+int uwph_inet_socket(int domain, int type, int proto);
+int uwph_is_inet(int fd);
+int uwph_inet_poll(struct uwph_object *o);
+int uwph_inet_sockopt(int fd, int set, int level, int name, void *val, uwph_socklen_t *len);
+int uwph_inet_call(int fd, int op, void *buf, size_t size, int flags, struct uwph_sockaddr *addr, uwph_socklen_t *len);
+#endif
 
 /* ---- Windows x64 CONTEXT layout, usable on the stub build too ---- */
 typedef struct { uint64_t lo; int64_t hi; } uwph_m128a;

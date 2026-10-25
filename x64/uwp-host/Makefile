@@ -55,7 +55,7 @@ $(OUT)/win/unixside.o: tests/unixside.c $(HDRS)
 
 $(OUT)/win/smoke.exe: tests/smoke.c $(OUT)/win/unixside.o $(OUT)/win/libuwph.a
 	$(CC_WIN) $(CFLAGS_COMMON) $(WIN_DEFS) -Isrc -o $@ tests/smoke.c $(OUT)/win/unixside.o \
-	    $(OUT)/win/libuwph.a -lbcrypt -lsynchronization -lwindowsapp
+	    $(OUT)/win/libuwph.a -lbcrypt -lsynchronization -lwindowsapp -lws2_32
 
 # O2 traced set: each O1-priority symbol through its uwph entry + counter
 $(OUT)/linux/traced: tests/traced.c $(OUT)/linux/libuwph.a
@@ -63,7 +63,7 @@ $(OUT)/linux/traced: tests/traced.c $(OUT)/linux/libuwph.a
 
 $(OUT)/win/traced.exe: tests/traced.c $(OUT)/win/libuwph.a
 	$(CC_WIN) $(CFLAGS_COMMON) $(WIN_DEFS) -o $@ tests/traced.c \
-	    $(OUT)/win/libuwph.a -lbcrypt -lsynchronization -lwindowsapp
+	    $(OUT)/win/libuwph.a -lbcrypt -lsynchronization -lwindowsapp -lws2_32
 
 # Bounded real Wine 10.0 inventory / binding diagnostic only. Unsupported imports
 # remain visible and block full-coverage claims; this does not run a PE.
