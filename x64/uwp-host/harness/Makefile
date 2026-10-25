@@ -47,11 +47,13 @@ wine-surface-check: out/libuwph_shim.so out/run_hello
 
 # Separate backend object: native fd interoperability is exclusive to Wine proof.
 $(OUT)/wine_linux_backend.o: linux_backend.c counters.h $(HEADERS)
+	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) -DUWPH_HARNESS_NATIVE_FDS -c $< -o $@
-$(OUT)/libuwph_wine_shim.so: shim.c counters.c counters.h $(OUT)/wine_linux_backend.o $(OUT)/libuwph.a $(OUT)/shim.map
-	$(CC) $(CFLAGS) -DUWPH_HARNESS_NATIVE_FDS -shared shim.c counters.c $(OUT)/wine_linux_backend.o $(OUT)/libuwph.a -ldl -Wl,--version-script=$(OUT)/shim.map -Wl,-z,defs -o $@
-$(OUT)/run_via_wine: ../../pe/launcher/run_via_wine.c
-	$(CC) -O2 -Wall -Wextra -Werror $< -o $@
+$(OUT)/libuwph_wine_shim.so: inproc_server.c ../wineserver/server_thread.c ../wineserver/out/libwineserver.a shim.c counters.c counters.h $(OUT)/wine_linux_backend.o $(OUT)/libuwph.a $(OUT)/shim.map
+	$(CC) $(CFLAGS) -DUWPH_HARNESS_NATIVE_FDS -shared inproc_server.c ../wineserver/server_thread.c ../wineserver/out/libwineserver.a shim.c counters.c $(OUT)/wine_linux_backend.o $(OUT)/libuwph.a -ldl -Wl,--version-script=$(OUT)/shim.map -Wl,-z,defs -o $@
+# Bundles the private W^X loader: used instead of stock wine64 under the shim.
+$(OUT)/run_via_wine: ../../pe/launcher/run_via_wine.c $(OUT)/wine-wx/.stamp
+	$(CC) -O2 -Wall -Wextra -Werror -DRUN_VIA_WINE_WX_LOADER='"$(abspath $(OUT))/wine-wx/lib/wine/wine64"' $< -o $@
 wine-test: $(OUT)/libuwph_wine_shim.so $(OUT)/run_via_wine $(OUT)/wine-wx/.stamp
 	./run-wine.sh
 .PHONY: wine-test
@@ -85,7 +87,7 @@ acceptance-test:
 	./run-acceptance.sh
 .PHONY: acceptance-test
 # R4X O2: private W^X ntdll.so (RW map/relocate, then per-section RX/R/RW).
-$(OUT)/wine-wx/.stamp: prepare-wine-wx.sh wine-image-wx.patch
+$(OUT)/wine-wx/.stamp: prepare-wine-wx.sh wine-image-wx.patch wine-loader-stub-wx.patch
 	./prepare-wine-wx.sh
 $(OUT)/run_hello: run-hello.sh $(OUT)/libuwph_wine_shim.so $(OUT)/run_via_wine $(OUT)/wine-wx/.stamp
 	cp $< $@
@@ -119,3 +121,26 @@ protect-test: $(OUT)/protect_test
 prebuilt-prefix:
 	./prepare-wine.sh --prebuilt-prefix
 .PHONY: prebuilt-prefix
+
+# B18: two intentionally absent exports; never execute the generated stubs.
+$(OUT)/stub_probe.def:
+	@mkdir -p $(OUT)
+	printf 'LIBRARY version.dll\nEXPORTS\nUWPHMissingOne\nUWPHMissingTwo\n' > $@
+$(OUT)/libstub_probe.a: $(OUT)/stub_probe.def
+	x86_64-w64-mingw32-dlltool -d $< -l $@
+$(OUT)/stub_probe.exe: stub_probe.c $(OUT)/libstub_probe.a
+	$(MINGW_CC) -O2 -Wall -Wextra -Werror $< $(OUT)/libstub_probe.a -o $@
+
+stub-test: $(OUT)/run_hello $(OUT)/stub_probe.exe
+	/workspace/xbox-readiness/bin/uwpjail --wx -- $(OUT)/run_hello $(CURDIR)/$(OUT)/stub_probe.exe
+.PHONY: stub-test
+
+../wineserver/out/libwineserver.a: FORCE
+	$(MAKE) -C ../wineserver lib
+$(OUT)/libuwph_inproc_server.so: inproc_server.c ../wineserver/server_thread.c ../wineserver/out/libwineserver.a
+	$(CC) $(CFLAGS) -shared $^ -Wl,-z,defs -o $@
+wine-test-inproc-build: $(OUT)/libuwph_wine_shim.so $(OUT)/libuwph_inproc_server.so $(OUT)/run_via_wine
+wine-test-inproc: wine-test-inproc-build
+	./run-wine.sh --inproc-server
+FORCE:
+.PHONY: wine-test-inproc wine-test-inproc-build FORCE

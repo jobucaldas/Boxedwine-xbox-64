@@ -26,6 +26,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
+#include "input/mapping.h"
 
 #if !defined(_WIN64) || !defined(__x86_64__)
 #error rungs.exe requires an x64 Windows target.
@@ -693,6 +694,8 @@ static void rung_n7(void)
           (unsigned long long)((UINT64)size.QuadPart / MB), (unsigned long long)(verified / MB), rerr, tr);
 }
 
+#include "input/probe.inc"
+
 static void run_all(IUnknown *window)
 {
     if (!g_device) note("off-device: successful stand-in API calls are labelled SKIP; no console PASS");
@@ -705,6 +708,7 @@ static void run_all(IUnknown *window)
     rung_n4();
     rung_n6();
     rung_n7();
+    rung_n8();
     rung_n5(); /* last: the commit test may hit the app's memory limit */
     note("rungs done; run once as App and once as Game and keep both logs");
 }
