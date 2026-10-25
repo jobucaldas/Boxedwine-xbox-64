@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Fetch Valve's minimal Windows Steam client tree from Valve's own manifest.
 
-GETs Valve's client manifest (steam_client_win64), downloads the zips for
-the requested --set from the same host, checks each against the manifest's
+GETs Valve's client manifest (--manifest steam_client_win64, default, or
+steam_cmd_win32 for steamcmd), downloads the zips for the requested --set
+from the same host, checks each against the manifest's
 "sha2", and unzips them unmodified into --out (a prefix's
 drive_c/Program Files (x86)/Steam). CEF/webhelper packages are refused
 (exit 2) so steamwebhelper can't be installed. Writes
@@ -19,10 +20,16 @@ import sys
 import urllib.request
 import zipfile
 
-MANIFESTS = [
-    'https://client-update.steamstatic.com/steam_client_win64',
-    'https://cdn.steamstatic.com/client/steam_client_win64',
+HOSTS = [
+    'https://client-update.steamstatic.com/',
+    'https://cdn.steamstatic.com/client/',
 ]
+# manifest name -> (root block, default sets)
+MANIFESTS = {
+    'steam_client_win64': ('win64', ['bins_win64']),
+    'steam_cmd_win32': ('win32', ['steamcmd_win32', 'steamcmd_bins_win32',
+                                  'steamcmd_public_all']),
+}
 REFUSED = ['bins_cef_win64', 'bins_webhelpers_win64', 'steamui_websrc_*']
 REFUSED_MEMBERS = ['steamwebhelper*', 'libcef*']
 UA = 'steam-min-fetch/1 (Valve client manifest, unmodified files)'
@@ -94,16 +101,18 @@ def parse_vdf(text):
     return block()
 
 
-def fetch_manifest():
+def fetch_manifest(name):
+    key = MANIFESTS[name][0]
     errs = []
-    for url in MANIFESTS:
+    for host in HOSTS:
+        url = host + name
         try:
             data = get(url)
             vdf = parse_vdf(data.decode('utf-8'))
-            root = vdf.get('win64')
+            root = vdf.get(key)
             if not isinstance(root, dict) or 'version' not in root:
-                raise ValueError('no "win64" version block')
-            return url.rsplit('/', 1)[0] + '/', root, data
+                raise ValueError(f'no "{key}" version block')
+            return host, root, data
         except (OSError, ValueError) as e:
             errs.append(f'{url}: {e}')
     sys.exit('manifest fetch failed:\n  ' + '\n  '.join(errs))
@@ -146,14 +155,20 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     ap.add_argument('--out', required=True, type=Path,
                     help='target Steam dir (drive_c/Program Files (x86)/Steam)')
+    ap.add_argument('--manifest', choices=sorted(MANIFESTS),
+                    default='steam_client_win64',
+                    help='Valve manifest to read (default steam_client_win64)')
     ap.add_argument('--set', action='append', default=[],
                     help='manifest package(s), repeatable or comma-separated '
-                         '(default bins_win64; e.g. public_all, strings_en_all, '
+                         '(default bins_win64, or steamcmd_win32,'
+                         'steamcmd_bins_win32,steamcmd_public_all for '
+                         'steam_cmd_win32; e.g. public_all, strings_en_all, '
                          'resources_all, steam_win64)')
     ap.add_argument('--cache', type=Path, default=HERE / 'out' / 'cache')
     a = ap.parse_args()
 
-    sets = [s.strip() for v in (a.set or ['bins_win64']) for s in v.split(',')
+    sets = [s.strip() for v in (a.set or MANIFESTS[a.manifest][1])
+            for s in v.split(',')
             if s.strip()]
     bad = [s for s in sets if refused(s, REFUSED)]
     if bad:
@@ -161,7 +176,7 @@ def main():
               'installed by steam-min)', file=sys.stderr)
         return 2
 
-    base, root, raw = fetch_manifest()
+    base, root, raw = fetch_manifest(a.manifest)
     print(f'manifest {base} version {root["version"]}')
     ents = []
     for s in dict.fromkeys(sets):
@@ -171,7 +186,7 @@ def main():
         ents.append((s, ent))
 
     a.cache.mkdir(parents=True, exist_ok=True)
-    (a.cache / f'steam_client_win64.{root["version"]}.vdf').write_bytes(raw)
+    (a.cache / f'{a.manifest}.{root["version"]}.vdf').write_bytes(raw)
     zips = [(s, ent, download(base, ent, a.cache)) for s, ent in ents]
 
     out = a.out.resolve()
@@ -195,7 +210,7 @@ def main():
                      'size': int(ent['size'])})
         print(f'extracted {ent["file"]}')
 
-    rec = {'manifest': base + 'steam_client_win64',
+    rec = {'manifest': base + a.manifest,
            'version': root['version'], 'packages': pkgs,
            'files': dict(sorted(files.items()))}
     meta = out.parent / 'steam-min-install.json'

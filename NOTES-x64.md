@@ -2944,6 +2944,35 @@ Steam UI log: `[2026-10-25 17:20:57] Started webhelper process 0`. Wine trace re
 
 Added `run-minimal.sh --uwph` via `run-wine.sh --guest`: launcher -> Wine own W^X loader -> shim -> uwph, constraints `wx,noproc`, nofork OFF, external stock wineserver concession. Linux only. Valve bootstrap reached “Suppressing Steam update” but no connection log/logged-on state appeared within 120s. Probe and game skipped by the login gate; no SteamAPI or game-progress proof. Webhelper count 0 (127 samples, max 0, matching CreateProcess lines 0). Exact test exited 1. Host tests and Windows smoke command exited 0 (500 smoke checks passed). Evidence and detailed limitations: `/workspace/x64-run/lanes/B50/o3`, `B50-O3.result`; video `/workspace/x64-run/videos/B50-O3.mp4` (8s). No alternate credential path or CEF attempted.
 
+## B71 O1
+
+BLOCKED (stock Wine 10.0 only, not THROUGH uwph, not console): B50 O2 rerun with `--steam-wait 360`, no code changes. B70's net fix is not merged (B70 O1 BLOCKED, O2 in progress), so this ran without it. Valve steam.exe stayed `[Logged Off, 0, 0] [U:1:0]` for all 360 s. **No CM connect was ever attempted.** connection_log has no `GetCMListForConnect`, `YieldingConnect`, `Connect()`, `LogOnResponse`, transport choice (WebSocket/UDP dice roll) or EResult. Its only network activity is the HTTP :80 connectivity probe, which times out every ~25 s, plus the IPv6 checks. Probe and Megabonk were skipped by the logon gate, so there is no probe output and no Player.log. webhelper_count=0 (363 samples, running max 0). webhelper_spawn_attempts=1: one CreateProcess of the physically absent `bin\cef\cef.win64\steamwebhelper.exe`. CEF never appeared in the prefix.
+
+This differs from the network hypothesis in STEAMHOST §2B. steamcmd under the same box networking does fetch the CM list and log on over UDP in ~30–150 s. steam.exe never reaches that code path at all. Two log lines point to the missing browser as the blocker:
+
+```text
+steamui_html.txt: Started webhelper process 0
+steamui_html.txt: Timed out waiting for webhelper init
+steamui_html.txt: STARTUP SteamUI browser requested at +130239ms
+console_log.txt:  src\steamUI\steamuisharedjscontroller.cpp (583) : Failed creating offscreen shared JS context
+console_log.txt:  src\common\net_misc.cpp (252) : Assertion Failed: CalcUnIPThisBox - GetAdaptersAddresses returned 13
+```
+
+This is consistent with the current client starting logon from its SteamUI/SharedJSContext, which CEF hosts. Without a webhelper, the client never asks for a CM logon. That is correlation from Valve's own logs, not a disassembly-level proof. The HTTP :80 connectivity failures do not gate CM connects in steamcmd. Last 60 s of connection_log (verbatim):
+
+```text
+[2026-10-25 21:07:24] Connectivity test: Starting test, fetching 'http://steamconnecttest.com/204'
+[2026-10-25 21:07:39] Connectivity test (198.18.0.1:80 (198.18.0.1:80)): HTTP fetch failed
+[2026-10-25 21:07:39] Connectivity test: result=TimedOut (since 340.8s ago), prev=Unknown, in progress=0
+[2026-10-25 21:07:57] Connectivity test: Starting test, fetching 'http://steamconnecttest.com/204'
+[2026-10-25 21:08:12] Connectivity test (198.18.0.1:80 (198.18.0.1:80)): HTTP fetch failed
+[2026-10-25 21:08:12] Connectivity test: result=TimedOut (since 374.4s ago), prev=Unknown, in progress=0
+[2026-10-25 21:08:19] [Logged Off, 0, 0] [U:1:0] ResetVoiceRecording() (was recording: 0) (last get voice time: 1792958899 seconds ago)
+[2026-10-25 21:08:19] [Logged Off, 0, 0] [U:1:0] Log session ended
+```
+
+The exact test exited 1 at run-minimal.sh, so the following `&&` assertions did not run. The separate leak check (`! grep -rIl --exclude-dir=pfx eyJ $E x64/steam-min`) exited 0. Evidence: `/workspace/x64-run/lanes/B71/o1/` (redacted steam-logs/, processes.txt, flags.txt, webhelper_*). Video: `/workspace/x64-run/videos/B71-O1.mp4` (8 s, logged-off branch; free Xvfb + ffmpeg, no Encom). Prefix `x64/steam-min/out/pfx` (1.7 GB) deleted. Implication: under João's no-browser rule, steam.exe as the logon driver looks like a dead end. The B72–B75 own-host route (IClientUser logon + callback pump) is the remaining path. A B70 fix alone is not expected to change this result.
+
 ## B34
 
 O2 implementation is **BLOCKED at runtime proof**, not DONE. The new
@@ -3022,3 +3051,48 @@ changed; no commit or push was performed.
 Evidence `/workspace/x64-run/lanes/B70/o1/https_probe.log`: `winhttp_status=200 err=0`, `wss_status=101`, `wss_upgrade=1 err=0` against a websockets :443 endpoint selected from the live directory response. Both API and CM certificates pass `CertGetCertificateChain` (`chain_error_bits=0x00000000`) and SSL hostname/server policy (`error=0x00000000`). `adapters_status=0 bytes=2128`; DNS returns IPv4 `198.18.0.1`. `readiness-net.log`: `SUMMARY net_probe pass=7 fail=0`. `curl-control.log`: HTTP 200, TLS verify 0, remote IP 198.18.0.1. TLS verification remains enabled; requests use their original DNS hostnames (preserving Host/SNI), with NO_PROXY explicitly selected in our diagnostic.
 
 Root-cause boundary: the claimed general “Wine HTTPS failure” does not reproduce in either WinHTTP probe. These results rule out a universally broken Wine crypt32 root store or fake-IP IPv4 route for these hosts in this fresh prefix. They do NOT rule out a Valve-specific trust store, TLS/ALPN configuration, mapped-IPv6 path, proxy handling, or prefix/bitness-dependent adapter failure. Prior unmodified steamcmd evidence, extracted without account identifiers to `prior-valve-failure.txt`, has `GetCMListForConnect -- web API call failed (status = 0)` and `CalcUnIPThisBox - GetAdaptersAddresses returned 13`; neither appears in our x64 diagnostic. Error 13 is ERROR_INVALID_DATA, but correlation is not proof it causes the HTTP failure. Exact Valve-stack root cause remains UNDETERMINED: O1 diagnosis is BLOCKED at that boundary, not an invented TLS fix. No O2 changes made. Exact test and video are recorded in `/workspace/x64-run/lanes/B70/exact-test.txt` and `/workspace/x64-run/videos/B70-O1.mp4`.
+
+## B73
+O1 (2026-10-25), stock Wine 10.0 on the box only; NOT THROUGH-uwph, not a console proof.
+BLOCKED by its dependency: B72-O2 never produced `logon=1`. steamhost's interface gate
+(PIN.txt `osw_tables_build=1745623383` != pinned client build 1792618285) refuses every
+IClientEngine/IClientUser slot call. The newest published OpenSteamClient tables do not
+match the pinned build. Re-deriving the slots would be new reverse engineering, and relaxing
+the gate would risk the InvalidateCredentials/DestroyCachedCredentials neighbours on João's
+account, so neither was done.
+
+Added so the stage is ready once the gate can pass:
+- `steamhost64.exe --logon --wait N --serve S`: after `logon=1`, steamhost stays the master
+  for S seconds with the same RunFrame + BGetCallback pump (callbacks are discarded), then
+  prints `serve_done=1`. No new slots are called.
+- `run.sh --game [--game-secs 60]`: starts steamhost in the background and waits for its
+  `activeprocess_pid_is_self=` line. Only on `logon=1` + `serving=` does it run
+  `steamapi_probe.exe` against Megabonk's unmodified `steam_api64.dll` (probe.log) and then
+  Megabonk from a symlink farm under out/ (-force-d3d11, 60 s, Xvfb, recorded to
+  B73-O1.mp4). Player.log is copied and redacted like wine.log. Otherwise it writes
+  `logon.txt` BLOCKED and records a 5 s clip of the gate output.
+  Exit codes: 6 = gate, 9 = no logon, 11 = steam_api did not init.
+
+Exact test: run.sh exits 6 (`iface_pin=mismatch`, `logon=not_attempted`). The token was not
+read (seed-login.py did not run). webhelper_count=0. The eyJ check is clean and the prefix
+was deleted. Evidence: /workspace/x64-run/lanes/B73/o1. Video
+/workspace/x64-run/videos/B73-O1.mp4 is 5 s of the gate output, not the game menu.
+Unblock options (João's call; unchanged from B72): OSC tables for a pinnable build, an
+authorised table dump, or Valve's steam.exe route (B71 is currently BLOCKED: it stays
+Logged Off without the webhelper).
+
+## B80 O1
+
+Added `x64/steam-min/steamhost/osw-watch.sh` and its README. The anonymous,
+read-only watcher snapshots OSW HEAD, prefers its win64 manifest with win32
+fallback, reports the latest commit under Generated, HEAD-checks the exact bins
+archive, and compares the table build against Valve's current manifest. It reads
+only manifest_version from the local PIN.txt and never modifies the pin.
+At most five GitHub requests per run; no packages, credentials, or login.
+
+Exact test passed: tables 1745623383, bins HEAD 200, local/current Valve build
+1792618285, verdict=match-old-only. Simulated connection refusal exits 2.
+Metadata-only host-shell validation (build-only category); neither THROUGH-uwph
+nor stock Wine was executed. No runtime/console compatibility claim. Evidence:
+`/workspace/x64-run/lanes/B80/o1.txt`, `network-failure.txt`; seven-second Xvfb
+terminal recording `/workspace/x64-run/videos/B80-O1.mp4`. No prefix created.
