@@ -1,0 +1,25 @@
+# x64/native-gfx - R4N native D3D11/DXGI passthrough work (see README.md).
+#
+#   make probe     build out/probe_native.exe (on-device native-API probe for the R4D ladder)
+#   make run-probe build + run it under wine (off-device: results describe Wine = stand-in)
+
+OUT    ?= out
+CC_WIN ?= x86_64-w64-mingw32-gcc
+WINE   ?= wine
+CFLAGS ?= -O2 -g -std=gnu11 -Wall -Wextra -Werror -Wno-unused-parameter -Wno-cast-function-type
+
+.PHONY: all probe run-probe clean
+
+all: probe
+
+probe: $(OUT)/probe_native.exe
+
+$(OUT)/probe_native.exe: probe_native.c
+	@mkdir -p $(@D)
+	$(CC_WIN) $(CFLAGS) -o $@ $< -ld3d11 -ldxgi -ld3d12 -lole32 -luuid
+
+run-probe: probe
+	WINEDEBUG=-all $(WINE) $(OUT)/probe_native.exe --log $(OUT)/probe_native.log
+
+clean:
+	rm -rf $(OUT)
