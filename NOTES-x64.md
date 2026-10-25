@@ -2368,3 +2368,39 @@ path stat/lstat/access answer directories from mapped-path metadata
 keep the handle-based fstat, and access W_OK still honours read-only mounts.
 Tests now cover registry/main-handle hit and miss on every backend plus
 access/stat/lstat of a newly created directory.
+
+## B11 O1 — Megabonk THROUGH-uwph (Linux only)
+
+`x64/uwp-host/harness/run-megabonk-wx.sh` (originally B11's
+`run-megabonk.sh`; renamed in the B916 merge so B12's nofork,wx,noproc
+`run-megabonk.sh` keeps its name) uses the same launcher, private W^X
+Wine loader and native-fd uwph shim as `run-hello.sh`, with a private copied
+prefix, external stock wineserver, a free Xvfb display and a 120-second guest
+timeout. It records at most 58 seconds to
+`/workspace/x64-run/videos/B11-O1.mp4` and appends measured wrapper/backend
+hits to `x64/uwp-host/harness/surface-trace-megabonk-wx.tsv` (kept apart
+from `surface-trace.tsv`, whose priority schema `verify_*.py` read).
+The recorder writes a fresh temporary MP4, and the harness waits for its exit,
+requires a nonempty video stream with a finite duration of at most 60 seconds,
+and decodes the full capture before publishing the required video path.
+Recording or validation failures fail the test while preserving the printed
+guest-stage report. A recorder that exits during startup fails the run before
+the guest launches. The run lock fd is not inherited by Xvfb, ffmpeg,
+wineserver or the guest, and cleanup reaps processes left in the private
+prefix (an orphaned explorer.exe/UnityCrashHandler64 previously held the lock
+and made later runs exit silently).
+Counters and diagnostic logs
+are in `harness/out/megabonk/`. Only `--wx` is applied: R4W O3 still marks the
+in-process server blocked; nofork/noproc are not claimed. This is selected-call
+routing on Linux, not an Xbox/UWP device pass or complete syscall coverage.
+
+The owned game ships `GameAssembly.dll` and
+`Megabonk_Data/il2cpp_data/Metadata/global-metadata.dat`: it is IL2CPP, with
+native ahead-of-time code, so no Mono JIT is needed. No Steam/DRM components
+were replaced or modified. The first missing service reported by Unity is
+`SteamAPI_Init() failed`; audio also lacks a host device and falls back to
+silent software output. Neither prevented the observed main menu. The script
+reports the conservative log-proven `gfx-init` stage (D3D11 device created);
+manual inspection of `out/megabonk/screen.png` during the same run confirmed
+the rendered MEGABONK title, PLAY, SETTINGS and EXIT menu. Gameplay was not
+tested. No credentials were read, no remotes accessed, no commit created.
