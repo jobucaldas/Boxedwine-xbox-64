@@ -298,3 +298,12 @@ int uwph_linux_pipe2(int fds[2], int flags)
     UNLOCK();
     return result(r);
 }
+
+int uwph_linux_native_fds(void)
+{
+#ifdef UWPH_HARNESS_NATIVE_FDS
+    return 1;
+#else
+    return 0;
+#endif
+}

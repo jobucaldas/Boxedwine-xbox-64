@@ -90,8 +90,12 @@ int uwph_fd_count(void)
 UWPH_API int uwph_close(int fd)
 {
 #ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
-    return uwph_linux_close(fd);
-#else
+    if (uwph_linux_native_fds()) return uwph_linux_close(fd);
+    enum uwph_fd_kind socket_kind;
+    struct uwph_object *socket_obj = uwph_fd_get(fd, &socket_kind, NULL);
+    uwph_obj_unref(socket_obj);
+    if (socket_kind != UWPH_FD_UNIX) return uwph_linux_close(fd);
+#endif
     struct fd_entry old;
     if (fd < 0 || fd >= UWPH_MAX_FDS) return UWPH_FAIL(UWPH_EBADF);
     uwph_lock(&fd_lock);
@@ -101,7 +105,6 @@ UWPH_API int uwph_close(int fd)
     if (old.kind == UWPH_FD_FREE) return UWPH_FAIL(UWPH_EBADF);
     release_entry(old, fd);
     return 0;
-#endif
 }
 
 static int dup_from(int fd, int start, int cloexec)

@@ -293,6 +293,9 @@ UWPH_API int uwph_pipe2(int fds[2], int flags)
 UWPH_API int uwph_pipe(int fds[2]) { return uwph_pipe2(fds, 0); }
 
 /* ---- sockets ---- */
+/* Wine passthrough uses native descriptors throughout the socket lifecycle,
+ * matching read/write/close and Wine's native descriptors. Owned-slot Linux and other backends keep
+ * the private in-process endpoint table; never mix these descriptor spaces. */
 static struct endpoint *get_unix(int fd, int *flags)
 {
     enum uwph_fd_kind kind;
@@ -305,6 +308,13 @@ static struct endpoint *get_unix(int fd, int *flags)
 
 UWPH_API int uwph_socket(int domain, int type, int proto)
 {
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    if (uwph_linux_native_fds()) {
+        UWPH_NATIVE(int, "socket", (int, int, int));
+        UWPH_NATIVE_RETURN(fn(domain, type, proto));
+    }
+#endif
+
     struct endpoint *ep;
     int fd, base_type = type & 0xf;
     (void)proto;
@@ -321,6 +331,13 @@ UWPH_API int uwph_socket(int domain, int type, int proto)
 
 UWPH_API int uwph_socketpair(int domain, int type, int proto, int sv[2])
 {
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    if (uwph_linux_native_fds()) {
+        UWPH_NATIVE(int, "socketpair", (int, int, int, int *));
+        UWPH_NATIVE_RETURN(fn(domain, type, proto, sv));
+    }
+#endif
+
     struct endpoint *a, *b;
     int fa, fb, fl = UWPH_O_RDWR | (type & (UWPH_SOCK_NONBLOCK | UWPH_SOCK_CLOEXEC));
     (void)proto;
@@ -354,6 +371,13 @@ static int sun_abspath(const struct uwph_sockaddr *addr, uwph_socklen_t len, cha
 
 UWPH_API int uwph_bind(int fd, const struct uwph_sockaddr *addr, uwph_socklen_t len)
 {
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    if (uwph_linux_native_fds()) {
+        UWPH_NATIVE(int, "bind", (int, const struct uwph_sockaddr *, uwph_socklen_t));
+        UWPH_NATIVE_RETURN(fn(fd, addr, len));
+    }
+#endif
+
     char abs[108];
     struct endpoint *ep = get_unix(fd, NULL);
     int ret = 0;
@@ -372,6 +396,13 @@ UWPH_API int uwph_bind(int fd, const struct uwph_sockaddr *addr, uwph_socklen_t 
 
 UWPH_API int uwph_listen(int fd, int backlog)
 {
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    if (uwph_linux_native_fds()) {
+        UWPH_NATIVE(int, "listen", (int, int));
+        UWPH_NATIVE_RETURN(fn(fd, backlog));
+    }
+#endif
+
     struct endpoint *ep = get_unix(fd, NULL);
     int ret = UWPH_FAIL(UWPH_EINVAL);
     if (!ep) return -1;
@@ -393,6 +424,13 @@ UWPH_API int uwph_listen(int fd, int backlog)
 
 UWPH_API int uwph_connect(int fd, const struct uwph_sockaddr *addr, uwph_socklen_t len)
 {
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    if (uwph_linux_native_fds()) {
+        UWPH_NATIVE(int, "connect", (int, const struct uwph_sockaddr *, uwph_socklen_t));
+        UWPH_NATIVE_RETURN(fn(fd, addr, len));
+    }
+#endif
+
     char abs[108];
     struct endpoint *ep = get_unix(fd, NULL), *srv, *peer;
     struct conn *c;
@@ -427,6 +465,13 @@ UWPH_API int uwph_connect(int fd, const struct uwph_sockaddr *addr, uwph_socklen
 
 UWPH_API int uwph_accept(int fd, struct uwph_sockaddr *addr, uwph_socklen_t *len)
 {
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    if (uwph_linux_native_fds()) {
+        UWPH_NATIVE(int, "accept", (int, struct uwph_sockaddr *, uwph_socklen_t *));
+        UWPH_NATIVE_RETURN(fn(fd, addr, len));
+    }
+#endif
+
     int flags, nfd;
     struct endpoint *ep = get_unix(fd, &flags), *peer = NULL;
     if (!ep) return -1;
@@ -455,6 +500,13 @@ UWPH_API int uwph_accept(int fd, struct uwph_sockaddr *addr, uwph_socklen_t *len
 
 UWPH_API int uwph_shutdown(int fd, int how)
 {
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    if (uwph_linux_native_fds()) {
+        UWPH_NATIVE(int, "shutdown", (int, int));
+        UWPH_NATIVE_RETURN(fn(fd, how));
+    }
+#endif
+
     struct endpoint *ep = get_unix(fd, NULL);
     if (!ep) return -1;
     uwph_lock(&uwph_io_lock);
@@ -469,8 +521,10 @@ UWPH_API uwph_ssize_t uwph_sendmsg(int fd, const struct uwph_msghdr *msg, int fl
 {
     uwph_trace_hit(UWPH_TRACE_SENDMSG);
 #ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
-    UWPH_NATIVE(uwph_ssize_t, "sendmsg", (int, const struct uwph_msghdr *, int));
-    UWPH_NATIVE_RETURN(fn(fd, msg, flags));
+    if (uwph_linux_native_fds()) {
+        UWPH_NATIVE(uwph_ssize_t, "sendmsg", (int, const struct uwph_msghdr *, int));
+        UWPH_NATIVE_RETURN(fn(fd, msg, flags));
+    }
 #endif
 
     struct passed_fd pf[MAX_PASS_FDS];
@@ -507,8 +561,10 @@ UWPH_API uwph_ssize_t uwph_recvmsg(int fd, struct uwph_msghdr *msg, int flags)
 {
     uwph_trace_hit(UWPH_TRACE_RECVMSG);
 #ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
-    UWPH_NATIVE(uwph_ssize_t, "recvmsg", (int, struct uwph_msghdr *, int));
-    UWPH_NATIVE_RETURN(fn(fd, msg, flags));
+    if (uwph_linux_native_fds()) {
+        UWPH_NATIVE(uwph_ssize_t, "recvmsg", (int, struct uwph_msghdr *, int));
+        UWPH_NATIVE_RETURN(fn(fd, msg, flags));
+    }
 #endif
 
     struct passed_fd pf[MAX_PASS_FDS];
@@ -561,6 +617,13 @@ UWPH_API uwph_ssize_t uwph_recv(int fd, void *buf, size_t len, int flags)
 
 UWPH_API int uwph_getsockopt(int fd, int level, int name, void *val, uwph_socklen_t *len)
 {
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    if (uwph_linux_native_fds()) {
+        UWPH_NATIVE(int, "getsockopt", (int, int, int, void *, uwph_socklen_t *));
+        UWPH_NATIVE_RETURN(fn(fd, level, name, val, len));
+    }
+#endif
+
     struct endpoint *ep = get_unix(fd, NULL);
     int ret = 0;
     if (!ep) return -1;
@@ -583,8 +646,10 @@ UWPH_API int uwph_setsockopt(int fd, int level, int name, const void *val, uwph_
 {
     uwph_trace_hit(UWPH_TRACE_SETSOCKOPT);
 #ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
-    UWPH_NATIVE(int, "setsockopt", (int, int, int, const void *, uwph_socklen_t));
-    UWPH_NATIVE_RETURN(fn(fd, level, name, val, len));
+    if (uwph_linux_native_fds()) {
+        UWPH_NATIVE(int, "setsockopt", (int, int, int, const void *, uwph_socklen_t));
+        UWPH_NATIVE_RETURN(fn(fd, level, name, val, len));
+    }
 #endif
 
     struct endpoint *ep = get_unix(fd, NULL);
@@ -606,6 +671,13 @@ static int fill_name(const char *path, struct uwph_sockaddr *addr, uwph_socklen_
 
 UWPH_API int uwph_getsockname(int fd, struct uwph_sockaddr *addr, uwph_socklen_t *len)
 {
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    if (uwph_linux_native_fds()) {
+        UWPH_NATIVE(int, "getsockname", (int, struct uwph_sockaddr *, uwph_socklen_t *));
+        UWPH_NATIVE_RETURN(fn(fd, addr, len));
+    }
+#endif
+
     struct endpoint *ep = get_unix(fd, NULL);
     int ret;
     if (!ep) return -1;
@@ -616,6 +688,13 @@ UWPH_API int uwph_getsockname(int fd, struct uwph_sockaddr *addr, uwph_socklen_t
 
 UWPH_API int uwph_getpeername(int fd, struct uwph_sockaddr *addr, uwph_socklen_t *len)
 {
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    if (uwph_linux_native_fds()) {
+        UWPH_NATIVE(int, "getpeername", (int, struct uwph_sockaddr *, uwph_socklen_t *));
+        UWPH_NATIVE_RETURN(fn(fd, addr, len));
+    }
+#endif
+
     struct endpoint *ep = get_unix(fd, NULL);
     int ret;
     if (!ep) return -1;

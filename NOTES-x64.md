@@ -1421,3 +1421,23 @@ run through our launcher without uwph. A separate stock Linux wineserver is
 retained; none of this is Xbox device or complete UWP compatibility evidence.
 Video: `/workspace/x64-run/videos/B06-O1.mp4` (private free Xvfb display, 10.67s).
 Exact recorded output: `/workspace/x64-run/v2/B06/O1-record.log`.
+
+B06 reviewer fix: Linux socket dispatch now selects the descriptor domain
+explicitly through the separately compiled backend adapter. Direct owned-slot
+Linux calls preserve private Unix endpoints for sendmsg/recvmsg/setsockopt and
+close; Wine's native-fd backend uses libc consistently for socket/socketpair,
+bind/listen/connect/accept, shutdown, message calls, options and name queries.
+The public API is unchanged. The socketpair regression now creates and closes
+both endpoints through uwph on every backend; additional Linux coverage tests
+socket/connect/accept producers, payload exchange, options, names and EOF.
+
+Fresh exact test after the fix: exit 0; direct Linux traced tests 120 passed,
+0 failed; Windows full smoke 569 passed, 0 failed. Full output:
+`/workspace/x64-run/lanes/B06/B06-O1.exact.log`.
+Fresh launcher/Wine-loader evidence: `harness/out/wine-o4/run-F8PMFjl7/`;
+`verify_b06.py` passes both PEs at THROUGH-uwph 20 -> 34 (+14).
+The unchanged broader verifier still rejects execv's zero hit count.
+This is Linux off-device THROUGH-uwph evidence, with separate stock Wine
+controls/wineserver and desktop Windows smoke; the UWP archive is built,
+not executed on an Xbox. Updated video records the test output and fresh
+surface verification on a free Xvfb display (10 seconds).
