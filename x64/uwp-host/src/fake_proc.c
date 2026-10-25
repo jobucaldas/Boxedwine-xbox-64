@@ -5,6 +5,25 @@
 #ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
 #include <link.h>
 #include <sys/auxv.h>
+#include <unistd.h>
+#include <limits.h>
+/* Capture invocation identity before application code can change cwd.
+ * No dependency on procfs, including when AT_EXECFN is relative. */
+static char invocation_exe[PATH_MAX];
+__attribute__((constructor)) static void capture_invocation_exe(void)
+{
+    const char *exe = (const char *)getauxval(AT_EXECFN);
+    if (!exe) return;
+    size_t prefix = 0;
+    if (*exe != '/') {
+        if (!getcwd(invocation_exe, sizeof(invocation_exe))) return;
+        prefix = strlen(invocation_exe);
+        if (prefix + 1 >= sizeof(invocation_exe)) { invocation_exe[0] = 0; return; }
+        invocation_exe[prefix++] = '/';
+    }
+    if (strlen(exe) >= sizeof(invocation_exe) - prefix) { invocation_exe[0] = 0; return; }
+    strcpy(invocation_exe + prefix, exe);
+}
 #endif
 
 int uwph_fake_proc_exe(char *buf, size_t size)
@@ -14,8 +33,8 @@ int uwph_fake_proc_exe(char *buf, size_t size)
     if (!n || n >= size) return UWPH_FAIL(UWPH_ENAMETOOLONG);
     return (int)n;
 #elif defined(UWPH_BACKEND_LINUX_PASSTHROUGH)
-    const char *exe = (const char *)getauxval(AT_EXECFN);
-    if (!exe) return UWPH_FAIL(UWPH_ENOENT);
+    const char *exe = invocation_exe;
+    if (!*exe) return UWPH_FAIL(UWPH_ENOENT);
     size_t n = strlen(exe);
     if (n >= size) return UWPH_FAIL(UWPH_ENAMETOOLONG);
     memcpy(buf, exe, n + 1);

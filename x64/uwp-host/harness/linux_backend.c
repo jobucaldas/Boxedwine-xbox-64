@@ -67,11 +67,13 @@ static long fdcall(long nr, int fd, long b, long c, long d)
     UNLOCK();
     return result(r);
 }
-/* Returns native read-only snapshot fd, -2 for paths outside /proc. */
-static long proc_open(const char *path, int flags)
+/* Handling is separate from the descriptor/negative errno result. */
+static long proc_open(const char *path, int flags, int *handled)
 {
     char *data; size_t len;
-    if (!path || strncmp(path, "/proc/", 6)) return -2;
+    *handled = path && (!strcmp(path, "/proc") || !strncmp(path, "/proc/", 6));
+    if (!*handled) return 0;
+    if (!strcmp(path, "/proc")) return -UWPH_ENOENT;
     if (flags & (UWPH_O_ACCMODE | UWPH_O_CREAT | UWPH_O_TRUNC)) return -UWPH_EACCES;
     if (!strcmp(path, "/proc/self/exe")) {
         char exe[1024];
@@ -105,8 +107,9 @@ int uwph_linux_openat(int dirfd, const char *path, int flags, unsigned mode)
      * an owned descriptor (or AT_FDCWD), never an arbitrary native fd. */
     int dir = path && path[0] == '/' ? UWPH_AT_FDCWD :
               dirfd == UWPH_AT_FDCWD ? dirfd : native(dirfd);
-    long r = proc_open(path, flags);
-    if (r == -2) r = dir == -1 ? -UWPH_EBADF : raw(SYS_openat,dir,PTR(path),flags,mode,0,0);
+    int handled;
+    long r = proc_open(path, flags, &handled);
+    if (!handled) r = dir == -1 ? -UWPH_EBADF : raw(SYS_openat,dir,PTR(path),flags,mode,0,0);
 #ifndef UWPH_HARNESS_NATIVE_FDS
     if (r >= 0) {
         int i; for (i=0;i<SLOTS && slots[i];i++);
@@ -219,8 +222,9 @@ uwph_FILE *uwph_linux_fopen(const char *path, const char *mode)
     int (*destroy)(FILE *) = uwph_linux_symbol("fclose");
     WRLOCK();
     FILE *f;
-    long proc = proc_open(path, !strcmp(mode, "r") || !strcmp(mode, "rb") ? 0 : UWPH_O_WRONLY);
-    if (proc == -2) f = fn(path, mode);
+    int handled;
+    long proc = proc_open(path, !strcmp(mode, "r") || !strcmp(mode, "rb") ? 0 : UWPH_O_WRONLY, &handled);
+    if (!handled) f = fn(path, mode);
     else if (proc < 0) { errno = -proc; f = NULL; }
     else {
         FILE *(*wrap)(int, const char *) = uwph_linux_symbol("fdopen");

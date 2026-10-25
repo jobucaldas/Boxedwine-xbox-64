@@ -6,9 +6,19 @@
 #include <sys/syscall.h>
 #include <unistd.h>
 #include <fcntl.h>
-int main(void)
+int main(int argc, char **argv)
 {
     char b[16384], exe[1024];
+    /* Existing host paths must never escape the provider, for either API. */
+    assert(uwph_open("/proc", UWPH_O_RDONLY) == -1);
+    assert(uwph_open("/proc/version", UWPH_O_RDONLY) == -1);
+    assert(uwph_errno == UWPH_ENOENT);
+    assert(uwph_fopen("/proc/version", "r") == NULL);
+    assert(uwph_errno == UWPH_ENOENT);
+    if (argc > 1 && !strcmp(argv[1], "--host-proc")) {
+        puts("PASS unsupported host proc paths blocked");
+        return 0;
+    }
     /* A raw call must fail in the strict namespace; provider calls must work. */
     assert(syscall(SYS_openat, AT_FDCWD, "/proc/self/maps", O_RDONLY) == -1);
     const char *paths[] = {"/proc/self/maps", "/proc/self/cmdline", "/proc/cpuinfo"};
@@ -28,6 +38,18 @@ int main(void)
     }
     int n = uwph_readlink("/proc/self/exe", exe, sizeof(exe));
     assert(n > 0);
+    assert(exe[0] == '/' && n < (int)sizeof(exe));
+    exe[n] = 0;
+    assert(chdir("/") == 0);
+    char resolved[4096], after[1024];
+    assert(uwph_realpath("/proc/self/exe", resolved) == resolved);
+    assert(!strcmp(resolved, exe));
+    assert(uwph_readlink("/proc/self/exe", after, sizeof(after)) == n);
+    assert(!memcmp(after, exe, n));
+    int executable = uwph_open("/proc/self/exe", UWPH_O_RDONLY);
+    assert(executable >= 0);
+    assert(uwph_read(executable, b, 4) == 4 && !memcmp(b, "\177ELF", 4));
+    assert(uwph_close(executable) == 0);
     char shortlink[2] = {0};
     assert(uwph_readlink("/proc/self/exe", shortlink, 1) == 1);
     assert(shortlink[0] == exe[0] && shortlink[1] == 0);

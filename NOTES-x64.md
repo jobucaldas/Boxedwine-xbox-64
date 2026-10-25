@@ -759,3 +759,11 @@ this path is build-checked with WINAPI_FAMILY_APP, not console-tested. A separat
 prestarted stock wineserver remains a concession. This is a bounded hello PASS,
 not full Linux proc fidelity or full UWP acceptance. Video:
 `/workspace/x64-run/videos/R4S-O3.mp4`.
+
+O3 review fixes: provider handling is independent of negative errno, including
+unsupported host-existing `/proc/version` for both open and fopen. Linux captures
+an absolute AT_EXECFN identity at initialization, before chdir; the hidden-proc
+provider test launches relatively and checks readlink, realpath and ELF open after
+chdir("/"). The acceptance script deletes the previous report and requires a new
+process report with positive ntdll open/read/close/mmap/munmap routing, zero bypass,
+recursion, unattributed calls and module overflow before printing THROUGH PASS.
