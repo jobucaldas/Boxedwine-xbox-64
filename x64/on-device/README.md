@@ -40,7 +40,8 @@ kit, and that every kit entry and rung is documented here. It's build-only.
 
 ## Pack and sign (Windows PC with the Windows SDK)
 
-Device Portal's Add flow takes a signed package. Copy `out/payload/`,
+Device Portal's Add flow takes a signed package. Use MakeAppx and SignTool from
+Windows SDK 10.0.22621 or later (troubleshooting row 13). Copy `out/payload/`,
 `out/test-cert.pfx` and `out/test-cert.cer` to the PC, then:
 
     MakeAppx pack /d payload /p BoxedwineDev.appx
@@ -78,7 +79,9 @@ hypervisor or code-signing bypass. Use documented capabilities only.
 ## Manifest and capabilities (O1)
 
 `AppxManifest.xml` targets Windows.Xbox/x64 and declares `codeGeneration`
-(base foundation capability), `internetClient`, `privateNetworkClientServer`
+(base foundation capability), `internetClient`, `internetClientServer`,
+`privateNetworkClientServer`, and uap `removableStorage` (with a `.bwlog`
+file-type association on the main app),
 and restricted `expandedResources` next to `codeGeneration`. `expandedResources`
 is deprecated and Store-rejected; this manifest is for dev sideload only.
 Declaring a capability doesn't prove it's available on a given console OS.
@@ -149,13 +152,19 @@ shown above.
 app from Dev Home: the **Boxedwine Dev Mode** tile (EntryPoint `Boxedwine.App`,
 executable `rungs.exe`). It activates a real CoreWindow and writes
 `ApplicationData.Current.LocalFolder/ladder-native.log`, flushing each stage.
+The B button no longer exits: the view handles
+[SystemNavigationManager.BackRequested](https://learn.microsoft.com/en-us/uwp/api/windows.ui.core.systemnavigationmanager)
+and sets `Handled=TRUE`, logging `back-requested handled` for each event.
+Use the Home/guide button to leave. This behavior still needs console validation.
 Save this file separately as `ladder-App.log` and `ladder-Game.log` before
 relaunching; the native log is overwritten each run. Keep hosted a–h evidence
 separately; these native probes do not prove the Wine compatibility runtime.
 
 - n1: D3D11 hardware HRESULT, feature level, adapter and WARP fallback result.
 - n2: D3D12 creation at FL 11_0, reported feature level and shader model.
-- n3: real CoreWindow, BGRA8 FLIP_DISCARD, two buffers, #0078D7 clear,
+- n3: real CoreWindow, BGRA8 FLIP_DISCARD (one FLIP_SEQUENTIAL retry on failure, both HRESULTs logged), two buffers, #0078D7 clear,
+  HDMI current-mode raw pixel size when available, otherwise CoreWindow bounds;
+  cap Series S at 2560x1440 and Series X/X devkit at 3840x2160 using n6 model IDs,
   120 vsynced Presents with average/max frame milliseconds.
 - n4: xaudio2_9.dll XAudio2Create and a one-second 440 Hz sine, consumed sample
   count; WASAPI ActivateAudioInterfaceAsync export availability. Listen on device;
@@ -218,7 +227,7 @@ Activation API reference: [IFrameworkView.Load](https://learn.microsoft.com/en-u
 | Symptom | What to copy back (exact file or Device Portal page) | Likely cause |
 | --- | --- | --- |
 | 1. Install says certificate is not trusted | **Home > My games & apps > Add**: full failed-install details and error code; record which public `.cer` was selected. | Test certificate is not trusted by the console, or signing certificate and manifest Publisher do not match. The portal HTTPS certificate is separate from package signing. |
-| 2. Install reports invalid manifest/schema | **Home > My games & apps > Add**: full error, element/attribute name and line number if shown; also copy the PC MakeAppx output and `out/payload/AppxManifest.xml`. | Manifest element, capability, namespace or target OS schema is unsupported or invalid. |
+| 2. Install reports invalid manifest/schema | **Home > My games & apps > Add**: full error, element/attribute name and line number if shown; also copy the PC MakeAppx output and `out/payload/AppxManifest.xml`. | Manifest element, capability, namespace or target OS schema is unsupported or invalid. The kit keeps documented `Windows.Xbox`; if installation reports schema/device-family errors, the working-app family is `Windows.Universal` with `MinVersion="10.0.0.0"`. |
 | 3. Install reports wrong architecture | **Home > My games & apps > Add**: full error code and package identity/architecture shown there; include `out/payload/AppxManifest.xml`. | Wrong package was selected or package/dependency architecture is incompatible with x64. |
 | 4. Install reports a missing dependency | **Home > My games & apps > Add**: full details including dependency name, publisher, minimum version and architecture. | Wrong/stale package or an unavailable framework dependency; this kit currently expects no dependency packages. |
 | 5. App launches then exits | `LocalState/ladder-native.log` (even partial); **Home > My games & apps**, selected app: exit/status details; Device Portal **Debug > Crash dumps** and **ETW** output if available, including the original HRESULT/errno diagnostics. | Activation or LocalState/log creation failed, a native API failed, or the process crashed. No log can mean failure before probes started. |
@@ -227,6 +236,10 @@ Activation API reference: [IFrameworkView.Load](https://learn.microsoft.com/en-u
 | 8. App vs Game mode seems unchanged | `LocalState/ladder-native.log` saved separately after each run as `ladder-App.log` and `ladder-Game.log`, including n5; **Home > My games & apps**, selected app details: capture the app type shown; also record Dev Home **View details > App type**. | Mode was set on a different tile, only the new-app default was changed, or the app was not stopped and relaunched. The normal and Big file opt-in entries need separate settings. |
 | 9. Out-of-memory or exit during memory probe | Partial `LocalState/ladder-native.log`, including n5 starting note, reported limit and last successful allocation; Device Portal **Performance > Memory** reading at failure and **Debug > Crash dumps** if available. | The selected mode's memory budget or commit limit was reached; the OS may terminate the process before a final log line. Commit acceptance does not measure physical residency. |
 | 10. >2 GB file fails or n7 is SKIP | `LocalState/ladder-native.log`, including activation EntryPoint/opt-in and n7 bytes, size and error codes; **File Explorer > Boxedwine app > LocalState** listing; record available storage reported by Device Portal if shown. | Normal tile intentionally skips n7; opt-in activation may not have arrived, free space may be insufficient, or file I/O failed. The probe uses 2304 MiB and deletes `LocalState/big-file.bin` on close. |
+| 11. Deploy fails with error 0x87e10008 | **Home > My games & apps > Add** (or the deploying tool's output): full error text and code; note which user, if any, was signed in on the console at the time. | No user was signed in on the console. Microsoft: "You must have a user signed in to deploy an app. If you receive a 0x87e10008 error message, make sure you have a user signed in and try again." ([FAQ, Fixing deployment failures](https://learn.microsoft.com/en-us/windows/uwp/xbox-apps/frequently-asked-questions)). Sign a user in and retry the same install. |
+| 12. Launch is blocked or asks for a PIN/password | Exact prompt or error text shown on the TV; record whether Parental Controls are on in console **Settings** and whether the signed-in account is a child account. | Parental Controls are on. Microsoft: "Launching your app from VS will fail if the console has Parental Controls turned on"; a launch from the console asks for a PIN or password instead. Either turn Parental Controls off temporarily, or launch once from the console, enter the PIN/password, and close the app; the permission then stays until that user signs out ([Known issues](https://learn.microsoft.com/en-us/windows/uwp/xbox-apps/known-issues)). |
+| 13. Pack, sign or install fails with a secure-channel/SHA1 error, or with tools from an old SDK | PC MakeAppx/SignTool console output and the full SDK path of each tool used (for example `C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\`); **Home > My games & apps > Add** error if install was reached. | Tools older than the Windows SDK for Windows 11, 22H2 (10.0.22621). Pack and sign with MakeAppx and SignTool from Windows SDK 10.0.22621 or later: "As of the August 2023 Xbox recovery, UWP development on Xbox requires using the Windows SDK for Windows 11, 22H2 (22621) or later. Older tools do not use the latest secure communication channel required by Xbox which no longer supports SHA1." (Microsoft DirectX engineer Chuck Walbourn, [DirectX and UWP on Xbox Series X\|S](https://walbourn.github.io/directx-and-uwp-on-xbox-series-x-s/); the [setup page](https://learn.microsoft.com/en-us/windows/uwp/xbox-apps/development-environment-setup) asks for the latest SDK). |
+| 14. n5 reports more memory than the App/Game budget | `LocalState/ladder-native.log` with n5, plus how the app was launched (Dev Home tile vs Visual Studio or another debugger). | A debugger was attached. Microsoft: "When running your app or game from the Visual Studio debugger, these memory constraints do not apply." ([System resources](https://learn.microsoft.com/en-us/windows/uwp/xbox-apps/system-resource-allocation)). Do not launch from Visual Studio for n5; start the tile from Dev Home with no debugger and send that log. |
 
 ## How to send results back
 
@@ -323,7 +336,8 @@ through the packaged launcher, bundled W^X Wine loader, shim and uwph on Linux.
 `package` and `kit` carry both PE guests plus the Linux runner, launcher, shim,
 W^X loader tree and verifiers in `payload/combo/`: `hello.exe`, `hello_k32.exe`,
 `run`, `run_via_wine`, `libuwph_wine_shim.so`, `wine-wx/`, `verify_noproc.py`,
-`verify_acceptance.py` and `surface-trace.tsv`. MakeAppx packs this directory
+`verify_acceptance.py`, `surface.tsv` (host-symbol classification) and
+`surface-trace.tsv`. MakeAppx packs this directory
 too; the console app never runs it. The Linux loader tree retains
 B21's links to matching installed Debian Wine 10.0 DLLs/data: these are hosted
 diagnostics, not a Windows/UWP runtime. Build-time `prebuilt-prefix` preparation
