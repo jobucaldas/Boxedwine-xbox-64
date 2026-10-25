@@ -67,7 +67,7 @@ evidence-replay: $(OUT)/backend_test
 .PHONY: evidence-replay
 
 # R4X O2: private W^X ntdll.so (RW map/relocate, then per-section RX/R/RW).
-$(OUT)/wine-wx/.stamp: prepare-wine-wx.sh wine-image-wx.patch
+$(OUT)/wine-wx/.stamp: prepare-wine-wx.sh wine-image-wx.patch wine-loader-stub-wx.patch
 	./prepare-wine-wx.sh
 $(OUT)/run_hello: run-hello.sh $(OUT)/libuwph_wine_shim.so $(OUT)/run_via_wine $(OUT)/wine-wx/.stamp
 	cp $< $@
@@ -101,3 +101,16 @@ protect-test: $(OUT)/protect_test
 prebuilt-prefix:
 	./prepare-wine.sh --prebuilt-prefix
 .PHONY: prebuilt-prefix
+
+# B18: two intentionally absent exports; never execute the generated stubs.
+$(OUT)/stub_probe.def:
+	@mkdir -p $(OUT)
+	printf 'LIBRARY version.dll\nEXPORTS\nUWPHMissingOne\nUWPHMissingTwo\n' > $@
+$(OUT)/libstub_probe.a: $(OUT)/stub_probe.def
+	x86_64-w64-mingw32-dlltool -d $< -l $@
+$(OUT)/stub_probe.exe: stub_probe.c $(OUT)/libstub_probe.a
+	$(MINGW_CC) -O2 -Wall -Wextra -Werror $< $(OUT)/libstub_probe.a -o $@
+
+stub-test: $(OUT)/run_hello $(OUT)/stub_probe.exe
+	/workspace/xbox-readiness/bin/uwpjail --wx -- $(OUT)/run_hello $(CURDIR)/$(OUT)/stub_probe.exe
+.PHONY: stub-test

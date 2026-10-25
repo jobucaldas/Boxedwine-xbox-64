@@ -36,7 +36,7 @@ fi
 export WINEPREFIX=$work/prefix
 run=$(mktemp -d "$work/run-XXXXXXXX")
 cp out/wine/identity.json "$run/identity.json"
-# Routed identity: same PE dlls (symlinks), private W^X loader copy + ntdll.so.
+# Routed identity: private W^X Unix + PE ntdll; other DLLs are symlinks.
 python3 - "$run/identity-wx.json" "$wx" <<'PY'
 import hashlib,json,pathlib,sys
 tree=pathlib.Path(sys.argv[2])
@@ -44,7 +44,7 @@ paths=dict(loader=tree/'lib/wine/wine64', pe_ntdll=tree/'lib/x86_64-linux-gnu/wi
            unix_ntdll=tree/'lib/x86_64-linux-gnu/wine/x86_64-unix/ntdll.so')
 def identity(p):
     return dict(path=str(p.resolve()),sha256=hashlib.sha256(p.read_bytes()).hexdigest())
-data=dict(selection='private W^X ntdll.so (prepare-wine-wx.sh, wine-image-wx.patch); other files = installed Debian Wine',
+data=dict(selection='private W^X Unix + PE ntdll (prepare-wine-wx.sh, image + stub patches); other DLLs = installed Debian Wine',
           stamp=(tree/'.stamp').read_text().strip(), artifacts={k:identity(v) for k,v in paths.items()})
 pathlib.Path(sys.argv[1]).write_text(json.dumps(data,indent=2)+'\n')
 PY

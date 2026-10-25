@@ -8,6 +8,8 @@
 #include <stdarg.h>
 #include <errno.h>
 #include <stdint.h>
+#include <dlfcn.h>
+#include <stdio.h>
 _Static_assert(sizeof(off_t)==sizeof(uwph_off_t),"offset ABI");
 _Static_assert(sizeof(ssize_t)==sizeof(uwph_ssize_t),"read ABI");
 _Static_assert(O_CREAT==UWPH_O_CREAT && MAP_ANONYMOUS==UWPH_MAP_ANONYMOUS,"flag ABI");
@@ -25,6 +27,21 @@ static int owned(int fd) { return 1; }
 #else
 static int owned(int fd) { return fd>=0x100000 && fd<0x100400; }
 #endif
+/* Log refused requests immediately: a timeout can prevent final counters, and
+ * these requests never reach strace. Diagnostic only; W^X remains enforced. */
+static void report_wx(const char *op, int prot, void *caller)
+{
+    if ((prot & (PROT_WRITE|PROT_EXEC)) != (PROT_WRITE|PROT_EXEC)) return;
+    Dl_info info={0};
+    dladdr(caller,&info);
+    char line[1024];
+    int n=snprintf(line,sizeof line,"UWPH_RWX pid=%ld op=%s caller=%s+%#lx\n",
+        harness_raw(SYS_getpid,0,0,0,0,0,0),op,
+        info.dli_fname ? info.dli_fname : "<unknown>",
+        (unsigned long)((uintptr_t)caller-(uintptr_t)info.dli_fbase));
+    if(n>0 && (size_t)n<sizeof line)
+        harness_raw(SYS_write,2,(long)line,n,0,0,0);
+}
 static long native_result(long r) { if((unsigned long)r>=(unsigned long)-4095) { errno=-r; return -1; } return r; }
 int open(const char *path,int flags,...)
 {
@@ -52,6 +69,7 @@ int close(int fd)
 void *mmap(void *addr,size_t len,int prot,int flags,int fd,off_t off)
 {
     BEGIN(C_MMAP,MAP_FAILED);
+    report_wx("mmap",prot,__builtin_return_address(0));
     /* W^X: refuse WRITE|EXEC before any backend; shows as calls > backend. */
     if((prot&PROT_WRITE) && (prot&PROT_EXEC)) { count_end(); errno=EACCES; return MAP_FAILED; }
     /* Borrowed native fds have no uwph ownership: explicit counted passthrough. */
@@ -65,6 +83,7 @@ void *mmap(void *addr,size_t len,int prot,int flags,int fd,off_t off)
 int mprotect(void *addr,size_t len,int prot)
 {
     BEGIN(C_PROTECT,-1);
+    report_wx("mprotect",prot,__builtin_return_address(0));
     int saved=errno, r=uwph_protect(addr,len,prot); END(r,r<0);
 }
 int munmap(void *addr,size_t len)

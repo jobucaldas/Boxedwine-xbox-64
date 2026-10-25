@@ -361,8 +361,9 @@ mode now runs the W^X ntdll.so below; with stock ntdll it would exit 13.
 `prepare-wine-wx.sh` builds a private `out/wine-wx/` tree: upstream Wine 10.0
 (`/tmp/wine-src`) + the Debian 10.0~repack-6 Unix-ntdll patches (install paths,
 server tmpdir, two virtual.c fixes, regenerated protocol version 1) +
-`wine-image-wx.patch`. Only ntdll.so is rebuilt; wine64 is copied and every
-other file is a symlink to the installed Debian Wine. The patch keeps Wine's own
+`wine-image-wx.patch`. R4X rebuilt only ntdll.so; B18 also rebuilds PE ntdll.dll
+for missing-import stubs (see below). wine64 is copied; other DLLs link to the
+installed Debian Wine. The patch keeps Wine's own
 loader algorithm and changes only the protection order: image pages are mapped
 RW (copy-on-write), sections are read and relocated, then each section gets its
 final R/RW/RX via mprotect. The view keeps EXEC as its allowed maximum
@@ -386,3 +387,29 @@ selects the stock Debian ntdll as a control; under `--wx` that exits 13.
 | Windows uwph_protect | Build-only (mingw APP headers); no VirtualProtectFromApp run |
 | Separate wineserver | Stock Linux wineserver64 (unshimmed), as in R4H O4 |
 | wine-test (R4H O4 gate) | Routed = W^X ntdll.so + shim -> uwph, both PEs exit 0; controls = stock Wine; still BLOCKED only by wineboot attempts |
+
+## B18: remaining W^X inventory and missing-import stubs
+
+`prepare-wine-wx.sh` now builds both Unix ntdll.so and PE ntdll.dll. The
+additional `wine-loader-stub-wx.patch` changes Wine's `allocate_stub`: allocate
+one RW region for each missing-import stub, fill it, protect it RX, flush the
+instruction cache, then publish its address. A published stub's page is never
+reopened for writes when a later import needs a stub. The original stub-count
+limit remains; failure returns Wine's existing failure sentinel. The allocation
+cost increases to at least one page per stub (only for unresolved imports).
+Other PE DLLs remain symlinks to the installed Debian Wine distribution.
+
+The shim logs `UWPH_RWX pid=... op=... caller=<module>+<offset>` immediately for
+RWX requests, including those rejected before any syscall. Pair this with
+`strace -f -e trace=mmap,mprotect`; `-k --status=failed` attributes denied native
+syscalls without unwinding every successful mapping. Do not infer zero requests
+from zero syscall hits alone. Neither diagnostic changes the refusal policy.
+
+Run the focused missing-import probe with
+`make -C x64/uwp-host/harness stub-test`. This uses the same initialized isolated
+prefix, explicit stock Linux wineserver, private `WINE_LOADER`, shim `LD_PRELOAD`,
+launcher `out/run_via_wine`, and `uwpjail --wx` used for hello.
+It imports two nonexistent `version.dll` exports and checks that both generated
+addresses have PAGE_EXECUTE_READ protection and separate allocation bases. It
+never invokes the missing functions. See NOTES-x64.md `## B18` for recorded
+commands, counts, console reachability, and limitations.
