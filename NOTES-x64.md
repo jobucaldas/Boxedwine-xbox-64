@@ -1027,3 +1027,20 @@ dlls/msvcp90/tests/string.c:137:                                                
   RWX pages; an ad-hoc PE check showed VirtualProtect(PAGE_EXECUTE_READWRITE)
   failing with error 5 while RX->RW->RX on an image section worked.
 
+## R4X O3 JIT probe under --wx
+
+`make -C x64/uwp-host/harness install-readiness-glue` builds the readiness
+`jit_probe.exe` from `src/pe/jit_probe.c` with MinGW when needed and installs
+`bin/jit_probe` as a wrapper for this checkout's `out/run_jit_probe`.
+The runner uses our launcher, private W^X Wine loader, and uwph shim with a
+separate Wine prefix. It checks the PE summary, both RWX refusal markers,
+and uwph protection/refusal counters; captured output is complete before parsing.
+
+Exact test: `/workspace/xbox-readiness/bin/uwpjail --wx -- /workspace/xbox-readiness/bin/jit_probe`.
+Result: exit 0, `SUMMARY jit_probe pass=7 fail=0`, `RWX_ALLOC=0`,
+`RWX_PROTECT=0`; 2254 uwph_protect backend calls and 3 refused RWX requests.
+RW allocation, execution after RW->RX, patch/re-execution, 1000 flip cycles,
+and separate RW/RX views pass. No verifier or jail changes, no RWX fallback.
+This is THROUGH launcher -> Wine's own loader -> uwph on Linux, not stock-Wine-only
+or on-device UWP proof; Xbox codeGeneration still requires device validation.
+Video: `/workspace/x64-run/videos/R4X-O3.mp4` (free Xvfb display, ffmpeg, 10 s).

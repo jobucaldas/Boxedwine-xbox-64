@@ -73,6 +73,24 @@ $(OUT)/run_hello: run-hello.sh $(OUT)/libuwph_wine_shim.so $(OUT)/run_via_wine $
 	cp $< $@
 	chmod +x $@
 
+# R4X O3: readiness jit_probe.exe under --wx (RW->RX pass, RWX refused).
+# install-readiness-glue writes /workspace/xbox-readiness/bin/jit_probe, a
+# one-line exec of this checkout's out/run_jit_probe (the O3 exact test path).
+$(OUT)/run_jit_probe: run-jit-probe.sh $(OUT)/libuwph_wine_shim.so $(OUT)/run_via_wine $(OUT)/wine-wx/.stamp
+	cp $< $@
+	chmod +x $@
+READINESS_JIT := /workspace/xbox-readiness/bin/jit_probe
+READINESS_PE := /workspace/xbox-readiness/src/pe
+MINGW_CC ?= x86_64-w64-mingw32-gcc
+$(READINESS_JIT).exe: $(READINESS_PE)/jit_probe.c $(READINESS_PE)/common.h
+	$(MINGW_CC) -O2 -Wall -Wextra $< -o $@
+install-readiness-glue: $(OUT)/run_jit_probe $(READINESS_JIT).exe
+	printf '#!/bin/sh\n# R4X O3 glue (installed by x64/uwp-host/harness make install-readiness-glue)\nexec %s "$$@"\n' '$(CURDIR)/$(OUT)/run_jit_probe' > $(READINESS_JIT)
+	chmod +x $(READINESS_JIT)
+jit-test: install-readiness-glue
+	/workspace/xbox-readiness/bin/uwpjail --wx -- $(READINESS_JIT)
+.PHONY: install-readiness-glue jit-test
+
 $(OUT)/protect_test: protect_test.c $(OUT)/libuwph.a
 	$(CC) $(CFLAGS) $< $(OUT)/libuwph.a -o $@
 protect-test: $(OUT)/protect_test
