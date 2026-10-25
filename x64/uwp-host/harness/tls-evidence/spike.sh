@@ -62,3 +62,4 @@ P= run deny-only "$E/net_probe.exe"
   readelf -d "$provider" | grep -E 'NEEDED|SONAME'
 } > "$E/provider-isolation.txt"
 sha256sum "$E/net_probe.exe" "$E/cert_probe.exe" "$E/run_via_wine" "$uwph/harness/out/libuwph_wine_shim.so" "$assets/wine-wx/lib/wine/wine64" "$provider" > "$E/artifacts.sha256"
+python3 "$uwph/harness/tls-evidence/verify-spike.py" "$E" "$provider"

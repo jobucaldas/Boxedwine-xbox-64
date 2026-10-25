@@ -35,6 +35,7 @@ check-symbols:
 	./check-symbols.sh
 
 test: check-symbols $(OUT)/provider_test.exe
+	PYTHONDONTWRITEBYTECODE=1 python3 ../harness/tls-evidence/test_verify_spike.py
 	x86_64-w64-mingw32-objdump -p $(OUT)/provider_test.exe | grep 'DLL Name' | sort
 	WINEDEBUG=-all $(WINE) $(OUT)/provider_test.exe
 

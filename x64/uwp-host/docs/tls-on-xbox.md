@@ -144,6 +144,10 @@ unset, behaviour is unchanged.
      provider.
    - Control without the provider: HTTP 0, 0x80090305, as in O1.
 
+   `spike.sh` enforces these results with `verify-spike.py`: unexpected
+   exit codes, missing success/rejection evidence, or successful host TLS
+   dependency opens make the spike target fail. Logs remain available on failure.
+
    Evidence: `/workspace/x64-run/lanes/B44/o2/`. Video:
    `/workspace/x64-run/videos/B44-O2.mp4` (55 s, free Xvfb display).
 
