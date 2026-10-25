@@ -1,0 +1,6 @@
+manifest_version=1788652215
+manifest_url=https://raw.githubusercontent.com/SteamDatabase/SteamTracking/bbc717da8d/ClientManifest/steam_client_win64
+package_url=https://client-update.steamstatic.com/bins_win64.zip.36f5d9202e79ab2aa3e3c5902e84bbd799d31fc0
+package_sha2=93f5b6bea0267fd85dc8cc823fdab5c5fb55d7f3a1deab0598acefef0e133bce
+steamclient64_sha256=caba4826aa3501039d095aee1843a6bfb270fb43a3ab4455b2d6733223579fee
+map_file=out/ifacemap-1788652215.json
