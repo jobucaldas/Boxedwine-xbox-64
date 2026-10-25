@@ -42,17 +42,58 @@ separate build diagnostic. Tomorrow's checklist:
 this README and `/workspace/x64-run/ON-DEVICE-TOMORROW.md` exists in the built
 kit, and that every kit entry and rung is documented here. It's build-only.
 
-## Pack and sign (Windows PC with the Windows SDK)
+## Pack, sign and deploy from Linux (B60: no Windows PC needed)
 
-Device Portal's Add flow takes a signed package. Use MakeAppx and SignTool from
+Everything runs on this Linux box; João only gives network access to the
+console's Device Portal and its Device Portal user name and password.
+
+    make -C x64/on-device linux-appx       # out/BoxedwineDev.appx, signed + verified
+    make -C x64/on-device linux-appx-test  # package checks + mock Device Portal test
+
+- Pack: Microsoft's open-source MSIX SDK `makemsix pack`
+  ([microsoft/msix-packaging](https://github.com/microsoft/msix-packaging),
+  built locally by `linux/build-makemsix.sh` at a pinned commit; it writes
+  `AppxBlockMap.xml` and `[Content_Types].xml`). Its validation parser
+  schema-checks `AppxManifest.xml` while packing (the test proves a bogus
+  attribute is rejected); that is the MSIX SDK's schema set, not proof the
+  console accepts every capability. Build deps: `apt-get install -y git cmake
+  make clang osslsigncode`.
+- Sign: `osslsigncode sign` (Debian package, APPX support) with the same
+  disposable `test-cert.pfx`; Publisher CN=BoxedwineDev equals the manifest.
+- Verify: `linux/appx_check.py` recomputes every block map SHA-256, checks
+  content types, publisher, payload equality and private-file exclusions, then
+  runs `osslsigncode verify` against `test-cert.cer`. It prints `APPX CHECK PASS`.
+- `payload/combo/` is not packed: it is the Linux-hosted diagnostic tree (ELF
+  files and symlinks into Debian Wine, which an `.appx` cannot hold) and the
+  console app never runs it. Everything else in `out/payload/` is packed as is.
+- Deploy: `deploy-devportal.sh` talks to the documented Xbox Device Portal REST
+  API with `DP_URL`, `DP_USER` and `DP_PASS` from the environment (never
+  printed). The console's portal cert is self-signed, so TLS verification is
+  off; `info` prints its SHA-256 fingerprint and `DP_TLS_SHA256` pins it.
+
+      export DP_URL=https://<console-ip>:11443 DP_USER=... DP_PASS=...
+      ./x64/on-device/deploy-devportal.sh info        # auth check, OS version, TLS fingerprint
+      ./x64/on-device/deploy-devportal.sh install     # upload out/BoxedwineDev.appx, poll install state
+      ./x64/on-device/deploy-devportal.sh launch      # tile App (Boxedwine Dev Mode)
+      ./x64/on-device/deploy-devportal.sh pull-logs runs/App  # every LocalState log
+      ./x64/on-device/deploy-devportal.sh screenshot  # what the TV shows
+
+  Other commands: `list`, `stop`, `files`, `settings`, `set-setting NAME VALUE`,
+  `pull NAME...`, `launch BigFile`, `uninstall yes`, `reboot now`. Xbox does not need the signing
+  certificate in the upload (Microsoft's Device Portal API reference: only
+  IoT and Desktop do).
+
+Windows SDK alternative (only if a Windows PC is ever available): Device
+Portal's Add flow takes a signed package. Use MakeAppx and SignTool from
 Windows SDK 10.0.22621 or later (troubleshooting row 13). Copy `out/payload/`,
 `out/test-cert.pfx` and `out/test-cert.cer` to the PC, then:
 
     MakeAppx pack /d payload /p BoxedwineDev.appx
     SignTool sign /fd SHA256 /f test-cert.pfx BoxedwineDev.appx
 
-If MakeAppx rejects the manifest, record its exact error. Don't loosen the
-capabilities to get past it. We haven't run either tool here.
+If MakeAppx or makemsix rejects the manifest, record its exact error. Don't
+loosen the capabilities to get past it. Neither tool's package has been
+installed on a console yet.
 
 ## Install through Xbox Device Portal (one page)
 
@@ -63,10 +104,14 @@ capabilities to get past it. We haven't run either tool here.
 2. Note the console IP shown in Dev Home. From a PC on the same LAN, browse to
    `https://<console-ip>:11443`. Accept the console's self-signed HTTPS
    warning, which is expected only for your own console on your LAN, and sign in.
-3. **Home > My games & apps > Add**. Choose the package file
-   `BoxedwineDev.appx`, the signed output of the MakeAppx/SignTool step above
-   built from `x64/on-device/out/payload/` (carried in
-   `x64/on-device/out/kit.zip`; run `sha256sum -c SHA256SUMS` in
+   From this Linux box, `./x64/on-device/deploy-devportal.sh info` does the same
+   sign-in check over the REST API (see "Pack, sign and deploy from Linux").
+3. `./x64/on-device/deploy-devportal.sh install` from this box (uploads
+   `x64/on-device/out/BoxedwineDev.appx` from `linux-appx`), or in the browser
+   **Home > My games & apps > Add**. Choose the package file
+   `BoxedwineDev.appx`, the signed output of the Linux `linux-appx` step (or the
+   MakeAppx/SignTool alternative) above, built from `x64/on-device/out/payload/`
+   (carried in `x64/on-device/out/kit.zip`; run `sha256sum -c SHA256SUMS` in
    `x64/on-device/out` first). Then continue.
    There are no dependency packages. If it asks for a certificate, give it
    `test-cert.cer` (never the `.pfx`). Start the install and wait for it to
@@ -151,8 +196,8 @@ certificate on first use and checks the CER/PFX pair, the publisher and the
 x64 identity. It also creates the PNG assets the manifest references and
 stages `out/payload/`, then writes `out/SHA256SUMS` over everything it
 packaged. LocalState, tokens and private keys are never staged.
-No signature or AppxBlockMap is produced here, so pack and sign on Windows as
-shown above.
+No signature or AppxBlockMap is produced by `package`; `linux-appx` packs and
+signs on Linux as shown above.
 
 ## Native ladder (O5)
 
@@ -362,8 +407,8 @@ through the packaged launcher, bundled W^X Wine loader, shim and uwph on Linux.
 W^X loader tree and verifiers in `payload/combo/`: `hello.exe`, `hello_k32.exe`,
 `run`, `run_via_wine`, `libuwph_wine_shim.so`, `wine-wx/`, `verify_noproc.py`,
 `verify_acceptance.py`, `surface.tsv` (host-symbol classification) and
-`surface-trace.tsv`. MakeAppx packs this directory
-too; the console app never runs it. The Linux loader tree retains
+`surface-trace.tsv`. `linux-appx` leaves this directory out of the `.appx`
+(a Windows MakeAppx run over `payload/` would pack it); the console app never runs it. The Linux loader tree retains
 B21's links to matching installed Debian Wine 10.0 DLLs/data: these are hosted
 diagnostics, not a Windows/UWP runtime. Build-time `prebuilt-prefix` preparation
 uses stock Wine. For a source or extracted kit run, set
