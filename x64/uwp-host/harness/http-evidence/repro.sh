@@ -33,25 +33,24 @@ ln -sfn "$assets/wine-wx/lib/x86_64-linux-gnu/wine/x86_64-unix" "$E/wow64-dlls/x
 for mode in stock uwph; do
  cp -a --reflink=auto /workspace/megabonk/pfx-stock "$E/prefix-$mode"
  export WINEPREFIX="$E/prefix-$mode" WINEDLLOVERRIDES=wineboot.exe=d WINEDEBUG=+wininet,+winsock,+loaddll
- /usr/lib/wine/wineserver64 -f -p > "$E/$mode-server.log" 2>&1 & sp=$!
+ strace -f -yy -s 256 -e trace=process,network -o "$E/$mode-server.strace" /usr/lib/wine/wineserver64 -f -p > "$E/$mode-server.log" 2>&1 & sp=$!
  sleep .3
  set +e
  if [[ $mode == stock ]]; then
-  timeout -k 3 40 /usr/lib/wine/wine64 "$E/http_probe.exe" > "$E/stock.log" 2>&1
+  timeout -k 3 40 /usr/lib/wine/wine64 "$E/http_probe.exe" > "$E/stock.log" 2> "$E/stock-debug.log"
  else
   WINESERVER=/bin/false WINE_LOADER="$assets/wine-wx/lib/wine/wine64" UWPH_WOW64_DLL_ROOT="$E/wow64-dlls" \
-  timeout -k 3 40 strace -f -s 256 -e trace=process,socket,connect -o "$E/uwph.strace" \
+  timeout -k 3 40 strace -f -s 256 -yy -e trace=process,network -o "$E/uwph.strace" \
   env LD_PRELOAD="$repo/x64/uwp-host/harness/out/libuwph_wine_shim.so" UWPH_REPORT="$E/uwph.counters" UWPH_REPORT_PID=1 \
-  "$E/run_via_wine" "$E/http_probe.exe" > "$E/uwph.log" 2>&1
+  "$E/run_via_wine" "$E/http_probe.exe" > "$E/uwph.log" 2> "$E/uwph-debug.log"
  fi
  rc=$?
  set -e
  echo "$rc" > "$E/$mode.exit"
  /usr/lib/wine/wineserver64 -k || true
  wait "$sp" || true
- rg '^(GET |CALL |FAIL |HTTP |BODY )' "$E/$mode.log" > "$E/$mode-output.txt" || true
+ rg '^(GET |CALL |FAIL |HTTP |BODY |COMPLETE )' "$E/$mode.log" > "$E/$mode-output.txt" || true
  xmessage -geometry 980x250+10+350 -file "$E/$mode-output.txt" > /dev/null 2>&1 &
 done
 wait "$vp"
-grep -q '^HTTP 200' "$E/stock-output.txt"
-grep -Eq '^(HTTP 200|FAIL function=)' "$E/uwph-output.txt"
+python3 "$repo/x64/uwp-host/harness/http-evidence/validate.py" "$E"

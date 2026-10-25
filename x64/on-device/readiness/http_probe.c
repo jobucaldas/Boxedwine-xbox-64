@@ -53,5 +53,6 @@ done:
     if (request) InternetCloseHandle(request);
     if (connection) InternetCloseHandle(connection);
     InternetCloseHandle(session);
+    printf("COMPLETE exit=%d\n", result);
     return result;
 }
