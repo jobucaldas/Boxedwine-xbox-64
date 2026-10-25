@@ -813,3 +813,51 @@ either through uwph or through stock Wine. Video:
 The archive's undefined symbols still include `fork`, `setsid`,
 `chdir`/`fchdir`, `atexit`, `exit`, `sigaction` and `ptrace`. These are the
 process-wide effects listed under O3, and O6 has to contain them.
+
+## R4W O6 hosted server thread
+
+`wineserver/server_thread.c` starts Wine's own `wine_server_main(-f -p)`
+on a pthread. `build.sh prepare` copies server C/headers under ignored `out/`
+and applies `patches/0001-hosted-lifecycle.patch`; the original `/tmp/wine-src`
+is untouched. The forced `patches/hosted.h` redirects server-only exit/_exit
+and atexit to a thread-local callback stack and pthread_exit. Normal and fatal
+shutdown run the socket cleanup; the retained lock fd is closed there rather
+than relying on process exit. A single server lifetime per process is supported;
+Wine's global objects and all allocations are not reset for a second start.
+
+Hosted main does not alter stderr buffering or install signal dispositions.
+Hosted init_signals creates only a Wine event-loop pipe handler for explicit
+shutdown; watchdog alarms are disabled. SIGPIPE is blocked on the server
+thread only. Stop writes to the control pipe; its callback invokes Wine's own shutdown_master_socket(), which drains/kills
+its remaining clients and then flushes the registry and exits on the server
+thread through Wine's normal socket timeout. Readiness is a byte on a CLOEXEC pipe after
+socket listen and all main initialization, before main_loop, with EOF on startup
+failure. It does not use a fixed startup sleep or spawn a separate server.
+
+O6 uses the explicitly permitted retained-cwd policy: Wine keeps its original
+config/server directory fds and its existing temporary fchdir operations in
+fd.c, registry.c and mapping.c. Start must precede client threads; all host and
+client filesystem paths must be absolute while the server runs (including the
+prefix, executable and any host resources). Relative cwd-dependent host I/O is
+unsupported during this lifetime. The shim restores the caller's saved cwd after
+join. This policy is sufficient for this isolated protocol test; this step does
+not claim arbitrary cwd-dependent applications are integrated into the loader.
+The WINEPREFIX environment update likewise occurs before clients start.
+
+`test_host --prefix ABSOLUTE_PATH --selftest` makes a disposable writable copy
+of the prebuilt prefix, starts the hosted server and consumes readiness, then
+runs one stock `WINESERVER=/bin/false WINEPREFIX=<copy> wine cmd /c echo
+R4W-O6-OK`. It checks /proc for wineserver64 throughout, sends the pipe stop
+request, joins, restores cwd and removes the copy. A pre-existing unrelated
+wineserver64 also fails that strict acceptance check; it is never killed by
+the test. Evidence is **our uwp-host server shim + an expressly allowed stock
+Wine protocol client**, not THROUGH-uwph PE launcher/loader integration (O7),
+and not an Xbox/UWP runtime proof. No verifier changes.
+
+O6 final exact test: `R4W-O6-OK` and `server thread joined rc=0`, but exit 1
+because an unrelated existing `/usr/lib/wine/wineserver64 -p0 -p 180`
+(PID 339142, PPID 53) violates the global no-server-process gate. No unrelated
+process was terminated. Status is BLOCKED, not DONE. Final output and details:
+`/workspace/x64-run/lanes/R4W/R4W-O6.result`; proof video:
+`/workspace/x64-run/videos/R4W-O6.mp4` (under 60 seconds). Final normal
+shutdown leaves no registry-save errors. No commit or remote operation.

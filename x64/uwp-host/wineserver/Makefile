@@ -1,9 +1,9 @@
-# Wine 10.0 server objects as a static library (build-only, no runtime).
+# Wine 10.0 server objects with private-copy hosted lifecycle patches.
 #
 #   make lib     configure $(WINE_BUILD) once, build $(OUT)/libwineserver.a
 #   make clean   remove $(OUT) and the server objects in $(WINE_BUILD)
 #
-# Sources are Wine's own server/*.c, unmodified; main() is renamed to
+# Sources are Wine's own server/*.c, patched in private copies; main() is renamed to
 # wine_server_main with objcopy so a host can link the archive.
 
 OUT        ?= out
@@ -11,7 +11,8 @@ WINE_SRC   ?= /tmp/wine-src
 WINE_BUILD ?= /workspace/wine-build
 OBJCOPY    ?= objcopy
 AR         ?= ar
-OBJDIR     := $(WINE_BUILD)/server
+OBJDIR     := $(OUT)/obj/hosted
+COPYDIR    := $(OUT)/server-src
 CONFIG_H   := $(WINE_BUILD)/include/config.h
 
 # Source list from Wine's own server/Makefile.in SOURCES.
@@ -28,8 +29,8 @@ WINE_CC          = $(call config_var,CC)
 WINE_CFLAGS      = $(call config_var,CFLAGS)
 WINE_EXTRACFLAGS = $(call config_var,EXTRACFLAGS)
 WINE_PREFIX      = $(call config_var,prefix)
-SERVER_DEFS = -I$(OBJDIR) -I$(WINE_SRC)/server -I$(WINE_BUILD)/include -I$(WINE_SRC)/include \
-              -D__WINESRC__ -DWINE_UNIX_LIB
+SERVER_DEFS = -I$(OBJDIR) -I$(COPYDIR) -I$(WINE_BUILD)/include -I$(WINE_SRC)/include \
+              -D__WINESRC__ -DWINE_UNIX_LIB -include $(CURDIR)/patches/hosted.h
 # server/Makefile.in: unicode_EXTRADEFS
 $(OBJDIR)/unicode.o: EXTRADEFS = -DBINDIR="\"$(WINE_PREFIX)/bin\"" -DDATADIR="\"$(WINE_PREFIX)/share\""
 
@@ -40,10 +41,14 @@ lib: $(OUT)/libwineserver.a $(OUT)/protocol_version
 $(CONFIG_H):
 	WINE_SRC=$(WINE_SRC) WINE_BUILD=$(WINE_BUILD) ./build.sh configure
 
-$(OBJDIR)/%.o: $(WINE_SRC)/server/%.c $(HDRS) $(CONFIG_H)
+$(COPYDIR)/.prepared: build.sh $(wildcard patches/*) $(wildcard $(WINE_SRC)/server/*.[ch])
+	WINE_SRC=$(WINE_SRC) WINE_BUILD=$(WINE_BUILD) ./build.sh prepare $(abspath $(COPYDIR))
+	@touch $@
+
+$(OBJDIR)/%.o: $(WINE_SRC)/server/%.c $(HDRS) $(CONFIG_H) $(COPYDIR)/.prepared
 	@test -n "$(WINE_CC)" || { echo "no CC in $(WINE_BUILD)/config.status" >&2; exit 1; }
 	@mkdir -p $(@D)
-	$(WINE_CC) -c -o $@ $< $(SERVER_DEFS) $(EXTRADEFS) $(WINE_EXTRACFLAGS) -fPIC $(WINE_CFLAGS)
+	$(WINE_CC) -c -o $@ $(COPYDIR)/$*.c $(SERVER_DEFS) $(EXTRADEFS) $(WINE_EXTRACFLAGS) -fPIC $(WINE_CFLAGS)
 
 $(OUT)/obj/wine_server_main.o: $(OBJDIR)/main.o
 	@mkdir -p $(@D)
@@ -61,3 +66,9 @@ clean:
 	rm -rf $(OUT) $(OBJS)
 
 .PHONY: all lib clean
+
+$(OUT)/test_host: test_host.c server_thread.c $(OUT)/libwineserver.a
+	$(CC) -Wall -Wextra -g -o $@ test_host.c server_thread.c $(OUT)/libwineserver.a -pthread
+
+test-host: $(OUT)/test_host
+.PHONY: test-host

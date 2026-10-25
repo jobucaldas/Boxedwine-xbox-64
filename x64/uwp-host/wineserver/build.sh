@@ -36,4 +36,13 @@ if [ ! -f "$WINE_BUILD/include/config.h" ]; then
 fi
 
 [ "${1:-}" = configure ] && exit 0
+if [ "${1:-}" = prepare ]; then
+    dest=$2
+    mkdir -p "$dest"
+    cp "$WINE_SRC"/server/*.[ch] "$dest/"
+    for patchfile in "$HERE"/patches/*.patch; do
+        patch --batch -d "$dest" -p1 < "$patchfile"
+    done
+    exit 0
+fi
 exec make -C "$HERE" WINE_SRC="$WINE_SRC" WINE_BUILD="$WINE_BUILD" ${1:+OUT="$1"} lib
