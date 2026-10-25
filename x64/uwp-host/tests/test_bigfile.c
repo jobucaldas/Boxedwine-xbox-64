@@ -6,11 +6,58 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <pthread.h>
+#include <stdatomic.h>
 #define CHUNK (1LL<<30)
 static void size_is(int fd, long long size)
 {
     struct uwph_stat st;
     assert(uwph_fstat(fd,&st)==0 && st.st_size==size);
+}
+/* Exercise metadata and snapshots while a sequential write creates hundreds
+ * of sparse parts. A separate handle also checks same-file coordination. */
+struct growth {
+    int fd;
+    pthread_barrier_t start;
+    atomic_int done;
+};
+static void *grow(void *arg)
+{
+    struct growth *g=arg;
+    pthread_barrier_wait(&g->start);
+    assert(uwph_write(g->fd,"X",1)==1);
+    atomic_store(&g->done,1);
+    return NULL;
+}
+static void concurrent_growth(int fd, const char *path)
+{
+    int reader=uwph_open(path,UWPH_O_RDONLY);
+    assert(reader>=0);
+    for(int round=0;round<3;round++) {
+        assert(uwph_ftruncate(fd,4096)==0);
+        assert(uwph_lseek(fd,999*CHUNK,UWPH_SEEK_SET)==999*CHUNK);
+        struct growth g={.fd=fd,.done=ATOMIC_VAR_INIT(0)};
+        assert(pthread_barrier_init(&g.start,NULL,2)==0);
+        pthread_t worker;
+        assert(pthread_create(&worker,NULL,grow,&g)==0);
+        pthread_barrier_wait(&g.start);
+        do {
+            struct uwph_stat st;
+            assert(uwph_fstat(reader,&st)==0);
+            assert(st.st_size==4096 || st.st_size==999*CHUNK+1);
+            void *map=uwph_mmap(NULL,4096,UWPH_PROT_READ,UWPH_MAP_PRIVATE,reader,0);
+            assert(map!=UWPH_MAP_FAILED);
+            for(int i=0;i<4096;i++) assert(!((unsigned char *)map)[i]);
+            assert(uwph_munmap(map,4096)==0);
+        } while(!atomic_load(&g.done));
+        assert(pthread_join(worker,NULL)==0);
+        assert(pthread_barrier_destroy(&g.start)==0);
+        size_is(reader,999*CHUNK+1);
+        char byte=0;
+        assert(uwph_pread(reader,&byte,1,999*CHUNK)==1 && byte=='X');
+    }
+    assert(uwph_ftruncate(fd,0)==0);
+    assert(uwph_close(reader)==0);
 }
 int main(void)
 {
@@ -75,9 +122,10 @@ int main(void)
     for(int i=0;i<8;i++) assert(!readback[i]);
     assert(uwph_close(fd)==0);
     fd=uwph_open(path,UWPH_O_RDWR|UWPH_O_TRUNC); assert(fd>=0); size_is(fd,0);
+    concurrent_growth(fd,path);
     assert(uwph_close(fd)==0);
     for(int i=0;i<4;i++) { snprintf(part,sizeof(part),"%s.uwphpart%d",path,i); unlink(part); }
     assert(rmdir(dir)==0);
-    puts("test_bigfile: PASS (THROUGH-uwph Linux; 3 GiB sparse, boundary I/O, reopen, shrink/grow, read-only mmap; console UNCONFIRMED)");
+    puts("test_bigfile: PASS (THROUGH-uwph Linux; 3 GiB sparse, boundary I/O, reopen, shrink/grow, read-only mmap, concurrent sequential growth/metadata/snapshots; console UNCONFIRMED)");
     return 0;
 }

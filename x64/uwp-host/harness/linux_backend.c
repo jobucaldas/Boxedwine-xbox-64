@@ -63,15 +63,17 @@ static int native(int fd) { return fd; }
 #endif
 static struct big_file *big_find(int fd);
 static long big_generic(struct big_file *, long, long, long, long);
-static pthread_mutex_t big_offset_lock = PTHREAD_MUTEX_INITIALIZER;
+/* Shared namespace readers serialize split operations here; ordinary blocking
+ * pipe I/O never takes this mutex. Namespace writers already exclude them. */
+static pthread_mutex_t big_operation_lock = PTHREAD_MUTEX_INITIALIZER;
 static long fdcall(long nr, int fd, long b, long c, long d)
 {
     RDLOCK();
     int n = native(fd);
     struct big_file *split = big_find(n);
-    if(split) pthread_mutex_lock(&big_offset_lock);
+    if(split) pthread_mutex_lock(&big_operation_lock);
     long r = n < 0 ? -UWPH_EBADF : split ? big_generic(split,nr,b,c,d) : raw(nr,n,b,c,d,0,0);
-    if(split) pthread_mutex_unlock(&big_offset_lock);
+    if(split) pthread_mutex_unlock(&big_operation_lock);
     UNLOCK();
     return result(r);
 }
@@ -159,7 +161,11 @@ int uwph_linux_fstat(int fd, struct uwph_stat *st) {
     RDLOCK(); int n = native(fd);
     long r = n < 0 ? -UWPH_EBADF : raw(SYS_fstat,n,PTR(st),0,0,0,0);
     struct big_file *b = big_find(n);
-    if (!r && b) { long size=big_size(b); if(size<0) r=size; else st->st_size=size; }
+    if (!r && b) {
+        pthread_mutex_lock(&big_operation_lock);
+        long size=big_size(b); if(size<0) r=size; else st->st_size=size;
+        pthread_mutex_unlock(&big_operation_lock);
+    }
     UNLOCK(); return result(r);
 }
 int uwph_linux_ftruncate(int fd, uwph_off_t len) {
@@ -184,7 +190,9 @@ void *uwph_linux_mmap(void *addr, size_t len, int prot, int flags, int fd, uwph_
     int n=(flags & UWPH_MAP_ANONYMOUS) ? -1 : native(fd);
     struct big_file *b = (flags & UWPH_MAP_ANONYMOUS) ? NULL : big_find(n);
     if (b) {
+        pthread_mutex_lock(&big_operation_lock);
         long r = big_map(b, addr, len, prot, flags, off);
+        pthread_mutex_unlock(&big_operation_lock);
         UNLOCK(); return (void *)result(r);
     }
     long r=(!(flags & UWPH_MAP_ANONYMOUS) && n<0) ? -UWPH_EBADF : raw(SYS_mmap,PTR(addr),len,prot,flags,n,off);

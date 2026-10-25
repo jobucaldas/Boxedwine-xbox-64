@@ -85,7 +85,11 @@ size (other metadata, including allocated blocks, comes from part0). Sequential
 read/write/lseek use the anchor descriptor's shared offset; positioned calls do
 not move it. Reopening discovers the existing parts even for read-only access.
 Relative paths pin the original directory descriptor. The private namespace lock
-pins operations against close and serializes resize/positioned writes.
+pins operations against close and serializes resize/positioned writes. A split
+operation mutex also serializes sequential I/O, fstat and snapshot construction
+while the namespace lock is shared, including across handles for the same file.
+Thus metadata and snapshots cannot observe an in-progress sequential resize or
+write. Ordinary blocking pipe I/O does not acquire the split mutex.
 
 Read-only mmap assembles the requested range in anonymous RW memory, then changes
 it to R. PRIVATE and SHARED requests both yield a **snapshot**, not a coherent
@@ -120,7 +124,9 @@ by splitting files. Preserve packaged content as read-only.
 Linux backend. It creates a **3 GiB sparse logical file**, checks physical part
 sizes and sparse allocation, writes/reads across the 2 GiB boundary, tests holes,
 EOF/reopen, negative arguments, access permissions, shrink/regrowth, sequential
-offsets and read-only mmap. This is **THROUGH-uwph**, with no stock Wine involved
+offsets and read-only mmap. A concurrent regression grows sequentially to
+999 GiB using sparse parts while another handle reads metadata and maps snapshots
+(three rounds, then cleanup). This is **THROUGH-uwph**, with no stock Wine involved
 in the bigfile test. Existing Windows smoke tests in the exact suite run under
 stock desktop Wine and are separate evidence. The Win32 stub is build-only for
 this feature. No console behavior is inferred from either.
