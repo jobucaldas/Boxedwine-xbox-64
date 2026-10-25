@@ -1,0 +1,78 @@
+R4X O2: W^X PE image mapping for Wine 10.0 dlls/ntdll/unix/virtual.c.
+
+Wine maps every PE image view (and file-backed header pages) RWX, then sets
+per-section protections. Under W^X (UWP without RWX; uwpjail --wx) the RWX
+request fails. This keeps Wine's own loader algorithm and only changes the
+protection order: pages are mapped RW (copy-on-write), sections are read and
+relocated, then each section gets its final R / RW / RX protection through
+mprotect (-> uwph_protect in the harness). The view keeps VPROT_EXEC as its
+allowed maximum so later NtProtectVirtualMemory(PAGE_EXECUTE_READ) still works.
+No RWX fallback: flat (non page-aligned) images and writable+executable
+sections are refused with STATUS_NOT_SUPPORTED. Applied by prepare-wine-wx.sh.
+
+--- a/dlls/ntdll/unix/virtual.c	2026-10-24 21:12:41.378399085 -0300
++++ b/dlls/ntdll/unix/virtual.c	2026-10-24 21:12:41.398398948 -0300
+@@ -2442,7 +2442,7 @@
+ 
+     if (!*removable)
+     {
+-        if (mmap( ptr, size, PROT_READ|PROT_WRITE|PROT_EXEC, MAP_FIXED|MAP_PRIVATE, fd, 0 ) != MAP_FAILED)
++        if (mmap( ptr, size, PROT_READ|PROT_WRITE, MAP_FIXED|MAP_PRIVATE, fd, 0 ) != MAP_FAILED)
+             return STATUS_SUCCESS;
+ 
+         switch (errno)
+@@ -2792,11 +2792,9 @@
+                 return status;  /* Windows refuses to load in that case too */
+         }
+ 
+-        /* set the image protections */
+-        set_vprot( view, ptr, total_size, VPROT_COMMITTED | VPROT_READ | VPROT_WRITECOPY | VPROT_EXEC );
+-
+-        /* no relocations are performed on non page-aligned binaries */
+-        return STATUS_SUCCESS;
++        /* W^X: a flat image would need its pages writable and executable at once */
++        ERR( "refusing non page-aligned image %s under W^X\n", debugstr_w(filename) );
++        return STATUS_NOT_SUPPORTED;
+     }
+ 
+ 
+@@ -2948,9 +2946,18 @@
+         if (sec->Characteristics & IMAGE_SCN_MEM_WRITE)   vprot |= VPROT_WRITECOPY;
+         if (sec->Characteristics & IMAGE_SCN_MEM_EXECUTE) vprot |= VPROT_EXEC;
+ 
+-        if (!set_vprot( view, ptr + sec->VirtualAddress, size, vprot ) && (vprot & VPROT_EXEC))
+-            ERR( "failed to set %08x protection on %s section %.8s, noexec filesystem?\n",
++        /* W^X: sections that are both writable and executable are refused */
++        if ((vprot & VPROT_EXEC) && (vprot & VPROT_WRITECOPY))
++        {
++            ERR( "refusing writable+executable section %.8s in %s under W^X\n", sec->Name, debugstr_w(filename) );
++            return STATUS_NOT_SUPPORTED;
++        }
++        if (!set_vprot( view, ptr + sec->VirtualAddress, size, vprot ))
++        {
++            ERR( "failed to set %08x protection on %s section %.8s\n",
+                  (int)sec->Characteristics, debugstr_w(filename), sec->Name );
++            return STATUS_ACCESS_DENIED;
++        }
+     }
+ 
+ #ifdef VALGRIND_LOAD_PDB_DEBUGINFO
+@@ -3016,7 +3023,9 @@
+ static NTSTATUS map_image_view( struct file_view **view_ret, struct pe_image_info *image_info, SIZE_T size,
+                                 ULONG_PTR limit_low, ULONG_PTR limit_high, ULONG alloc_type )
+ {
+-    unsigned int vprot = SEC_IMAGE | SEC_FILE | VPROT_COMMITTED | VPROT_READ | VPROT_EXEC | VPROT_WRITECOPY;
++    /* W^X: pages start RW so sections can be filled and relocated; EXEC is
++     * granted per section afterwards (see virtual_map_image) */
++    unsigned int vprot = SEC_IMAGE | SEC_FILE | VPROT_COMMITTED | VPROT_READ | VPROT_WRITECOPY;
+     void *base;
+     NTSTATUS status;
+     ULONG_PTR start, end;
+@@ -3111,6 +3120,7 @@
+ 
+     status = map_image_view( &view, image_info, size, limit_low, limit_high, alloc_type );
+     if (status) goto done;
++    view->protect |= VPROT_EXEC;  /* allowed maximum (AllocationProtect); pages stay non-exec */
+ 
+     status = map_image_into_view( view, filename, unix_fd, image_info, machine, shared_fd, needs_close );
+     if (status == STATUS_SUCCESS)

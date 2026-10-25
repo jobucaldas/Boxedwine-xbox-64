@@ -3,6 +3,7 @@
  * guest wants writable and executable at once.
  */
 #include "internal.h"
+#include "fake_proc.h"
 
 /* ---- W^X tracking (portable) ---- */
 #define MAX_WX_REGIONS 256
@@ -176,6 +177,7 @@ UWPH_API void *uwph_mmap(void *addr, size_t len, int prot, int flags, int fd, uw
         VirtualFree(p, 0, MEM_RELEASE);
         return uwph_errno = e, UWPH_MAP_FAILED;
     }
+    uwph_proc_mapping(p, len, 1);
     return p;
 #endif
 }
@@ -188,15 +190,19 @@ UWPH_API int uwph_munmap(void *addr, size_t len)
     MEMORY_BASIC_INFORMATION mbi;
     uwph_wx_untrack(addr, len);
     if (!VirtualQuery(addr, &mbi, sizeof(mbi))) return UWPH_FAIL(UWPH_EINVAL);
-    if (mbi.AllocationBase == addr && mbi.RegionSize >= len && VirtualFree(addr, 0, MEM_RELEASE)) return 0;
+    if (mbi.AllocationBase == addr && mbi.RegionSize >= len && VirtualFree(addr, 0, MEM_RELEASE)) {
+        uwph_proc_mapping(addr, mbi.RegionSize, 0); return 0;
+    }
     /* partial unmap of a reservation: Windows cannot release part of it, so
        the range goes back to reserved (Wine treats it as free again) */
-    return VirtualFree(addr, len, MEM_DECOMMIT) ? 0 : UWPH_FAIL(UWPH_EINVAL);
+    if (!VirtualFree(addr, len, MEM_DECOMMIT)) return UWPH_FAIL(UWPH_EINVAL);
+    uwph_proc_mapping(addr, len, 0); return 0;
 #endif
 }
 
 UWPH_API int uwph_mprotect(void *addr, size_t len, int prot)
 {
+    uwph_trace_hit(UWPH_TRACE_MPROTECT);
 #ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
     return uwph_linux_mprotect(addr, len, prot);
 #else
@@ -259,6 +265,7 @@ UWPH_API int uwph_munmap(void *addr, size_t len) {
 #endif
 }
 UWPH_API int uwph_mprotect(void *addr, size_t len, int prot) {
+    uwph_trace_hit(UWPH_TRACE_MPROTECT);
 #ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
     return uwph_linux_mprotect(addr, len, prot);
 #else
@@ -272,3 +279,20 @@ UWPH_API int uwph_msync(void *addr, size_t len, int flags) { (void)addr; (void)l
 /* VirtualLock is not in the APP partition; locking is advisory for Wine */
 UWPH_API int uwph_mlock(const void *addr, size_t len)   { (void)addr; (void)len; return 0; }
 UWPH_API int uwph_munlock(const void *addr, size_t len) { (void)addr; (void)len; return 0; }
+
+/* Explicit loader transition; unlike the legacy mprotect emulation this never
+ * tracks RWX or falls back to desktop VirtualProtect. codeGeneration is needed
+ * for executable protection in an actual UWP package. */
+UWPH_API int uwph_protect(void *addr, size_t len, int prot)
+{
+    if (!len || ((uintptr_t)addr & 4095) ||
+        (prot & ~(UWPH_PROT_READ | UWPH_PROT_WRITE | UWPH_PROT_EXEC)))
+        return UWPH_FAIL(UWPH_EINVAL);
+    if ((prot & UWPH_PROT_WRITE) && (prot & UWPH_PROT_EXEC))
+        return UWPH_FAIL(UWPH_EACCES);
+#ifdef UWPH_BACKEND_WIN32
+    resolve_vprotect();
+    if (!vprotect_is_fromapp) return UWPH_FAIL(UWPH_ENOSYS);
+#endif
+    return uwph_mprotect(addr, len, prot);
+}

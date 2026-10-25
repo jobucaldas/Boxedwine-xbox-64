@@ -1,7 +1,10 @@
 /* Minimal buffered stdio over uwph fds. */
 #include "internal.h"
 #include <stdio.h>
+#include <ctype.h>
+#include <limits.h>
 
+#ifndef UWPH_BACKEND_LINUX_PASSTHROUGH
 struct uwph_FILE {
     int fd;
     int eof, err;
@@ -34,6 +37,7 @@ UWPH_API uwph_FILE *uwph_fdopen(int fd, const char *mode)
 
 UWPH_API uwph_FILE *uwph_fopen(const char *path, const char *mode)
 {
+    uwph_trace_hit(UWPH_TRACE_FOPEN);
     int fd = uwph_open(path, mode_flags(mode), 0666);
     uwph_FILE *f;
     if (fd < 0) return NULL;
@@ -43,6 +47,7 @@ UWPH_API uwph_FILE *uwph_fopen(const char *path, const char *mode)
 
 UWPH_API int uwph_fclose(uwph_FILE *f)
 {
+    uwph_trace_hit(UWPH_TRACE_FCLOSE);
     int r;
     if (f == uwph_stdout || f == uwph_stderr) return 0;
     r = uwph_close(f->fd);
@@ -102,6 +107,7 @@ UWPH_API char *uwph_fgets(char *s, int n, uwph_FILE *f)
 
 UWPH_API uwph_ssize_t uwph___getdelim(char **line, size_t *n, int delim, uwph_FILE *f)
 {
+    uwph_trace_hit(UWPH_TRACE___GETDELIM);
     size_t i = 0;
     if (!*line || !*n) { *n = 128; if (!(*line = malloc(*n))) return UWPH_FAIL(UWPH_ENOMEM); }
     while (fill(f)) {
@@ -138,10 +144,15 @@ UWPH_API int uwph_puts(const char *s)
     return uwph_fputc('\n', uwph_stdout) < 0 ? -1 : 1;
 }
 
-UWPH_API int uwph_feof(uwph_FILE *f) { return f->eof; }
+UWPH_API int uwph_feof(uwph_FILE *f) { uwph_trace_hit(UWPH_TRACE_FEOF); return f->eof; }
 UWPH_API int uwph_fileno(uwph_FILE *f) { return f->fd; }
 UWPH_API int uwph_fflush(uwph_FILE *f) { (void)f; return 0; }   /* writes are unbuffered */
-UWPH_API void uwph_setbuf(uwph_FILE *f, char *buf) { (void)buf; f->unbuffered = 1; }
+UWPH_API void uwph_setbuf(uwph_FILE *f, char *buf)
+{
+    uwph_trace_hit(UWPH_TRACE_SETBUF);
+    (void)buf;
+    f->unbuffered = 1;
+}
 UWPH_API int uwph_setvbuf(uwph_FILE *f, char *buf, int mode, size_t size)
 { (void)buf; (void)mode; (void)size; f->unbuffered = 1; return 0; }
 
@@ -173,12 +184,108 @@ UWPH_API int uwph_fprintf(uwph_FILE *f, const char *fmt, ...)
     return n;
 }
 
+/* Bounded integer/string scanner for Wine's /proc formats. Floating point and
+ * allocating conversions fail explicitly; they are not claimed as supported. */
+static int scan_peek(uwph_FILE *f) { return fill(f) ? (unsigned char)f->rbuf[f->rpos] : -1; }
+static int scan_take(uwph_FILE *f) { int c = scan_peek(f); if (c >= 0) f->rpos++; return c; }
+UWPH_API int uwph_vfscanf(uwph_FILE *f, const char *fmt, va_list ap)
+{
+    int assigned = 0, consumed = 0;
+    uwph_trace_hit(UWPH_TRACE___ISOC23_FSCANF);
+    while (*fmt) {
+        int c, suppress = 0, width = 0, length = 0;
+        char conv;
+        if (isspace((unsigned char)*fmt)) {
+            while (isspace((unsigned char)*fmt)) fmt++;
+            while ((c = scan_peek(f)) >= 0 && isspace(c)) { scan_take(f); consumed++; }
+            continue;
+        }
+        if (*fmt != '%') {
+            c = scan_peek(f);
+            if (c != (unsigned char)*fmt) return c < 0 && !assigned ? -1 : assigned;
+            scan_take(f); consumed++; fmt++; continue;
+        }
+        fmt++;
+        if (*fmt == '%') {
+            if (scan_peek(f) != '%') return assigned;
+            scan_take(f); consumed++; fmt++; continue;
+        }
+        if (*fmt == '*') { suppress = 1; fmt++; }
+        while (isdigit((unsigned char)*fmt)) {
+            if (width > 1000000) return UWPH_FAIL(UWPH_EINVAL);
+            width = width * 10 + *fmt++ - '0';
+        }
+        if (*fmt == 'h') { fmt++; length = -1; if (*fmt == 'h') { fmt++; length = -2; } }
+        else if (*fmt == 'l') { fmt++; length = 1; if (*fmt == 'l') { fmt++; length = 2; } }
+        else if (*fmt == 'z' || *fmt == 't' || *fmt == 'j') { fmt++; length = 2; }
+        conv = *fmt++;
+        if (!conv) return UWPH_FAIL(UWPH_EINVAL);
+        if (!strchr("diuoxXbBscn", conv) || (length && (conv == 's' || conv == 'c')))
+            return UWPH_ENOSYS_INT();
+        if (conv != 'c' && conv != 'n')
+            while ((c = scan_peek(f)) >= 0 && isspace(c)) { scan_take(f); consumed++; }
+        if (conv == 's' || conv == 'c') {
+            int got = 0, limit = width ? width : conv == 'c' ? 1 : INT_MAX;
+            char *out = suppress ? NULL : va_arg(ap, char *);
+            while (got < limit && (c = scan_peek(f)) >= 0 && (conv == 'c' || !isspace(c))) {
+                if (out) out[got] = (char)c;
+                got++; consumed++; scan_take(f);
+            }
+            if (!got) return assigned ? assigned : -1;
+            if (out && conv == 's') out[got] = 0;
+            if (!suppress) assigned++;
+        } else {
+            unsigned long long value = 0;
+            int negative = 0, digits = 0, base = conv == 'o' ? 8 : conv == 'x' || conv == 'X' ? 16 : conv == 'b' || conv == 'B' ? 2 : 10;
+            int limit = width ? width : INT_MAX;
+            if (conv != 'n') {
+                c = scan_peek(f);
+                if (c < 0) return assigned ? assigned : -1;
+                if ((c == '-' || c == '+') && limit) { negative = c == '-'; scan_take(f); consumed++; limit--; }
+                if (limit && scan_peek(f) == '0') {
+                    scan_take(f); consumed++; limit--; digits++;
+                    c = scan_peek(f);
+                    if (conv == 'i') base = 8;
+                    if (limit && ((c == 'x' || c == 'X') && (conv == 'i' || base == 16))) {
+                        base = 16; scan_take(f); consumed++; limit--; digits = 0;
+                    } else if (limit && (c == 'b' || c == 'B') && (conv == 'i' || base == 2)) {
+                        base = 2; scan_take(f); consumed++; limit--; digits = 0;
+                    }
+                }
+                while (limit && (c = scan_peek(f)) >= 0) {
+                    int d = c >= '0' && c <= '9' ? c - '0' : c >= 'a' && c <= 'f' ? c - 'a' + 10 : c >= 'A' && c <= 'F' ? c - 'A' + 10 : 99;
+                    if (d >= base) break;
+                    value = value * (unsigned)base + (unsigned)d;
+                    digits++; limit--; scan_take(f); consumed++;
+                }
+                if (!digits) return assigned;
+                if (negative) value = 0 - value;
+            } else value = (unsigned)consumed;
+            if (!suppress) {
+                void *out = va_arg(ap, void *);
+                /* memcpy avoids aliasing and signed/unsigned pointer punning. */
+                if (length == -2) { unsigned char v = (unsigned char)value; memcpy(out, &v, sizeof v); }
+                else if (length == -1) { unsigned short v = (unsigned short)value; memcpy(out, &v, sizeof v); }
+                else if (length == 1) { uint64_t v = (uint64_t)value; memcpy(out, &v, sizeof v); }
+                else if (length == 2) memcpy(out, &value, sizeof value);
+                else { unsigned v = (unsigned)value; memcpy(out, &v, sizeof v); }
+                if (conv != 'n') assigned++;
+            }
+        }
+    }
+    return assigned;
+}
 UWPH_API int uwph_fscanf(uwph_FILE *f, const char *fmt, ...)
 {
-    /* Wine scans /proc and /sys files with it; those do not exist here */
-    (void)f; (void)fmt;
-    return UWPH_ENOSYS_INT();
+    va_list ap;
+    int r;
+    va_start(ap, fmt);
+    r = uwph_vfscanf(f, fmt, ap);
+    va_end(ap);
+    return r;
 }
+
+#endif /* non-Linux FILE implementation */
 
 static const char *const errstr[] = {
     [0] = "Success", [UWPH_EPERM] = "Operation not permitted", [UWPH_ENOENT] = "No such file or directory",

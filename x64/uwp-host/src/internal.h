@@ -7,6 +7,15 @@
 #include <stdlib.h>
 #ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
 #include "linux_backend.h"
+#include <errno.h>
+/* Resolve past our shim, never call an interposed entry recursively. */
+#define UWPH_NATIVE(ret, name, args) \
+    static ret (*fn) args; \
+    if (!__atomic_load_n(&fn, __ATOMIC_ACQUIRE)) \
+        __atomic_store_n(&fn, (ret (*) args)uwph_linux_symbol(name), __ATOMIC_RELEASE)
+#define UWPH_NATIVE_RETURN(expr) do { \
+    __auto_type native_result = (expr); uwph_errno = errno; return native_result; \
+} while (0)
 #endif
 
 #ifdef UWPH_BACKEND_WIN32
@@ -17,6 +26,8 @@
 #else
 # include <pthread.h>
 #endif
+
+void uwph_trace_hit(enum uwph_trace_symbol symbol);
 
 /* set uwph errno and return -1 (or another failure value) */
 #define UWPH_FAIL(e)        (uwph_errno = (e), -1)
@@ -130,6 +141,8 @@ int uwph_mem_protect_is_fromapp(void);
 void *uwph_resolve(const char *fn);   /* GetProcAddress over kernelbase/kernel32/ntdll */
 
 /* module init hooks */
+int uwph_thread_ids(int *ids, int capacity);
+int uwph_fd_ids(int *ids, int capacity);
 void uwph_fd_init(void);
 int  uwph_signal_init(void);
 int  uwph_mem_page_size(void);

@@ -1,0 +1,45 @@
+496734 execve("/usr/bin/env", ["env", "LD_PRELOAD=/workspace/wt/B10/x64/uwp-host/harness/out/libuwph_wine_shim.so", "UWPH_REPORT=/workspace/x64-run/lanes/B10/install.counters", "UWPH_REPORT_PID=1", "/workspace/wt/B10/x64/uwp-host/harness/out/run_via_wine", "/workspace/steam-owned/SteamSetup.exe", "/S"], 0x7ffece048b38 /* 86 vars */) = 0
+496734 execve("/workspace/wt/B10/x64/uwp-host/harness/out/run_via_wine", ["/workspace/wt/B10/x64/uwp-host/harness/out/run_via_wine", "/workspace/steam-owned/SteamSetup.exe", "/S"], 0x562395762e10 /* 89 vars */) = 0
+496734 execve("/workspace/wt/B10/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64", ["/workspace/wt/B10/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64", "/workspace/steam-owned/SteamSetup.exe", "/S"], 0x7ffc4cd85638 /* 89 vars */) = 0
+496734 execve("/workspace/wt/B10/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64-preloader", ["/workspace/wt/B10/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64-preloader", "/workspace/wt/B10/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64", "/workspace/steam-owned/SteamSetup.exe", "/S"], 0x56001ee8fe70 /* 91 vars */) = -1 ENOENT (No such file or directory)
+496734 execve("/workspace/wt/B10/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64", ["/workspace/wt/B10/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64", "/workspace/steam-owned/SteamSetup.exe", "/S"], 0x56001ee8fe70 /* 91 vars */) = 0
+496734 clone(child_stack=NULL, flags=CLONE_CHILD_CLEARTID|CLONE_CHILD_SETTID|SIGCHLD, child_tidptr=0x7f232c960a10) = 496744
+496734 wait4(496744,  <unfinished ...>
+496744 clone(child_stack=NULL, flags=CLONE_CHILD_CLEARTID|CLONE_CHILD_SETTID|SIGCHLD, child_tidptr=0x7f232c960a10) = 496745
+496745 execve("/workspace/wt/B10/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64-preloader", ["/workspace/wt/B10/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64-preloader", "/workspace/wt/B10/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64", "C:\\windows\\system32\\wineboot.exe", "--init"], 0x559990c5f2f0 /* 93 vars */) = -1 ENOENT (No such file or directory)
+496745 execve("/workspace/wt/B10/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64", ["/workspace/wt/B10/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64", "C:\\windows\\system32\\wineboot.exe", "--init"], 0x559990c5f2f0 /* 93 vars */ <unfinished ...>
+496744 exit_group(0)                    = ?
+496744 +++ exited with 0 +++
+496734 <... wait4 resumed>NULL, 0, NULL) = 496744
+496745 <... execve resumed>)            = 0
+496745 exit_group(-1073741515)          = ?
+496745 +++ exited with 53 +++
+496734 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=496744, si_uid=1000, si_status=0, si_utime=0, si_stime=0} ---
+496734 clone(child_stack=NULL, flags=CLONE_CHILD_CLEARTID|CLONE_CHILD_SETTID|SIGCHLD, child_tidptr=0x7f232c960a10) = 496767
+496734 wait4(496767,  <unfinished ...>
+496767 clone(child_stack=NULL, flags=CLONE_CHILD_CLEARTID|CLONE_CHILD_SETTID|SIGCHLD, child_tidptr=0x7f232c960a10) = 496768
+496768 execve("/workspace/wt/B10/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64-preloader", ["/workspace/wt/B10/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64-preloader", "/workspace/wt/B10/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64", "C:\\windows\\system32\\conhost.exe", "--unix", "--width", "0", "--height", "0", "--server", "0x30"], 0x559990c655e0 /* 93 vars */) = -1 ENOENT (No such file or directory)
+496768 execve("/workspace/wt/B10/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64", ["/workspace/wt/B10/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64", "C:\\windows\\system32\\conhost.exe", "--unix", "--width", "0", "--height", "0", "--server", "0x30"], 0x559990c655e0 /* 93 vars */ <unfinished ...>
+496767 exit_group(0)                    = ?
+496767 +++ exited with 0 +++
+496734 <... wait4 resumed>NULL, 0, NULL) = 496767
+496734 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=496767, si_uid=1000, si_status=0, si_utime=0, si_stime=0} ---
+496768 <... execve resumed>)            = 0
+496734 clone(child_stack=NULL, flags=CLONE_CHILD_CLEARTID|CLONE_CHILD_SETTID|SIGCHLD, child_tidptr=0x7f232c960a10) = 496990
+496734 wait4(496990,  <unfinished ...>
+496990 clone(child_stack=NULL, flags=CLONE_CHILD_CLEARTID|CLONE_CHILD_SETTID|SIGCHLD, child_tidptr=0x7f232c960a10) = 496991
+496991 execve("/workspace/wt/B10/x64/uwp-host/harness/out/wine-wx/lib/wine/wine-preloader", ["/workspace/wt/B10/x64/uwp-host/harness/out/wine-wx/lib/wine/wine-preloader", "/workspace/wt/B10/x64/uwp-host/harness/out/wine-wx/lib/wine/wine", "Z:\\workspace\\steam-owned\\SteamSetup.exe", "/S"], 0x559990c73630 /* 93 vars */) = -1 ENOENT (No such file or directory)
+496991 execve("/workspace/wt/B10/x64/uwp-host/harness/out/wine-wx/lib/wine/wine", ["/workspace/wt/B10/x64/uwp-host/harness/out/wine-wx/lib/wine/wine", "Z:\\workspace\\steam-owned\\SteamSetup.exe", "/S"], 0x559990c73630 /* 93 vars */) = -1 ENOENT (No such file or directory)
+496991 execve("/workspace/wt/B10/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64-preloader", ["/workspace/wt/B10/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64-preloader", "/workspace/wt/B10/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64", "Z:\\workspace\\steam-owned\\SteamSetup.exe", "/S"], 0x559990c73630 /* 93 vars */) = -1 ENOENT (No such file or directory)
+496991 execve("/workspace/wt/B10/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64", ["/workspace/wt/B10/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64", "Z:\\workspace\\steam-owned\\SteamSetup.exe", "/S"], 0x559990c73630 /* 93 vars */ <unfinished ...>
+496990 exit_group(0)                    = ?
+496991 <... execve resumed>)            = 0
+496990 +++ exited with 0 +++
+496734 <... wait4 resumed>NULL, 0, NULL) = 496990
+496734 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=496990, si_uid=1000, si_status=0, si_utime=0, si_stime=0} ---
+496991 exit_group(1)                    = ?
+496991 +++ exited with 1 +++
+496734 exit_group(1)                    = ?
+496768 exit_group(0)                    = ?
+496734 +++ exited with 1 +++
+496768 +++ exited with 0 +++

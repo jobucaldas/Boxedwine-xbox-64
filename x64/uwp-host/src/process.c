@@ -9,14 +9,28 @@
 
 UWPH_API uwph_pid_t uwph_getpid(void)
 {
+    uwph_trace_hit(UWPH_TRACE_GETPID);
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    UWPH_NATIVE(uwph_pid_t, "getpid", (void));
+    UWPH_NATIVE_RETURN(fn());
+#endif
 #ifdef UWPH_BACKEND_WIN32
     return (uwph_pid_t)GetCurrentProcessId();
+
 #else
     return 1;
 #endif
 }
 
-UWPH_API uwph_uid_t uwph_getuid(void) { return UWPH_UID; }
+UWPH_API uwph_uid_t uwph_getuid(void)
+{
+    uwph_trace_hit(UWPH_TRACE_GETUID);
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    UWPH_NATIVE(uwph_uid_t, "getuid", (void));
+    UWPH_NATIVE_RETURN(fn());
+#endif
+    return UWPH_UID;
+}
 
 UWPH_API struct uwph_passwd *uwph_getpwuid(uwph_uid_t uid)
 {
@@ -60,6 +74,12 @@ UWPH_API int uwph_sysinfo(struct uwph_sysinfo *si)
 
 UWPH_API long uwph_sysconf(int name)
 {
+    uwph_trace_hit(UWPH_TRACE_SYSCONF);
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    UWPH_NATIVE(long, "sysconf", (int));
+    UWPH_NATIVE_RETURN(fn(name));
+#endif
+
     switch (name) {
     case UWPH_SC_PAGESIZE: return uwph_mem_page_size();
     case UWPH_SC_CLK_TCK:  return 100;
@@ -92,6 +112,12 @@ static struct uwph_rlimit nofile = { UWPH_MAX_FDS, UWPH_MAX_FDS };
 
 UWPH_API int uwph_getrlimit(int res, struct uwph_rlimit *rl)
 {
+    uwph_trace_hit(UWPH_TRACE_GETRLIMIT);
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    UWPH_NATIVE(int, "getrlimit", (int, struct uwph_rlimit *));
+    UWPH_NATIVE_RETURN(fn(res, rl));
+#endif
+
     switch (res) {
     case UWPH_RLIMIT_NOFILE: *rl = nofile; return 0;
     case UWPH_RLIMIT_STACK:  rl->rlim_cur = 8 << 20; rl->rlim_max = UWPH_RLIM_INFINITY; return 0;
@@ -103,7 +129,14 @@ UWPH_API int uwph_getrlimit(int res, struct uwph_rlimit *rl)
 
 UWPH_API int uwph_setrlimit(int res, const struct uwph_rlimit *rl)
 {
-    if (res != UWPH_RLIMIT_NOFILE) return 0;
+    uwph_trace_hit(UWPH_TRACE_SETRLIMIT);
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    UWPH_NATIVE(int, "setrlimit", (int, const struct uwph_rlimit *));
+    UWPH_NATIVE_RETURN(fn(res, rl));
+#endif
+
+    if (res != UWPH_RLIMIT_NOFILE) return UWPH_ENOSYS_INT();
+    if (rl->rlim_cur > rl->rlim_max) return UWPH_FAIL(UWPH_EINVAL);
     if (rl->rlim_cur > UWPH_MAX_FDS || rl->rlim_max > UWPH_MAX_FDS) return UWPH_FAIL(UWPH_EPERM);
     nofile = *rl;
     return 0;
@@ -155,6 +188,12 @@ static int env_find(const char *name, size_t n)
 
 UWPH_API char *uwph_getenv(const char *name)
 {
+    uwph_trace_hit(UWPH_TRACE_GETENV);
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    UWPH_NATIVE(char *, "getenv", (const char *));
+    UWPH_NATIVE_RETURN(fn(name));
+#endif
+
     char *r = NULL;
     int i;
     uwph_lock(&env_lock);
@@ -184,6 +223,11 @@ static int env_put(char *entry, size_t namelen, int overwrite)
 
 UWPH_API int uwph_setenv(const char *name, const char *val, int overwrite)
 {
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    /* Same native table as the passthrough getenv (uwph_environ is not it). */
+    UWPH_NATIVE(int, "setenv", (const char *, const char *, int));
+    UWPH_NATIVE_RETURN(fn(name, val, overwrite));
+#endif
     size_t nl = strlen(name);
     char *e;
     if (!nl || strchr(name, '=')) return UWPH_FAIL(UWPH_EINVAL);
@@ -194,6 +238,12 @@ UWPH_API int uwph_setenv(const char *name, const char *val, int overwrite)
 
 UWPH_API int uwph_putenv(char *s)
 {
+    uwph_trace_hit(UWPH_TRACE_PUTENV);
+
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    UWPH_NATIVE(int, "putenv", (char *));
+    UWPH_NATIVE_RETURN(fn(s));
+#endif
     char *eq = strchr(s, '=');
     if (!eq) return uwph_unsetenv(s);
     return env_put(s, (size_t)(eq - s), 1);
@@ -201,6 +251,10 @@ UWPH_API int uwph_putenv(char *s)
 
 UWPH_API int uwph_unsetenv(const char *name)
 {
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    UWPH_NATIVE(int, "unsetenv", (const char *));
+    UWPH_NATIVE_RETURN(fn(name));
+#endif
     int i;
     uwph_lock(&env_lock);
     if ((i = env_find(name, strlen(name))) >= 0)
@@ -221,9 +275,27 @@ UWPH_API void uwph_exit(int code) { exit(code); }
 UWPH_API void uwph_abort(void) { abort(); }
 
 /* ---- no process creation in a UWP app ---- */
-UWPH_API uwph_pid_t uwph_fork(void) { return UWPH_ENOSYS_INT(); }
+UWPH_API uwph_pid_t uwph_fork(void)
+{
+    uwph_trace_hit(UWPH_TRACE_FORK);
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    UWPH_NATIVE(uwph_pid_t, "fork", (void));
+    UWPH_NATIVE_RETURN(fn());
+#else
+    return UWPH_ENOSYS_INT();
+#endif
+}
 UWPH_API int uwph_execve(const char *p, char *const a[], char *const e[]) { (void)p; (void)a; (void)e; return UWPH_ENOSYS_INT(); }
-UWPH_API int uwph_execv(const char *p, char *const a[]) { (void)p; (void)a; return UWPH_ENOSYS_INT(); }
+UWPH_API int uwph_execv(const char *p, char *const a[])
+{
+    uwph_trace_hit(UWPH_TRACE_EXECV);
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    UWPH_NATIVE(int, "execv", (const char *, char *const []));
+    UWPH_NATIVE_RETURN(fn(p, a));
+#endif
+    (void)p; (void)a;
+    return UWPH_ENOSYS_INT();
+}
 UWPH_API int uwph_execvp(const char *f, char *const a[]) { (void)f; (void)a; return UWPH_ENOSYS_INT(); }
 UWPH_API int uwph_posix_spawn(uwph_pid_t *pid, const char *path, const void *fa, const void *attr,
                               char *const argv[], char *const envp[])
