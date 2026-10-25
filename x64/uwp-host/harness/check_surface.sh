@@ -20,9 +20,9 @@ export_names={line.split()[-1].split('@')[0] for line in exports.splitlines()}
 # O2 traced set + O3 readlink (provider assertions cover this entry): exactly the shim's version-script exports.
 script=pathlib.Path('shim.map').read_text()
 selected={x.strip() for x in script.split('global:')[1].split('local:')[0].split(';') if x.strip()}-{'uwph_shim_report'}
-assert {'open','read','close','mmap','mprotect','munmap','_exit'}<=selected and len(selected)==43, sorted(selected)
+assert {'open','read','close','mmap','mprotect','munmap','_exit'}<=selected and len(selected)==57, sorted(selected)
 traced=set(re.findall(r'"([^"]+)"',pathlib.Path('../src/trace.c').read_text().split('names[]')[1].split(';')[0]))
-assert traced==selected-{'open','read','close','mmap','munmap','mprotect','_exit','readlink'}, 'uwph trace counters != shim traced exports'
+assert traced==selected-{'open','read','close','mmap','munmap','_exit','readlink'}, 'uwph trace counters != shim traced exports'
 assert {s for s,r in policy.items() if r['classification']=='routed'}==selected-{'_exit','readlink'}
 # readlink is a Wine loader export, absent from this ntdll import inventory.
 assert 'readlink' in export_names

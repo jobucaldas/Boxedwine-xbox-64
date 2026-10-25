@@ -1,6 +1,6 @@
 #include "internal.h"
 static uint64_t counts[UWPH_TRACE_COUNT];
-static const char *const names[] = {"snprintf","fopen","__isoc23_fscanf","fclose","pthread_getspecific","pthread_sigmask","feof","stat","write","pthread_mutex_lock","pthread_mutex_unlock","writev","getenv","asprintf","sigaddset","fcntl","setlocale","time","getuid","realpath","sendmsg","fstat","putenv","recvmsg","setsockopt","chdir","dladdr","execv","getrlimit","isatty","pipe2","setbuf","setrlimit","sigemptyset","sysconf"};
+static const char *const names[] = {"snprintf","fopen","__isoc23_fscanf","fclose","pthread_getspecific","pthread_sigmask","feof","stat","write","pthread_mutex_lock","pthread_mutex_unlock","writev","getenv","asprintf","sigaddset","fcntl","setlocale","time","getuid","realpath","sendmsg","fstat","putenv","recvmsg","setsockopt","chdir","dladdr","execv","getrlimit","isatty","pipe2","setbuf","setrlimit","sigemptyset","sysconf","umask","__getdelim","access","connect","dlsym","dup","fchdir","fork","getcwd","getpid","lstat","mkdir","mprotect","nl_langinfo","opendir"};
 void uwph_trace_hit(enum uwph_trace_symbol s)
 { __atomic_add_fetch(&counts[s], 1, __ATOMIC_RELAXED); }
 uint64_t uwph_trace_count(enum uwph_trace_symbol s)
