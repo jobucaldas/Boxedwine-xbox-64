@@ -2093,3 +2093,130 @@ the normal ntdll PROCESS_DETACH.
 Video /workspace/x64-run/videos/B20-O2.mp4 (60 s, Xvfb :122): routed client
 run 2, the 32-bit Steam updater window under uwph. Run 1 (installer + crypt32
 failure) is kept as /workspace/x64-run/lanes/B20/B20-O2-run1.mp4.
+
+## B22 O1
+
+**Diagnosis: WINEDLLPATH/install-layout gap. No fix applied.** Reproduced with
+an i386 build of the existing `x64/on-device/readiness/net_probe.c` through
+this worktree's compiled `x64/pe/launcher/run_via_wine.c`, B20's uwph shim and
+private Wine W^X loader, in the existing
+`/workspace/wt/B20/x64/uwp-host/harness/out/b20/pfx-wow64-uwph` prefix.
+B22 has no harness/out build; the shared B20 binaries/prefix are used explicitly
+by `x64/uwp-host/harness/steam-evidence/b22-o1/repro.sh` (override assets with
+B20_HARNESS). Shim source is identical between B20 and B22. This is Linux
+harness evidence THROUGH uwph, not an Xbox on-device run or stock Wine proof.
+Separate wineserver64 is infrastructure. No Steam binary or login is needed.
+
+Environment: `WINEDEBUG=+winsock,+module,+loaddll`,
+`WINEDLLPATH=/usr/lib/i386-linux-gnu/wine` (the original installer setting),
+`WINEDLLOVERRIDES=wineboot.exe=d`, `WINESERVER=/bin/false`, and
+`LD_PRELOAD=<B20 harness>/out/libuwph_wine_shim.so` on the launcher/loader.
+Wine reports experimental wow64 mode and loads builtin WS2_32.dll at
+`0x7b250000`. The actual failing attach is
+`DllMain(instance=0x7b250000, reason=DLL_PROCESS_ATTACH=1, reserved=0x0022fd24)`.
+Its `__wine_init_unix_call()` requests the WoW64 Unix function table;
+`get_builtin_unix_funcs(module=0x7b250000, wow=TRUE, funcs=<output pointer>)`
+at Wine `dlls/ntdll/unix/virtual.c:642` calls
+`dlopen("/usr/lib/i386-linux-gnu/wine/x86_64-unix/ws2_32.so", RTLD_NOW)`.
+The loader logs “cannot open shared object file: No such file or directory”.
+The corresponding observed system call is
+`openat(AT_FDCWD, "/usr/lib/i386-linux-gnu/wine/x86_64-unix/ws2_32.so", O_RDONLY|O_CLOEXEC) = -1 ENOENT`.
+The function returns STATUS_DLL_NOT_FOUND (0xc0000135, source-derived),
+WS2_32 DllMain returns FALSE (`dlls/ws2_32/socket.c:580-585`), and the guest
+loader aborts with STATUS_DLL_INIT_FAILED (0xc0000142), process exit 66.
+The output pointer value is not logged; function arguments/status above are
+identified from the matching loader source and observed module mapping.
+
+This is the same missing path logged during B20's steamservice.exe attach.
+The probe never reaches main/WSAStartup(0x0202, &wd), so it does not reach its
+`socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)` call. There is no evidence here
+of a refused socket family or a missing uwph socket syscall. The missing
+file is the **x86-64 Unix companion of an i386 Windows PE**, not an i386 ELF
+library: `<B20 harness>/out/wine-wx/lib/x86_64-linux-gnu/wine/x86_64-unix/ws2_32.so`
+exists (links to Debian's x86-64 library) and `nm -D` shows both
+`__wine_unix_call_funcs` and `__wine_unix_call_wow64_funcs`. O1 deliberately
+uses the failing DLL path and does not activate/change the B20 overlay.
+
+Evidence: `/workspace/x64-run/lanes/B22/o1/{probe.log,probe.strace,probe.exit,probe.file,probe.counters.*}`;
+small extracted logs are retained beside the repro script. Exec trace shows
+our launcher -> private wine64, unsuccessful i386 loader lookup -> wine64
+WoW64 fallback, no successful i386 ELF exec. Shim counters prove routing.
+Video: `/workspace/x64-run/videos/B22-O1.mp4`, 12 seconds on a free Xvfb
+display; diagnostic caption and DLL-init capture, no game/client UI expected.
+Exact test: `grep -q '## B22 O1' NOTES-x64.md` -> exit 0 (no stdout).
+
+## B22 O2
+
+Fixed the O1 WINEDLLPATH layout gap in our launcher. The opt-in
+`UWPH_WOW64_DLL_ROOT` validates both `i386-windows` and `x86_64-unix`
+directories and sets Wine's DLL root to that paired layout. An incomplete
+root fails before exec (exit 127); ordinary launcher use keeps its existing
+Wine configuration. The repro packages the distro's i386 Windows PEs beside
+B20's private W^X loader's x86-64 Unix companions using local symlinks.
+No Steam binary changes, W^X relaxation, or i386 Unix loader required.
+
+Proof is THROUGH uwph: B22-compiled launcher -> B20 private Wine W^X loader
+with B20's unchanged uwph shim, using B20's installer-created owned prefix.
+This is Linux harness evidence, not an Xbox device result. Separate
+wineserver64 is harness infrastructure. The i386 net_probe now reaches main:
+WSAStartup, bind/listen, connect, accept and TCP payload all PASS (5/0), exit 0.
+The previous missing ws2_32.so attach failure is resolved.
+
+`Steam.exe -no-browser -silent` was run through that same route with a
+90-second cap. Got as far as bootstrapper self-update: downloading
+`https://cdn.steamstatic.com/client/steam_client_win32`. The manifest request
+fails with `Download failed: http error 0`; the bootstrapper verifies the
+incomplete installation and retries. Next blocker: bootstrap manifest/network
+transport failure, not WS2_32 init. No steamclient.dll load or client UI was
+observed; no login attempted. No conclusion about later client compatibility.
+
+Repro and trace extractor: `x64/uwp-host/harness/steam-evidence/b22-o2/`.
+Trace: `x64/uwp-host/harness/surface-trace-steam-client.tsv` (same five columns
+as the existing trace, with real TSV separators). Full logs, exec/open/socket
+trace, exit codes, bootstrap log and per-PID routing counters:
+`/workspace/x64-run/lanes/B22/o2/`. Video:
+`/workspace/x64-run/videos/B22-O2.mp4`, free Xvfb display, 55 seconds,
+with a diagnostic caption; no client UI reached.
+
+Validation: launcher compiles with `-Wall -Wextra -Werror`; an invalid paired
+root is rejected. Exact O2 test output is retained in
+`/workspace/x64-run/lanes/B22/o2/exact-test.log`. Windows smoke uses a newly
+initialized dedicated stock-Wine fixture (setup only) and hosts the uwph
+Windows code under stock Wine; it is distinct from the THROUGH-uwph Steam
+and net_probe proofs above.
+Steam hit the cap (exit 124); shim totals: probe 62,241 calls / 5 reports,
+client 84,524 / 5 reports. Wine also logs `wininet:open_http_connection
+create_netconn failed: 12029`. Existing harness wineboot-init attempts remain
+visible (wineboot.exe disabled, c0000135); this order does not claim the
+separate no-wineboot runtime acceptance gate passes. No successful i386 ELF
+loader exec is present. O2 exact test: PASS, exit 0; make summaries 55/566
+smoke, 60/63/70 traced, all zero failures; Windows futex smoke 500 passed,
+0 failed.
+
+B22 O2 reviewer follow-up: the collector now creates a unique `o2/run.*`
+evidence directory for every invocation, so old per-PID counter reports cannot
+contribute to a later run. It passes the actual selected prefix's bootstrap
+log to the extractor and saves a byte-for-byte prelaunch snapshot. Only bytes
+appended during the client launch enter the trace; replacement/truncation
+fails extraction explicitly. Successful exec evidence now joins strace's
+unfinished/resumed execve records by PID before checking the return value.
+The collector regression fixture covers an alternate bootstrap path, stale
+sibling counter reports, zero current reports, successful resumed execve,
+failed execve exclusion, and bootstrap truncation rejection.
+
+Final reviewer-fix rerun evidence: `/workspace/x64-run/lanes/B22/o2/run.0L0qbguI/`
+(supersedes the fixed-directory counts above). THROUGH-uwph probe: exit 0,
+`SUMMARY net_probe pass=5 fail=0`, 62,285 routed calls / 5 reports. Client:
+exit 124 at the 90-second cap, 84,535 routed calls / 5 reports; WS2_32 attach
+observed. Again reached bootstrap manifest download, HTTP error 0, then
+verification/retry; next blocker remains bootstrap HTTP transport. No
+steamclient.dll load or client UI observed. An earlier isolated rerun
+`run.L9bSKzTz` timed out during probe initialization; its reports are excluded
+from this final trace. Video was regenerated with wall-clock capture timestamps
+and one encoder thread: `/workspace/x64-run/videos/B22-O2.mp4`, ffprobe 55.0 s.
+Collector regression: 1 test OK; shell syntax and diff whitespace checks pass.
+Exact O2 command passed, exit 0; complete output:
+`/workspace/x64-run/lanes/B22/o2/review-exact-test.log` (55/566 smoke,
+60/63/70 traced, Windows futex 500 passed, all zero failures).
+These remain Linux THROUGH-uwph client/probe proofs, with separate stock-Wine
+Windows smoke; no Xbox-device claim, Steam login, or client modification.
