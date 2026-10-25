@@ -3128,3 +3128,38 @@ token_scan=PASS
 ```
 
 The script also emitted missing-file grep diagnostics for probe-wine.log and game-wine.log, since both stages were skipped. No follow-up orders started; no commit or remote operations performed.
+## B47 (B13 retry)
+
+O1 BLOCKED: preflight `df -BG /` reports only 14G available (128G total,
+114G used, 90% used), below the required 20 GB reserve. Per B47 orders,
+stopped before downloader info/full download; no token was read and no download
+was started. No files were deleted to make room.
+
+Exact test run:
+```
+$ ls /workspace/steam-owned/games/hades/x64/Hades.exe || find /workspace/steam-owned/games/hades -iname 'Hades*.exe' | head
+ls: cannot access '/workspace/steam-owned/games/hades/x64/Hades.exe': No such file or directory
+```
+The fallback find produced no output. Hades executable presence failed;
+manifest file-count/byte verification could not run without the download.
+Classification: host filesystem/download preflight only (build-only category);
+neither THROUGH-uwph nor stock Wine ran. No runtime proof or video was produced.
+O2 was not attempted (outside this assignment).
+
+## B81
+
+O2 (2026-10-25): BLOCKED by the required disk preflight. `df -h /`
+reports 6.3G available (128G total, 96% used), below the >=10G free rule.
+Neither Ghidra analyzeHeadless nor rizin/radare2 is installed/on PATH;
+searches of /opt, /workspace, /usr/local and /home/box found no tool executable.
+No tool download was attempted under the disk constraint, and no unrelated
+files were deleted. No DLL execution or static disassembly was performed.
+Intended method: verify pinned SHA256, resolve the four interface RTTI/COL
+and version strings, enumerate vtables, then compare slots and method string
+xrefs to OSW @3793a5db (1745623383). This method is NOT implemented or validated.
+Slot counts vs baseline: unavailable; confidence histogram: unavailable.
+No generated map/header, Ghidra projects, prefixes, or video were created.
+Exact O2 test exited 127 at its first command:
+`bash: x64/steam-min/ifacemap/derive.sh: No such file or directory`.
+Evidence category: build-only/static-analysis preflight; no THROUGH-uwph or
+stock Wine run, and no console result. O2 remains incomplete.

@@ -6,7 +6,7 @@ CFLAGS := -O2 -std=c11 -Wall -Wextra -Werror
 all: smoke-exe
 
 # Loose layout fallback; no SDK packer or device activation is implied.
-package: smoke-exe $(OUT)/rungs.exe $(OUT)/child_probe.exe $(OUT)/probe_d3d12.exe combo-binaries
+package: smoke-exe $(OUT)/rungs.exe $(OUT)/child_probe.exe $(OUT)/probe_d3d12.exe combo-binaries steam-downloader
 	./pack.sh
 
 # B60: signed .appx on Linux (makemsix + osslsigncode), then offline checks.
@@ -16,7 +16,7 @@ linux-appx: package
 linux-appx-test: linux-appx
 	linux/test-linux-appx.sh
 
-kit: smoke-exe ladder $(OUT)/probe_d3d12.exe combo-binaries
+kit: smoke-exe ladder $(OUT)/probe_d3d12.exe combo-binaries steam-downloader
 	./pack.sh --kit
 
 # An explicit PACKAGE_DIR checks an existing bundle without rebuilding it.
@@ -100,6 +100,11 @@ combo-binaries:
 	$(CC_WIN) -O1 -nostdlib -e entry -o $(OUT)/combo-guests/hello_k32.exe ../pe/tests/hello_k32.c -lkernel32
 	$(CC_WIN) -O1 -o $(OUT)/combo-guests/hello.exe ../pe/tests/hello.c
 	$(MAKE) -C ../uwp-host/harness out/libuwph_wine_shim.so out/run_via_wine prebuilt-prefix
+
+# B53 desktop transport: kit diagnostic only, excluded with combo/ from Appx.
+.PHONY: steam-downloader
+steam-downloader:
+	bash ../launcher-dl/build.sh
 
 $(OUT)/child_probe.exe: child_probe.c Makefile
 	mkdir -p $(OUT)
