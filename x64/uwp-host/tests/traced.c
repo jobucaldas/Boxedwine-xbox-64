@@ -373,6 +373,12 @@ static void test_b07(void)
     uwph_snprintf(newdir,sizeof(newdir),"/uwph-b07-%d",uwph_getpid());
 #endif
     CHECK(uwph_mkdir(newdir,0700)==0, "B07 mkdir creates directory");
+    CHECK(uwph_access(newdir,0)==0, "B07 access created directory exists");
+    CHECK(uwph_access(newdir,5)==0, "B07 access created directory read/search");
+    CHECK(uwph_stat(newdir,&st)==0 && (st.st_mode & UWPH_S_IFMT)==UWPH_S_IFDIR,
+          "B07 stat created directory");
+    CHECK(uwph_lstat(newdir,&st)==0 && (st.st_mode & UWPH_S_IFMT)==UWPH_S_IFDIR,
+          "B07 lstat created directory");
     uwph_DIR *created=uwph_opendir(newdir);
     CHECK(created!=NULL, "B07 opendir created directory");
     if(created) uwph_closedir(created);
@@ -419,6 +425,7 @@ static void test_b07(void)
     CHECK(codeset && !strcmp(codeset,"ANSI_X3.4-1968"), "B07 nl_langinfo C codeset");
 #ifndef UWPH_BACKEND_LINUX_PASSTHROUGH
     CHECK(!uwph_trace_nl_langinfo(-1) && uwph_errno==UWPH_ENOSYS, "B07 unsupported locale item ENOSYS");
+#endif
     static int marker;
     static const struct uwph_dl_symbol symbols[]={{"b07_marker",&marker},{NULL,NULL}};
     static const struct uwph_dl_library lib={"b07",symbols,NULL,NULL};
@@ -426,6 +433,9 @@ static void test_b07(void)
     void *handle=uwph_dlopen("b07",0);
     CHECK(handle && uwph_dlsym(handle,"b07_marker")==&marker, "B07 dlsym static registry");
     CHECK(!uwph_dlsym(handle,"missing"), "B07 dlsym missing");
+    CHECK(uwph_dlsym(uwph_dlopen(NULL,0),"b07_marker")==&marker, "B07 dlsym main registry handle");
+    CHECK(!uwph_dlsym(uwph_dlopen(NULL,0),"missing"), "B07 dlsym main registry missing");
+#ifndef UWPH_BACKEND_LINUX_PASSTHROUGH
     CHECK(uwph_fork()==-1 && uwph_errno==UWPH_ENOSYS, "B07 fork counted ENOSYS");
 #else
     CHECK(uwph_dlsym(NULL,"malloc")!=NULL, "B07 dlsym native lookup without resolver recursion");

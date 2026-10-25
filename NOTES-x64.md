@@ -1482,15 +1482,15 @@ strict uwph_protect still requires FromApp availability and is not relaxed.
 
 Exact command `make -C x64/uwp-host test && make -C x64/uwp-host/harness windows-smoke-test`
 exits 0. Stub smoke: 55 passed, 0 failed; normal Windows smoke: 566 passed,
-0 failed; traced tests: stub 137/0, Win32/UWP 148/0, Linux passthrough 164/0
+0 failed; traced tests: stub 139/0, Win32/UWP 154/0, Linux passthrough 172/0
 (50 counted symbols each); desktop full Windows smoke: 569 passed, 0 failed.
-Full exact output: `/workspace/x64-run/lanes/B07/B07-O1.exact.log`.
+Full exact output: `/workspace/x64-run/lanes/B07/B07-O1-fix.exact.log`.
 
 Actual launcher -> Wine's private W^X loader -> ntdll -> shim -> uwph runs
 both hello PEs successfully. `harness/verify_b07.py` checks all 50 real ntdll
 bindings, single-process counters, successful PE output, clean stock controls,
 and the >=10 new-entry delta. Both reports rise from B06's 34 to 49 (+15);
-all 15 new symbols have hits. Evidence: `harness/out/wine-o4/run-gPdUzSM2/`;
+all 15 new symbols have hits. Evidence: `harness/out/wine-o4/run-qRzznwUS/` (fresh run after review fixes);
 surface verification: `/workspace/x64-run/lanes/B07/B07-surface.log`.
 The broader `wine-test` still fails because execv is bound but unhit. Its
 all-symbols-hit assertion remains intact; only its traced set now includes
@@ -1503,3 +1503,14 @@ uwph Windows code under stock Wine; the desktop exception artifact is separate
 from the UWP archive. The UWP archive compiles with APP headers; no Xbox device
 execution or full Wine/UWP compatibility is claimed. Video (12 seconds, free
 Xvfb display): `/workspace/x64-run/videos/B07-O1.mp4`.
+
+Review fixes. `uwph_dlsym` resolves registry handles (each registered
+library and the `dlopen(NULL)` main handle) only from the static registry;
+a registered miss fails rather than falling through. Under Linux passthrough,
+only handles the registry does not own (e.g. `RTLD_DEFAULT`) reach native
+`dlsym`, so registry pointers are never read as glibc link maps. On Win32/UWP,
+path stat/lstat/access answer directories from mapped-path metadata
+(`GetFileAttributesExW`) instead of a non-directory `CreateFile2`; regular files
+keep the handle-based fstat, and access W_OK still honours read-only mounts.
+Tests now cover registry/main-handle hit and miss on every backend plus
+access/stat/lstat of a newly created directory.

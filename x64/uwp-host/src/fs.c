@@ -372,6 +372,34 @@ static int stat_path(const char *path, struct uwph_stat *st)
     int fd, ret;
     /* wineserver's socket: ntdll lstat()s it before connecting (server.c) */
     if (uwph_unix_path_listening(path)) { fill_socket_stat(st); return 0; }
+#ifdef UWPH_BACKEND_WIN32
+    /* Directories cannot be opened by host_open without O_DIRECTORY; answer
+     * them from mapped path metadata. Files keep the handle-based fstat. */
+    if (strncmp(path, "/proc/", 6)) {
+        char host[1024]; WCHAR wide[1024]; WIN32_FILE_ATTRIBUTE_DATA data;
+        LARGE_INTEGER time;
+        int flags = uwph_fs_translate(path, host, sizeof(host));
+        if (flags < 0) return UWPH_FAIL(-flags);
+        if (!utf8_to_wide(host, wide, 1024)) return UWPH_FAIL(UWPH_ENAMETOOLONG);
+        if (!GetFileAttributesExW(wide, GetFileExInfoStandard, &data))
+            return UWPH_FAIL(win_errno(GetLastError()));
+        if (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+            memset(st, 0, sizeof(*st));
+            /* READONLY on a Windows directory is a shell hint, not a write ban */
+            st->st_mode = UWPH_S_IFDIR | 0755;
+            st->st_nlink = 1;
+            st->st_uid = st->st_gid = uwph_getuid();
+            st->st_blksize = 4096;
+            time.HighPart = data.ftLastAccessTime.dwHighDateTime;
+            time.LowPart = data.ftLastAccessTime.dwLowDateTime;
+            st->st_atim = ft_to_ts(time);
+            time.HighPart = data.ftLastWriteTime.dwHighDateTime;
+            time.LowPart = data.ftLastWriteTime.dwLowDateTime;
+            st->st_mtim = st->st_ctim = ft_to_ts(time);
+            return 0;
+        }
+    }
+#endif
     if ((fd = host_open(path, UWPH_O_RDONLY)) < 0) return -1;
     ret = uwph_fstat(fd, st);
     uwph_close(fd);
