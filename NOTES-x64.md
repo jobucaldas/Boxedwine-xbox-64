@@ -2921,6 +2921,28 @@ The requested exact test ran on a free Xvfb display and exited 0 (`/tmp/b33-exac
 
 Video: `/workspace/x64-run/videos/B33-O2.mp4` (13.2 seconds, private Xvfb + ffmpeg), showing both runs and the exact-test completion.
 
+## B50 O2
+
+BLOCKED (stock Wine only, not THROUGH uwph): Valve steam.exe never reached logged-on state within 120 seconds after the single seeded-cache attempt. The client remained `[Logged Off, 0, 0] [U:1:0]`; connectivity checks timed out. This does not isolate token rejection from network/UI initialization failure. No alternate credential path or CEF installation was attempted.
+
+Added the public Steamworks probe, stdin-only Wine CryptProtectData helper, private login-state seeder, and stock-Wine runner. Valve/game binaries remain unmodified; the game stage uses symlinks. The probe and game were skipped on the failed-login stop condition, so there is no probe output or Player.log and no engine progress claim. Helpers built with mingw x86_64; Bash syntax and Python compile checks passed.
+
+Flags requested: `-silent -nofriendsui -nochatui -nobigpicture -nointro -noverifyfiles`. Bootstrap log echoes all six; no Steam log calls them unknown/ignored. Acceptance of their semantics is unproven. Process trace lists steam.exe, steamerrorreporter64.exe, steamsysinfo.exe, GL/Vulkan driver queries (32/64), Wine services/conhost/device helpers, and an attempted missing steamwebhelper.exe. Full command lines: `/workspace/x64-run/lanes/B50/o2/processes.txt`.
+
+Exact test exited 1 at run-minimal.sh, so subsequent && assertions did not execute. Required raw pgrep samples: 127, maximum 1; steamwebhelper CreateProcess lines: 1; webhelper_count: 2. The raw global count can include ambient command-line matches and was retained without filtering. Separate required leak check passed (exit 0, no output). Video: `/workspace/x64-run/videos/B50-O2.mp4` (8 seconds). Exact Steam bootstrap/connection logs are preserved in `o2/steam-logs/`; salient lines:
+
+```text
+[2026-10-25 17:20:57] Suppressing Steam update
+[2026-10-25 17:21:08] [Logged Off, 0, 0] [U:1:0] CCMInterface::SetSteamID( [U:1:0] )
+[2026-10-25 17:21:23] Connectivity test (198.18.0.1:80 (198.18.0.1:80)): HTTP fetch failed
+[2026-10-25 17:22:50] Connectivity test: result=TimedOut (since 87.4s ago), prev=Unknown, in progress=0
+```
+
+Steam UI log: `[2026-10-25 17:20:57] Started webhelper process 0`. Wine trace records the attempted `bin\cef\cef.win64\steamwebhelper.exe` CreateProcess. This does not prove that a helper process successfully started.
+
+## B50 O3
+
+Added `run-minimal.sh --uwph` via `run-wine.sh --guest`: launcher -> Wine own W^X loader -> shim -> uwph, constraints `wx,noproc`, nofork OFF, external stock wineserver concession. Linux only. Valve bootstrap reached “Suppressing Steam update” but no connection log/logged-on state appeared within 120s. Probe and game skipped by the login gate; no SteamAPI or game-progress proof. Webhelper count 0 (127 samples, max 0, matching CreateProcess lines 0). Exact test exited 1. Host tests and Windows smoke command exited 0 (500 smoke checks passed). Evidence and detailed limitations: `/workspace/x64-run/lanes/B50/o3`, `B50-O3.result`; video `/workspace/x64-run/videos/B50-O3.mp4` (8s). No alternate credential path or CEF attempted.
 
 ## B34
 
