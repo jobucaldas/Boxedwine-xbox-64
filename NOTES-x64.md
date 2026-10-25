@@ -1878,3 +1878,31 @@ separate no-wineboot runtime acceptance gate passes. No successful i386 ELF
 loader exec is present. O2 exact test: PASS, exit 0; make summaries 55/566
 smoke, 60/63/70 traced, all zero failures; Windows futex smoke 500 passed,
 0 failed.
+
+B22 O2 reviewer follow-up: the collector now creates a unique `o2/run.*`
+evidence directory for every invocation, so old per-PID counter reports cannot
+contribute to a later run. It passes the actual selected prefix's bootstrap
+log to the extractor and saves a byte-for-byte prelaunch snapshot. Only bytes
+appended during the client launch enter the trace; replacement/truncation
+fails extraction explicitly. Successful exec evidence now joins strace's
+unfinished/resumed execve records by PID before checking the return value.
+The collector regression fixture covers an alternate bootstrap path, stale
+sibling counter reports, zero current reports, successful resumed execve,
+failed execve exclusion, and bootstrap truncation rejection.
+
+Final reviewer-fix rerun evidence: `/workspace/x64-run/lanes/B22/o2/run.0L0qbguI/`
+(supersedes the fixed-directory counts above). THROUGH-uwph probe: exit 0,
+`SUMMARY net_probe pass=5 fail=0`, 62,285 routed calls / 5 reports. Client:
+exit 124 at the 90-second cap, 84,535 routed calls / 5 reports; WS2_32 attach
+observed. Again reached bootstrap manifest download, HTTP error 0, then
+verification/retry; next blocker remains bootstrap HTTP transport. No
+steamclient.dll load or client UI observed. An earlier isolated rerun
+`run.L9bSKzTz` timed out during probe initialization; its reports are excluded
+from this final trace. Video was regenerated with wall-clock capture timestamps
+and one encoder thread: `/workspace/x64-run/videos/B22-O2.mp4`, ffprobe 55.0 s.
+Collector regression: 1 test OK; shell syntax and diff whitespace checks pass.
+Exact O2 command passed, exit 0; complete output:
+`/workspace/x64-run/lanes/B22/o2/review-exact-test.log` (55/566 smoke,
+60/63/70 traced, Windows futex 500 passed, all zero failures).
+These remain Linux THROUGH-uwph client/probe proofs, with separate stock-Wine
+Windows smoke; no Xbox-device claim, Steam login, or client modification.

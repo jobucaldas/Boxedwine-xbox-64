@@ -3,8 +3,8 @@
 set -eu
 repo=$(cd "$(dirname "$0")/../../../../.." && pwd)
 assets=${B20_HARNESS:-/workspace/wt/B20/x64/uwp-host/harness}
-E=/workspace/x64-run/lanes/B22/o2
-mkdir -p "$E" /workspace/x64-run/videos
+mkdir -p /workspace/x64-run/lanes/B22/o2 /workspace/x64-run/videos
+E=$(mktemp -d /workspace/x64-run/lanes/B22/o2/run.XXXXXXXX)
 pfx=$assets/out/b20/pfx-wow64-uwph
 test -f "$pfx/system.reg"
 i686-w64-mingw32-gcc -O2 "$repo/x64/on-device/readiness/net_probe.c" -o "$E/net_probe-i386.exe" -lws2_32
@@ -25,7 +25,7 @@ export WINEPREFIX=$pfx
 cleanup() { env -u LD_PRELOAD /usr/lib/wine/wineserver64 -k >/dev/null 2>&1 || true; kill "$xp" 2>/dev/null || true; }
 trap cleanup EXIT
 sleep 1
-ffmpeg -y -loglevel error -f x11grab -video_size 1024x768 -framerate 10 -i "$DISPLAY" -t 55 -c:v libx264 -pix_fmt yuv420p /workspace/x64-run/videos/B22-O2.mp4 > "$E/ffmpeg.log" 2>&1 & vp=$!
+ffmpeg -y -loglevel error -use_wallclock_as_timestamps 1 -f x11grab -video_size 1024x768 -framerate 10 -i "$DISPLAY" -t 55 -r 10 -c:v libx264 -threads 1 -pix_fmt yuv420p /workspace/x64-run/videos/B22-O2.mp4 > "$E/ffmpeg.log" 2>&1 & vp=$!
 if command -v xmessage >/dev/null; then
     xmessage -geometry 920x100+30+30 'B22 O2: Steam.exe -no-browser -silent THROUGH uwph and Wine own WoW64 loader. Paired DLL layout; W^X enforced. No login. Bootstrap evidence in /workspace/x64-run/lanes/B22/o2.' >/dev/null 2>&1 &
 fi
@@ -45,9 +45,12 @@ route() {
  printf '%s\n' "$rc" > "$E/$tag.exit"
 }
 route probe 20 "$E/net_probe-i386.exe"
+bootstrap="$pfx/drive_c/Program Files (x86)/Steam/logs/bootstrap_log.txt"
+if [[ -f "$bootstrap" ]]; then cp "$bootstrap" "$E/bootstrap.before"; else : > "$E/bootstrap.before"; fi
+printf '%s\n' "$pfx" > "$E/prefix.txt"
 route client 90 "$pfx/drive_c/Program Files (x86)/Steam/Steam.exe" -no-browser -silent
 env -u LD_PRELOAD /usr/lib/wine/wineserver64 -k >/dev/null 2>&1 || true
 wait "$sp" || true
 wait "$vp"
-python3 "$(dirname "$0")/summarize.py"
+python3 "$(dirname "$0")/summarize.py" "$E" "$bootstrap"
 printf 'THROUGH-uwph evidence=%s\n' "$E"

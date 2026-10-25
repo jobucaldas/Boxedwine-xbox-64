@@ -1,24 +1,26 @@
 phase	kind	symbol_or_surface	count	evidence
 probe	run	net_probe-i386.exe	1	THROUGH uwph; exit=0
-probe	diagnostic	loader/probe/Wine	1	[launcher] paired WoW64 DLL root: /workspace/x64-run/lanes/B22/o2/wow64-dlls
-probe	diagnostic	loader/probe/Wine	1	[launcher] exec /workspace/wt/B20/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64 -> /workspace/x64-run/lanes/B22/o2/net_probe-i386.exe (handing guest to Wine's loader)
+probe	diagnostic	loader/probe/Wine	1	[launcher] paired WoW64 DLL root: /workspace/x64-run/lanes/B22/o2/run.0L0qbguI/wow64-dlls
+probe	diagnostic	loader/probe/Wine	1	[launcher] exec /workspace/wt/B20/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64 -> /workspace/x64-run/lanes/B22/o2/run.0L0qbguI/net_probe-i386.exe (handing guest to Wine's loader)
 probe	diagnostic	loader/probe/Wine	1	0024:err:environ:run_wineboot failed to start wineboot c0000135
-probe	diagnostic	loader/probe/Wine	1	0034:err:environ:init_peb starting L"Z:\\workspace\\x64-run\\lanes\\B22\\o2\\net_probe-i386.exe" in experimental wow64 mode
+probe	diagnostic	loader/probe/Wine	1	0034:err:environ:init_peb starting L"Z:\\workspace\\x64-run\\lanes\\B22\\o2\\run.0L0qbguI\\net_probe-i386.exe" in experimental wow64 mode
 probe	diagnostic	loader/probe/Wine	1	PASS WSAStartup 2.2                             rc=0
-probe	diagnostic	loader/probe/Wine	1	PASS bind/listen ephemeral loopback             wsa=0 port=34113
+probe	diagnostic	loader/probe/Wine	1	PASS bind/listen ephemeral loopback             wsa=0 port=33589
 probe	diagnostic	loader/probe/Wine	1	PASS bounded same-process TCP connect           socket_error=0 wsa=0
 probe	diagnostic	loader/probe/Wine	1	PASS bounded TCP accept                         wsa=0
 probe	diagnostic	loader/probe/Wine	1	PASS same-process TCP payload                   received=4 wsa=0
 probe	diagnostic	loader/probe/Wine	1	SUMMARY net_probe pass=5 fail=0
 probe	module	WS2_32.dll	3	0034:trace:module:MODULE_InitDLL (7B250000 L"WS2_32.dll",PROCESS_ATTACH,0022FD24) - CALL
 probe	module	steamclient.dll	0	No load/attach observed
-probe	uwph-routed	shim totals	62241	{'open': 7630, 'read': 16895, 'close': 14721, 'mmap': 12021, 'munmap': 9737, 'mprotect': 1237}; reports=5
-probe	linux-exec	successful execve	1	725610 execve("/usr/bin/env", ["env", "LD_PRELOAD=/workspace/wt/B20/x64/uwp-host/harness/out/libuwph_wine_shim.so", "UWPH_REPORT=/workspace/x64-run/lanes/B22/o2/probe.counters", "UWPH_REPORT_PID=1", "/workspace/x64-run/lanes/B22/o2/run_via_wine", "/workspace/x64-run/lanes/B22/o2/net_probe-i386.exe"], 0x7ffe07661590 /* 83 vars */) = 0
-probe	linux-exec	successful execve	1	725610 execve("/workspace/x64-run/lanes/B22/o2/run_via_wine", ["/workspace/x64-run/lanes/B22/o2/run_via_wine", "/workspace/x64-run/lanes/B22/o2/net_probe-i386.exe"], 0x55ac0e5e2e10 /* 86 vars */) = 0
-probe	linux-exec	successful execve	1	725610 execve("/workspace/wt/B20/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64", ["/workspace/wt/B20/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64", "/workspace/x64-run/lanes/B22/o2/net_probe-i386.exe"], 0x55cc0bd4a2e0 /* 87 vars */) = 0
-probe	linux-exec	successful execve	1	725610 execve("/workspace/wt/B20/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64", ["/workspace/wt/B20/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64", "/workspace/x64-run/lanes/B22/o2/net_probe-i386.exe"], 0x55a575bbbe70 /* 89 vars */) = 0
+probe	uwph-routed	shim totals	62285	{'open': 7634, 'read': 16905, 'close': 14727, 'mmap': 12045, 'munmap': 9737, 'mprotect': 1237}; reports=5
+probe	linux-exec	successful execve	1	794061 execve("/usr/bin/env", ["env", "LD_PRELOAD=/workspace/wt/B20/x64/uwp-host/harness/out/libuwph_wine_shim.so", "UWPH_REPORT=/workspace/x64-run/lanes/B22/o2/run.0L0qbguI/probe.counters", "UWPH_REPORT_PID=1", "/workspace/x64-run/lanes/B22/o2/run.0L0qbguI/run_via_wine", "/workspace/x64-run/lanes/B22/o2/run.0L0qbguI/net_probe-i386.exe"], 0x7fff8db1f050 /* 83 vars */) = 0
+probe	linux-exec	successful execve	1	794061 execve("/workspace/x64-run/lanes/B22/o2/run.0L0qbguI/run_via_wine", ["/workspace/x64-run/lanes/B22/o2/run.0L0qbguI/run_via_wine", "/workspace/x64-run/lanes/B22/o2/run.0L0qbguI/net_probe-i386.exe"], 0x555c9eadae10 /* 86 vars */) = 0
+probe	linux-exec	successful execve	1	794061 execve("/workspace/wt/B20/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64", ["/workspace/wt/B20/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64", "/workspace/x64-run/lanes/B22/o2/run.0L0qbguI/net_probe-i386.exe"], 0x562defdca2f0 /* 87 vars */) = 0
+probe	linux-exec	successful execve	1	794061 execve("/workspace/wt/B20/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64", ["/workspace/wt/B20/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64", "/workspace/x64-run/lanes/B22/o2/run.0L0qbguI/net_probe-i386.exe"], 0x557876cc1e70 /* 89 vars */) = 0
+probe	linux-exec	successful execve	1	794063 execve("/workspace/wt/B20/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64", ["/workspace/wt/B20/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64", "C:\\windows\\system32\\wineboot.exe", "--init"], 0x55ca079f0070 /* 91 vars */ )            = 0
+probe	linux-exec	successful execve	1	794110 execve("/workspace/wt/B20/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64", ["/workspace/wt/B20/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64", "Z:\\workspace\\x64-run\\lanes\\B22\\o2\\run.0L0qbguI\\net_probe-i386.exe"], 0x55ca07a009a0 /* 91 vars */) = 0
 client	run	Steam.exe -no-browser -silent	1	THROUGH uwph; exit=124
-client	diagnostic	loader/probe/Wine	1	[launcher] paired WoW64 DLL root: /workspace/x64-run/lanes/B22/o2/wow64-dlls
+client	diagnostic	loader/probe/Wine	1	[launcher] paired WoW64 DLL root: /workspace/x64-run/lanes/B22/o2/run.0L0qbguI/wow64-dlls
 client	diagnostic	loader/probe/Wine	1	[launcher] exec /workspace/wt/B20/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64 -> /workspace/wt/B20/x64/uwp-host/harness/out/b20/pfx-wow64-uwph/drive_c/Program Files (x86)/Steam/Steam.exe (handing guest to Wine's loader)
 client	diagnostic	loader/probe/Wine	1	003c:err:environ:run_wineboot failed to start wineboot c0000135
 client	diagnostic	loader/probe/Wine	1	004c:err:environ:init_peb starting L"C:\\Program Files (x86)\\Steam\\Steam.exe" in experimental wow64 mode
@@ -28,38 +30,40 @@ client	diagnostic	loader/probe/Wine	1	0068:err:wininet:open_http_connection crea
 client	diagnostic	loader/probe/Wine	1	0054:err:ole:start_rpcss Failed to open service manager
 client	module	WS2_32.dll	3	004c:trace:module:MODULE_InitDLL (78410000 L"WS2_32.dll",PROCESS_ATTACH,0012FD24) - CALL
 client	module	steamclient.dll	0	No load/attach observed
-client	uwph-routed	shim totals	84524	{'open': 12011, 'read': 15632, 'close': 22082, 'mmap': 18006, 'munmap': 14599, 'mprotect': 2194}; reports=5
-client	linux-exec	successful execve	1	725675 execve("/usr/bin/env", ["env", "LD_PRELOAD=/workspace/wt/B20/x64/uwp-host/harness/out/libuwph_wine_shim.so", "UWPH_REPORT=/workspace/x64-run/lanes/B22/o2/client.counters", "UWPH_REPORT_PID=1", "/workspace/x64-run/lanes/B22/o2/run_via_wine", "/workspace/wt/B20/x64/uwp-host/harness/out/b20/pfx-wow64-uwph/drive_c/Program Files (x86)/Steam/Steam.exe", "-no-browser", "-silent"], 0x7ffc8df3d070 /* 83 vars */) = 0
-client	linux-exec	successful execve	1	725675 execve("/workspace/x64-run/lanes/B22/o2/run_via_wine", ["/workspace/x64-run/lanes/B22/o2/run_via_wine", "/workspace/wt/B20/x64/uwp-host/harness/out/b20/pfx-wow64-uwph/drive_c/Program Files (x86)/Steam/Steam.exe", "-no-browser", "-silent"], 0x55cb50c7de10 /* 86 vars */) = 0
-client	linux-exec	successful execve	1	725675 execve("/workspace/wt/B20/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64", ["/workspace/wt/B20/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64", "/workspace/wt/B20/x64/uwp-host/harness/out/b20/pfx-wow64-uwph/drive_c/Program Files (x86)/Steam/Steam.exe", "-no-browser", "-silent"], 0x558a15e8b2e0 /* 87 vars */) = 0
-client	linux-exec	successful execve	1	725675 execve("/workspace/wt/B20/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64", ["/workspace/wt/B20/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64", "/workspace/wt/B20/x64/uwp-host/harness/out/b20/pfx-wow64-uwph/drive_c/Program Files (x86)/Steam/Steam.exe", "-no-browser", "-silent"], 0x55a6173bce70 /* 89 vars */) = 0
-client	linux-exec	successful execve	1	725677 execve("/workspace/wt/B20/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64", ["/workspace/wt/B20/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64", "C:\\windows\\system32\\wineboot.exe", "--init"], 0x55f90336d070 /* 91 vars */) = 0
-client	steam-bootstrap	bootstrap_log.txt	1	Startup - updater built May 20 2024 14:26:54
-client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 07:40:37] Startup - Steam Client launched with: "C:\Program Files (x86)\Steam\Steam.exe" -no-browser -silent
-client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 07:40:37] Loading cached metrics from disk (C:\Program Files (x86)\Steam\package\steam_client_metrics.bin)
-client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 07:40:37] Failed to load cached hosts file (File 'update_hosts_cached.vdf' not found), using defaults
-client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 07:40:37] Using the following download hosts for Public, Realm steamglobal
-client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 07:40:37] 1. https://cdn.steamstatic.com, /client/, Realm 'steamglobal', weight was 1, source = 'baked in'
-client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 07:40:37] Checking for update on startup
-client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 07:40:37] Checking for available updates...
-client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 07:40:37] Downloading manifest: https://cdn.steamstatic.com/client/steam_client_win32
-client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 07:40:37] Manifest download: send request
-client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 07:40:38] Manifest download: waiting for download to finish
-client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 07:41:38] Manifest download: finished
-client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 07:41:38] Download failed: http error 0 (cdn.steamstatic.com/client/steam_client_win32)
-client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 07:41:38] DownloadManifest - exhausted list of download hosts
-client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 07:41:38] failed to load manifest from buffer.
-client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 07:41:38] Failed to load manifest
-client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 07:41:38] Error: Download failed: http error 0
-client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 07:41:38] Saving metrics to disk (C:\Program Files (x86)\Steam\package\steam_client_metrics.bin)
-client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 07:41:38] Error: Failed to determine download location for universe 1
-client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 07:41:38] Verifying installation...
-client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 07:41:38] Performing checksum verification of executable files
-client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 07:41:38] Unable to read and verify install manifest C:\Program Files (x86)\Steam\package\steam_client_win32.installed
-client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 07:41:38] Verification complete
-client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 07:41:38] Downloading update...
-client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 07:41:38] Checking for available updates...
-client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 07:41:38] Downloading manifest: https://cdn.steamstatic.com/client/steam_client_win32
-client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 07:41:38] Manifest download: send request
-client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 07:41:38] Manifest download: waiting for download to finish
+client	uwph-routed	shim totals	84535	{'open': 12011, 'read': 15635, 'close': 22090, 'mmap': 18006, 'munmap': 14599, 'mprotect': 2194}; reports=5
+client	linux-exec	successful execve	1	794122 execve("/usr/bin/env", ["env", "LD_PRELOAD=/workspace/wt/B20/x64/uwp-host/harness/out/libuwph_wine_shim.so", "UWPH_REPORT=/workspace/x64-run/lanes/B22/o2/run.0L0qbguI/client.counters", "UWPH_REPORT_PID=1", "/workspace/x64-run/lanes/B22/o2/run.0L0qbguI/run_via_wine", "/workspace/wt/B20/x64/uwp-host/harness/out/b20/pfx-wow64-uwph/drive_c/Program Files (x86)/Steam/Steam.exe", "-no-browser", "-silent"], 0x7ffe130cb830 /* 83 vars */) = 0
+client	linux-exec	successful execve	1	794122 execve("/workspace/x64-run/lanes/B22/o2/run.0L0qbguI/run_via_wine", ["/workspace/x64-run/lanes/B22/o2/run.0L0qbguI/run_via_wine", "/workspace/wt/B20/x64/uwp-host/harness/out/b20/pfx-wow64-uwph/drive_c/Program Files (x86)/Steam/Steam.exe", "-no-browser", "-silent"], 0x557cb613ee10 /* 86 vars */) = 0
+client	linux-exec	successful execve	1	794122 execve("/workspace/wt/B20/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64", ["/workspace/wt/B20/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64", "/workspace/wt/B20/x64/uwp-host/harness/out/b20/pfx-wow64-uwph/drive_c/Program Files (x86)/Steam/Steam.exe", "-no-browser", "-silent"], 0x55b0a854e2f0 /* 87 vars */) = 0
+client	linux-exec	successful execve	1	794122 execve("/workspace/wt/B20/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64", ["/workspace/wt/B20/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64", "/workspace/wt/B20/x64/uwp-host/harness/out/b20/pfx-wow64-uwph/drive_c/Program Files (x86)/Steam/Steam.exe", "-no-browser", "-silent"], 0x55e4ed561e70 /* 89 vars */) = 0
+client	linux-exec	successful execve	1	794124 execve("/workspace/wt/B20/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64", ["/workspace/wt/B20/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64", "C:\\windows\\system32\\wineboot.exe", "--init"], 0x557eb6926070 /* 91 vars */) = 0
+client	linux-exec	successful execve	1	794343 execve("/workspace/wt/B20/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64", ["/workspace/wt/B20/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64", "C:\\Program Files (x86)\\Steam\\Steam.exe", "-no-browser", "-silent"], 0x557eb69370f0 /* 91 vars */) = 0
+client	linux-exec	successful execve	1	794746 execve("/workspace/wt/B20/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64", ["/workspace/wt/B20/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64", "C:\\windows\\system32\\explorer.exe", "/desktop"], 0x56283e511c50 /* 91 vars */ )            = 0
+client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 08:00:16] Startup - updater built May 20 2024 14:26:54
+client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 08:00:16] Startup - Steam Client launched with: "C:\Program Files (x86)\Steam\Steam.exe" -no-browser -silent
+client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 08:00:16] Loading cached metrics from disk (C:\Program Files (x86)\Steam\package\steam_client_metrics.bin)
+client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 08:00:16] Failed to load cached hosts file (File 'update_hosts_cached.vdf' not found), using defaults
+client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 08:00:16] Using the following download hosts for Public, Realm steamglobal
+client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 08:00:16] 1. https://cdn.steamstatic.com, /client/, Realm 'steamglobal', weight was 1, source = 'baked in'
+client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 08:00:16] Checking for update on startup
+client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 08:00:16] Checking for available updates...
+client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 08:00:16] Downloading manifest: https://cdn.steamstatic.com/client/steam_client_win32
+client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 08:00:16] Manifest download: send request
+client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 08:00:16] Manifest download: waiting for download to finish
+client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 08:01:16] Manifest download: finished
+client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 08:01:16] Download failed: http error 0 (cdn.steamstatic.com/client/steam_client_win32)
+client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 08:01:16] DownloadManifest - exhausted list of download hosts
+client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 08:01:16] failed to load manifest from buffer.
+client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 08:01:16] Failed to load manifest
+client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 08:01:16] Error: Download failed: http error 0
+client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 08:01:16] Saving metrics to disk (C:\Program Files (x86)\Steam\package\steam_client_metrics.bin)
+client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 08:01:16] Error: Failed to determine download location for universe 1
+client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 08:01:16] Verifying installation...
+client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 08:01:16] Performing checksum verification of executable files
+client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 08:01:16] Unable to read and verify install manifest C:\Program Files (x86)\Steam\package\steam_client_win32.installed
+client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 08:01:16] Verification complete
+client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 08:01:16] Downloading update...
+client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 08:01:16] Checking for available updates...
+client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 08:01:16] Downloading manifest: https://cdn.steamstatic.com/client/steam_client_win32
+client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 08:01:16] Manifest download: send request
+client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 08:01:16] Manifest download: waiting for download to finish
 client	not-reached	client UI / steamclient.dll	0	Bootstrap manifest download blocked; no client UI observed

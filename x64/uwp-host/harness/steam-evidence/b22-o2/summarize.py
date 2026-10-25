@@ -2,11 +2,34 @@
 """Extract the bounded THROUGH-uwph run; no stock Wine client evidence."""
 from pathlib import Path
 from collections import Counter
-import re, shutil
-E = Path('/workspace/x64-run/lanes/B22/o2')
+import re, sys
+E = Path(sys.argv[1]).resolve()
 repo = Path(__file__).resolve().parents[5]
-source = Path('/workspace/wt/B20/x64/uwp-host/harness/out/b20/pfx-wow64-uwph/drive_c/Program Files (x86)/Steam/logs/bootstrap_log.txt')
-shutil.copyfile(source, E / 'bootstrap_log.txt')
+source = Path(sys.argv[2])
+before = (E / 'bootstrap.before').read_bytes()
+current = source.read_bytes() if source.exists() else b''
+if not current.startswith(before):
+    raise RuntimeError('Bootstrap log rotated/truncated; cannot attribute log to this run')
+# Only bytes appended during this launch can be used as bootstrap evidence.
+(E / 'bootstrap_log.txt').write_bytes(current[len(before):])
+
+def successful_execs(lines):
+    pending = {}
+    for line in lines:
+        match = re.match(r'(\d+)\s+(.*)', line)
+        if not match:
+            continue
+        pid, call = match.groups()
+        if 'execve(' in call and '<unfinished ...>' in call:
+            pending[pid] = call.split('<unfinished ...>')[0]
+            continue
+        if call.startswith('<... execve resumed>'):
+            start = pending.pop(pid, None)
+            if start is None:
+                continue
+            call = start + call[len('<... execve resumed>'):]
+        if call.startswith('execve(') and re.search(r'= 0\s*$', call):
+            yield pid + ' ' + call
 rows = [('phase', 'kind', 'symbol_or_surface', 'count', 'evidence')]
 def add(phase, kind, surface, count, evidence):
     rows.append(tuple(str(x).replace('\t', ' ').replace('\r', '').replace('\n', ' ') for x in (phase,kind,surface,count,evidence)))
@@ -25,11 +48,13 @@ for phase in ('probe', 'client'):
             fields = line.split()
             if fields and fields[0] == 'total': totals[fields[1]] += int(fields[2])
     add(phase, 'uwph-routed', 'shim totals', sum(totals.values()), str(dict(totals)) + '; reports=' + str(len(reports)))
-    execs = [l for l in (E / (phase + '.strace')).read_text(errors='replace').splitlines() if 'execve(' in l and '= 0' in l]
+    execs = successful_execs((E / (phase + '.strace')).read_text(errors='replace').splitlines())
     for line in execs: add(phase, 'linux-exec', 'successful execve', 1, line)
 # Only the latest bootstrap launch, rather than earlier B20 observations.
 boot = (E / 'bootstrap_log.txt').read_text(errors='replace')
-boot = boot[boot.rfind('Startup - updater built'):]
+# This file already contains only this run's appended bytes.
+if not boot.strip():
+    add('client', 'steam-bootstrap', 'bootstrap_log.txt', 0, 'No bootstrap log bytes appended during this run')
 for line in boot.splitlines():
     if line.strip(): add('client', 'steam-bootstrap', 'bootstrap_log.txt', 1, line)
 add('client', 'not-reached', 'client UI / steamclient.dll', 0, 'Bootstrap manifest download blocked; no client UI observed')
