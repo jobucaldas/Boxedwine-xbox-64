@@ -6,6 +6,8 @@
 #include "../src/fake_proc.h"
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
+#include <limits.h>
 #include "counters.h"
 extern void uwph_harness_backend_entry(int) __attribute__((weak));
 #define COUNT(op) do { if (uwph_harness_backend_entry) uwph_harness_backend_entry(op); } while (0)
@@ -59,14 +61,22 @@ static int native(int fd) { return fd; }
 #define WRLOCK() pthread_rwlock_wrlock(&lock)
 #define UNLOCK() pthread_rwlock_unlock(&lock)
 #endif
+static struct big_file *big_find(int fd);
+static long big_generic(struct big_file *, long, long, long, long);
+static pthread_mutex_t big_offset_lock = PTHREAD_MUTEX_INITIALIZER;
 static long fdcall(long nr, int fd, long b, long c, long d)
 {
     RDLOCK();
     int n = native(fd);
-    long r = n < 0 ? -UWPH_EBADF : raw(nr,n,b,c,d,0,0);
+    struct big_file *split = big_find(n);
+    if(split) pthread_mutex_lock(&big_offset_lock);
+    long r = n < 0 ? -UWPH_EBADF : split ? big_generic(split,nr,b,c,d) : raw(nr,n,b,c,d,0,0);
+    if(split) pthread_mutex_unlock(&big_offset_lock);
     UNLOCK();
     return result(r);
 }
+/* Split implementation uses raw syscalls, under the descriptor lock. */
+#include "bigfile.inc"
 /* Handling is separate from the descriptor/negative errno result. */
 static long proc_open(const char *path, int flags, int *handled)
 {
@@ -109,11 +119,14 @@ int uwph_linux_openat(int dirfd, const char *path, int flags, unsigned mode)
               dirfd == UWPH_AT_FDCWD ? dirfd : native(dirfd);
     int handled;
     long r = proc_open(path, flags, &handled);
-    if (!handled) r = dir == -1 ? -UWPH_EBADF : raw(SYS_openat,dir,PTR(path),flags,mode,0,0);
+    if (!handled) {
+        r = big_open(dir, path, flags, mode, &handled);
+        if (!handled) r = dir == -1 ? -UWPH_EBADF : raw(SYS_openat,dir,PTR(path),flags,mode,0,0);
+    }
 #ifndef UWPH_HARNESS_NATIVE_FDS
     if (r >= 0) {
         int i; for (i=0;i<SLOTS && slots[i];i++);
-        if (i==SLOTS) { raw(SYS_close,r,0,0,0,0,0); r=-UWPH_EMFILE; }
+        if (i==SLOTS) { big_close(r); raw(SYS_close,r,0,0,0,0,0); r=-UWPH_EMFILE; }
         else { slots[i]=r+1; r=BASE+i; }
     }
 #endif
@@ -130,6 +143,7 @@ int uwph_linux_close(int fd)
     COUNT(C_CLOSE);
     WRLOCK();
     int n=native(fd);
+    big_close(n);
     long r=n<0 ? -UWPH_EBADF : raw(SYS_close,n,0,0,0,0,0);
 #ifndef UWPH_HARNESS_NATIVE_FDS
     if(n>=0) slots[fd-BASE]=0; /* Linux close releases fd even on EINTR. */
@@ -138,10 +152,21 @@ int uwph_linux_close(int fd)
 }
 uwph_ssize_t uwph_linux_read(int fd, void *buf, size_t len) { COUNT(C_READ); return fdcall(SYS_read,fd,PTR(buf),len,0); }
 uwph_ssize_t uwph_linux_write(int fd, const void *buf, size_t len) { return fdcall(SYS_write,fd,PTR(buf),len,0); }
-uwph_ssize_t uwph_linux_pread(int fd, void *buf, size_t len, uwph_off_t off) { return fdcall(SYS_pread64,fd,PTR(buf),len,off); }
-uwph_ssize_t uwph_linux_pwrite(int fd, const void *buf, size_t len, uwph_off_t off) { return fdcall(SYS_pwrite64,fd,PTR(buf),len,off); }
+uwph_ssize_t uwph_linux_pread(int fd, void *buf, size_t len, uwph_off_t off) { return big_call(fd, buf, len, off, 0); }
+uwph_ssize_t uwph_linux_pwrite(int fd, const void *buf, size_t len, uwph_off_t off) { return big_call(fd, (void *)buf, len, off, 1); }
 uwph_off_t uwph_linux_lseek(int fd, uwph_off_t off, int whence) { return fdcall(SYS_lseek,fd,off,whence,0); }
-int uwph_linux_fstat(int fd, struct uwph_stat *st) { return fdcall(SYS_fstat,fd,PTR(st),0,0); }
+int uwph_linux_fstat(int fd, struct uwph_stat *st) {
+    RDLOCK(); int n = native(fd);
+    long r = n < 0 ? -UWPH_EBADF : raw(SYS_fstat,n,PTR(st),0,0,0,0);
+    struct big_file *b = big_find(n);
+    if (!r && b) { long size=big_size(b); if(size<0) r=size; else st->st_size=size; }
+    UNLOCK(); return result(r);
+}
+int uwph_linux_ftruncate(int fd, uwph_off_t len) {
+    WRLOCK(); int n = native(fd); struct big_file *b = big_find(n);
+    long r = b ? big_resize(b, len) : -UWPH_ENOSYS;
+    UNLOCK(); return result(r);
+}
 int uwph_linux_fstatat(int dirfd, const char *path, struct uwph_stat *st, int flags)
 {
     RDLOCK();
@@ -157,6 +182,11 @@ void *uwph_linux_mmap(void *addr, size_t len, int prot, int flags, int fd, uwph_
     COUNT(C_MMAP);
     RDLOCK();
     int n=(flags & UWPH_MAP_ANONYMOUS) ? -1 : native(fd);
+    struct big_file *b = (flags & UWPH_MAP_ANONYMOUS) ? NULL : big_find(n);
+    if (b) {
+        long r = big_map(b, addr, len, prot, flags, off);
+        UNLOCK(); return (void *)result(r);
+    }
     long r=(!(flags & UWPH_MAP_ANONYMOUS) && n<0) ? -UWPH_EBADF : raw(SYS_mmap,PTR(addr),len,prot,flags,n,off);
     UNLOCK(); return (void *)result(r);
 }

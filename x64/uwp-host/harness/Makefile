@@ -5,7 +5,7 @@ SOURCES := $(wildcard ../src/*.c) linux_backend.c
 HEADERS := $(wildcard ../include/uwph/*.h ../src/*.h)
 OBJECTS := $(patsubst %.c,$(OUT)/%.o,$(notdir $(SOURCES)))
 vpath %.c ../src .
-$(OUT)/%.o: %.c $(HEADERS) counters.h
+$(OUT)/%.o: %.c $(HEADERS) counters.h bigfile.inc
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) -c $< -o $@
 $(OUT)/libuwph.a: $(OBJECTS)
@@ -144,3 +144,9 @@ wine-test-inproc: wine-test-inproc-build
 	./run-wine.sh --inproc-server
 FORCE:
 .PHONY: wine-test-inproc wine-test-inproc-build FORCE
+
+$(OUT)/test_bigfile: ../tests/test_bigfile.c $(OUT)/libuwph.a
+	$(CC) $(CFLAGS) $< $(OUT)/libuwph.a -ldl -o $@
+bigfile-test: $(OUT)/test_bigfile
+	timeout 30s $(OUT)/test_bigfile
+.PHONY: bigfile-test

@@ -36,3 +36,5 @@ int uwph_linux_pipe2(int fds[2], int flags);
 
 /* Explicit descriptor domain: Wine borrows native fds; direct tests do not. */
 int uwph_linux_native_fds(void);
+
+int uwph_linux_ftruncate(int fd, uwph_off_t len);
