@@ -37,6 +37,13 @@ static struct wrapper pool[64];
 static d3dpass_handle handle(void *p) { return p ? ((struct wrapper *)p)->handle : 0; }
 static void *wrap(d3dpass_handle h,const void *vt,const IID *iid)
 {
+    if(!h) return NULL;
+    /* Each returned host handle already owns one reference. Adopt it into the
+     * live wrapper without taking another host AddRef (same-thread O3 only). */
+    for(unsigned i=0;i<64;++i)
+        if(pool[i].refs && pool[i].handle==h && pool[i].vtbl==vt) {
+            ++pool[i].refs; return &pool[i];
+        }
     for(unsigned i=0;i<64;++i) if(!pool[i].refs) {
         pool[i]=(struct wrapper){vt,h,1,iid}; return &pool[i];
     }

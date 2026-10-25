@@ -13,6 +13,10 @@ int main(void)
     struct uwph_teb_swap swap={0};
     ID3D11Device *device=NULL;
     ID3D11DeviceContext *context=NULL,*extra=NULL;
+    ID3D11DeviceContext *held[96]={0};
+    IUnknown *identity=NULL,*other=NULL;
+    unsigned held_count=0;
+    int identity_ok=0;
     ID3D11Texture2D *target=NULL,*staging=NULL;
     ID3D11RenderTargetView *view=NULL;
     IDXGIFactory1 *factory=NULL;
@@ -30,6 +34,24 @@ int main(void)
     TEB_ERROR(teb)=0x9876;
     CHECK(d3dpass_CreateDXGIFactory1(&IID_IDXGIFactory1,(void **)&factory));
     CHECK(d3dpass_D3D11CreateDevice(D3D_DRIVER_TYPE_HARDWARE,0,NULL,0,&device,NULL,&context));
+    CHECK(ID3D11DeviceContext_QueryInterface(context,&IID_IUnknown,(void **)&identity));
+    /* Hold more references than the wrapper pool has slots. All retrievals
+     * must share the creation-returned context's canonical IUnknown. */
+    for(unsigned i=0;i<96;++i) {
+        ID3D11Device_GetImmediateContext(device,&held[i]);
+        if(!held[i]) { failed=__LINE__; goto cleanup; }
+        ++held_count;
+        CHECK(ID3D11DeviceContext_QueryInterface(held[i],&IID_IUnknown,(void **)&other));
+        if(other!=identity) { failed=__LINE__; goto cleanup; }
+        IUnknown_Release(other); other=NULL;
+    }
+    while(held_count) {
+        --held_count;
+        ULONG remaining=ID3D11DeviceContext_Release(held[held_count]);
+        if(remaining!=held_count+2) { failed=__LINE__; goto cleanup; }
+    }
+    if(IUnknown_Release(identity)!=1) { identity=NULL; failed=__LINE__; goto cleanup; }
+    identity=NULL; identity_ok=1;
     ID3D11Device_GetImmediateContext(device,&extra);
     if(!extra) { failed=__LINE__; goto cleanup; }
     ID3D11DeviceContext_AddRef(extra); ID3D11DeviceContext_Release(extra);
@@ -49,11 +71,17 @@ int main(void)
     }
     ID3D11DeviceContext_Unmap(context,(ID3D11Resource *)staging,0);
 cleanup:
+    if(other) IUnknown_Release(other);
+    while(held_count) {
+        --held_count;
+        ID3D11DeviceContext_Release(held[held_count]);
+    }
+    if(identity) IUnknown_Release(identity);
     if(view) ID3D11RenderTargetView_Release(view);
     if(staging) ID3D11Texture2D_Release(staging);
     if(target) ID3D11Texture2D_Release(target);
     if(extra) ID3D11DeviceContext_Release(extra);
-    if(context) ID3D11DeviceContext_Release(context);
+    if(context && ID3D11DeviceContext_Release(context)!=0) { failed=__LINE__; identity_ok=0; }
     if(device) ID3D11Device_Release(device);
     if(factory) IDXGIFactory1_Release(factory);
     state_ok &= FIELD(teb,UWPH_TEB_PEB)==0x12345000;
@@ -61,8 +89,9 @@ cleanup:
     state_ok &= TEB_ERROR(teb)==0x9876;
     for(int i=0;i<64;++i) { state_ok &= FIELD(teb,0x1480+i*8)==0x50000000u+i; FIELD(teb,0x1480+i*8)=host.tls_slots[i]; }
     uwph_teb_leave_guest(teb,&swap); TEB_ERROR(teb)=host.last_error;
-    int ok=!failed && pixel_ok && state_ok && !d3dpass_stats.host_peb_bad && !d3dpass_stats.unimplemented && d3dpass_stats.calls>=19;
+    int ok=!failed && identity_ok && pixel_ok && state_ok && !d3dpass_stats.host_peb_bad && !d3dpass_stats.unimplemented && d3dpass_stats.calls>=405;
     puts("HOST d3d11 = Wine builtin stand-in; THROUGH-uwph d3dpass.so + uwph_host_call; Wine PE loader");
+    printf("CONTEXT canonical_IUnknown=%s held_retrievals=96 balanced_releases=%s\n",identity_ok?"PASS":"FAIL",identity_ok?"PASS":"FAIL");
     printf("BOUNDARY calls=%u host_peb_bad=%u guest_restored=%d unsupported=%u failure_line=%d hr=0x%08lx\n",d3dpass_stats.calls,d3dpass_stats.host_peb_bad,state_ok,d3dpass_stats.unimplemented,failed,(unsigned long)hr);
     printf("READBACK %u,%u,%u,%u %s\n",pixel[0],pixel[1],pixel[2],pixel[3],ok?"PASS":"FAIL");
     return !ok;
