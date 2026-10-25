@@ -482,3 +482,19 @@ It imports two nonexistent `version.dll` exports and checks that both generated
 addresses have PAGE_EXECUTE_READ protection and separate allocation bases. It
 never invokes the missing functions. See NOTES-x64.md `## B18` for recorded
 commands, counts, console reachability, and limitations.
+
+## B27: isolated nofork acceptance
+
+`run-isolated.sh CMD...` runs one acceptance command under
+`unshare -Urpf --mount-proc` (unprivileged), so other lanes' wineservers on the
+same box are invisible. After CMD returns, still inside the namespace, it runs
+the unchanged check `pgrep -x wineserver64 || pgrep -f '/wineserver64'`; pass is
+empty output. Logs land in the staged run dir (`out/inproc-staged.txt`, or
+`$UWPH_ISOLATED_RUN`): `isolated.ns` (gating), `isolated.host` (host-wide pgrep,
+informational only), `isolated.status`, `isolated.cmd`. It never relaxes uwpjail
+`--nofork`, the seccomp filter, or any verifier.
+
+    make -C x64/uwp-host/harness wine-test-inproc-build
+    UWPH_INPROC_SERVER=1 x64/uwp-host/harness/run-isolated.sh \
+      /workspace/xbox-readiness/tests/uwp_run.sh nofork "$PWD/x64/uwp-host/harness" \
+      -- ./run-wine.sh --inproc-server --no-build
