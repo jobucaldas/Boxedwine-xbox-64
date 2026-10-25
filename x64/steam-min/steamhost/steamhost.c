@@ -5,6 +5,8 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
+#include "slots.h"
+#include "out/host-map.h"
 #define API __declspec(dllexport)
 static char install_dir[MAX_PATH], logging_dir[MAX_PATH];
 API const char *SteamBootstrapper_GetInstallDir(void) { return install_dir; }
@@ -47,24 +49,23 @@ done:
     return ok;
 }
 
-/* O2 logon path. Slot numbers come from OpenSteamworks @3793a5db (PIN.txt). Those tables were
-   dumped for Valve build OSW_TABLES_BUILD; a different build may have another vtable layout,
-   and the IClientUser neighbours of LogOn/SetAccountNameForCachedCredentialLogin are
-   InvalidateCredentials/DestroyCachedCredentials. So no IClientEngine/IClientUser slot is
-   called unless the pinned client build equals the build the tables were dumped from. */
-#define ENGINE_CREATEGLOBALUSER 2   /* IClientEngine.cs:20 */
-#define ENGINE_GETICLIENTUSER 8     /* IClientEngine.cs:26 */
-#define ENGINE_RUNFRAME 19          /* IClientEngine.cs:42 */
-#define USER_LOGON 2                /* IClientUser.cs:30 (index: 2) */
-#define USER_SETACCOUNTCACHED 51    /* IClientUser.cs:96 (index: 51) */
 #define CB_SERVERS_CONNECTED 101    /* SteamServersConnected_t, public Steamworks */
 #define CB_SERVER_CONNECT_FAILURE 102 /* SteamServerConnectFailure_t { EResult; bool } */
 typedef struct { int32_t user; int32_t id; uint8_t *param; int32_t size; } CallbackMsg_t;
 typedef unsigned char (__cdecl *bgetcb_fn)(int32_t, CallbackMsg_t *);
 typedef void (__cdecl *freecb_fn)(int32_t);
-#define SLOT(obj, i) ((*(void ***)(obj))[i])
+static void *mapped_slot(void *object, const char *iface_name, const char *name) {
+    for (size_t i = 0; i < sizeof(host_slots)/sizeof(host_slots[0]); ++i)
+        if (!strcmp(host_slots[i].iface_name, iface_name) && !strcmp(host_slots[i].name, name))
+            return resolve_slot(&host_slots[i], object);
+    denied_slot_name = name;
+    denied_trap();
+    return NULL;
+}
+#define SLOT(obj, method) mapped_slot(obj, "IClientEngine", method)
+#define USER_SLOT(obj, method) mapped_slot(obj, "IClientUser", method)
 
-static int tables_match(void) { return OSW_TABLES_BUILD == PIN_VERSION; }
+static int tables_match(void) { return HOST_MAP_BUILD == PIN_VERSION; }
 
 /* account + SteamID from Steam's own loginusers.vdf (seed-login.py wrote it); never printed. */
 static int read_loginusers(char *account, size_t acc_len, uint64_t *steamid) {
@@ -116,18 +117,18 @@ static int logon(HMODULE client, void *engine, const char *dll, int wait_s, int 
     DWORD start = GetTickCount();
     if (!read_loginusers(account, sizeof(account), &steamid)) { puts("loginusers=0"); return 7; }
     puts("loginusers=1");
-    user = ((int32_t (*)(void *, int32_t *))SLOT(engine, ENGINE_CREATEGLOBALUSER))(engine, &pipe);
+    user = ((int32_t (*)(void *, int32_t *))SLOT(engine, "CreateGlobalUser"))(engine, &pipe);
     printf("global_user=%d\n", user != 0 && pipe != 0);
     if (!user || !pipe) return 8;
-    iuser = ((void *(*)(void *, int32_t, int32_t))SLOT(engine, ENGINE_GETICLIENTUSER))(engine, user, pipe);
+    iuser = ((void *(*)(void *, int32_t, int32_t))SLOT(engine, "GetIClientUser"))(engine, user, pipe);
     if (!iuser) { puts("iclientuser=0"); return 8; }
     printf("cached_login_set=%d\n", ((unsigned char (*)(void *, const char *, unsigned char))
-           SLOT(iuser, USER_SETACCOUNTCACHED))(iuser, account, 0) != 0);
+           USER_SLOT(iuser, "SetAccountNameForCachedCredentialLogin"))(iuser, account, 0) != 0);
     SecureZeroMemory(account, sizeof(account));
-    printf("logon_call_eresult=%d\n", ((int (*)(void *, uint64_t))SLOT(iuser, USER_LOGON))(iuser, steamid));
+    printf("logon_call_eresult=%d\n", ((int (*)(void *, uint64_t))USER_SLOT(iuser, "LogOn"))(iuser, steamid));
     while (result < 0 && GetTickCount() - start < (DWORD)wait_s * 1000u) {
         CallbackMsg_t msg;
-        ((void (*)(void *))SLOT(engine, ENGINE_RUNFRAME))(engine);
+        ((void (*)(void *))SLOT(engine, "RunFrame"))(engine);
         while (bget(pipe, &msg)) {
             if (msg.id == CB_SERVERS_CONNECTED) result = 1;
             else if (msg.id == CB_SERVER_CONNECT_FAILURE && msg.size >= 4) {
@@ -151,7 +152,7 @@ static int logon(HMODULE client, void *engine, const char *dll, int wait_s, int 
         printf("serving=%d\n", serve_s);
         for (start = GetTickCount(); GetTickCount() - start < (DWORD)serve_s * 1000u; Sleep(100)) {
             CallbackMsg_t msg;
-            ((void (*)(void *))SLOT(engine, ENGINE_RUNFRAME))(engine);
+            ((void (*)(void *))SLOT(engine, "RunFrame"))(engine);
             while (bget(pipe, &msg)) bfree(pipe);
         }
         puts("serve_done=1");
@@ -176,6 +177,9 @@ int main(int argc, char **argv) {
         fprintf(stderr, "usage: steamhost64.exe --selftest | --check-pin | --logon --wait SECONDS [--serve SECONDS]\n");
         return 2;
     }
+    const char *valid = getenv("STEAMHOST_VALIDATED_MAP");
+    if (!valid || strcmp(valid, HOST_MAP_SHA256)) { puts("map_valid=0"); return 12; }
+    puts("map_valid=1");
     /* steamhost spawns no process; there is no webhelper (or any child) code path. */
     if (!selftest) puts("webhelper_started=0");
     len = GetModuleFileNameA(NULL, install_dir, sizeof(install_dir));
@@ -188,14 +192,14 @@ int main(int argc, char **argv) {
     if (!matches_pin(dll)) { puts("pin=mismatch"); return 3; }
     puts("pin=ok");
     if (!selftest) {
-        printf("iface_tables_build=%u client_build=%u\n", (unsigned)OSW_TABLES_BUILD, (unsigned)PIN_VERSION);
+        printf("iface_tables_build=%u client_build=%u\n", (unsigned)HOST_MAP_BUILD, (unsigned)PIN_VERSION);
         if (!tables_match()) {
             puts("iface_pin=mismatch");
             puts("logon=not_attempted reason=no_published_vtable_tables_for_pinned_build");
             puts("activeprocess_pid_is_self=0");
             return 6;
         }
-        puts("iface_pin=ok");
+        puts("iface_pin=match");
         if (check) return 0;
     }
     CreateDirectoryA(logging_dir, NULL);
