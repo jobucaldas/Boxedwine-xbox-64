@@ -1,0 +1,19 @@
+--- a/directory.c
++++ b/directory.c
+@@ -491,6 +491,16 @@
+         release_object( create_event( &dir_kernel->obj, &kernel_events[i], OBJ_PERMANENT, 1, 0, NULL ));
+     release_object( create_keyed_event( &dir_kernel->obj, &keyed_event_crit_sect_str, OBJ_PERMANENT, NULL ));
+ 
++    /* Hosted prefix was validated before server startup. Retain the state
++     * wineboot leaves so ntdll does not launch a fresh wineboot process. */
++    {
++        static const WCHAR boot_name[] = {'_','_','w','i','n','e','b','o','o','t','_','e','v','e','n','t'};
++        const struct unicode_str boot_str = {boot_name, sizeof(boot_name)};
++        struct event *boot = create_event( &dir_kernel->obj, &boot_str, OBJ_PERMANENT, 1, 1, NULL );
++        if (!boot) fatal_error( "cannot create hosted prebuilt-prefix wineboot event\n" );
++        release_object( boot );
++    }
++
+     /* mappings */
+     release_object( create_fd_mapping( &dir_nls->obj, &intl_str, intl_fd, OBJ_PERMANENT, NULL ));
+     release_object( create_user_data_mapping( &dir_kernel->obj, &user_data_str, OBJ_PERMANENT, NULL ));

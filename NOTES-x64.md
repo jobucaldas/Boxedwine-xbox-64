@@ -1328,6 +1328,176 @@ runtime proof and no stock Wine execution in O3. Recording
 `/workspace/x64-run/videos/R4W-O3.mp4` shows the blocked exact test only.
 No runtime code was changed, no commits created and no remotes accessed.
 
+## R4W O5 Wine 10.0 server as a static library (build-only)
+
+`x64/uwp-host/wineserver/` (`Makefile`, `build.sh`, `README.md`) builds Wine
+10.0's server sources from `/tmp/wine-src` (Debian 10.0~repack), with no
+changes, into `x64/uwp-host/wineserver/out/libwineserver.a` (42 objects). The
+out-of-tree configure lives in `/workspace/wine-build`
+(`--enable-win64 --without-x --without-freetype --without-mingw` and the other
+optional libraries off); neither it nor `out/` is committed. Configure runs
+with `--no-create`, then `config.status include/config.h`. A full
+config.status run fails in makedep because the Debian repack strips the binary
+test resources (`dlls/amstream/tests/rsrc.rc: test.avi`), and the server needs
+only config.h. Compile flags are configure's CC/CFLAGS/EXTRACFLAGS plus
+makedep's `server/` defines (`-D__WINESRC__ -DWINE_UNIX_LIB`, unicode.c
+BINDIR/DATADIR), with `-fPIC` added. `main` is renamed with
+`objcopy --redefine-sym main=wine_server_main`. The archive has
+`T wine_server_main` and no `T main`, and it links into a dummy host with only
+libc. The dummy host was linked and never run.
+
+Protocol: `SERVER_PROTOCOL_VERSION 855` appears in
+`/tmp/wine-src/include/wine/server_protocol.h` and in `out/protocol_version`.
+It matches the stock server `/usr/lib/wine/wineserver64` ("Wine 10.0", dpkg
+`wine64 10.0~repack-6`), which is the same Wine release and Debian repack.
+
+Evidence: **build-only**. No server logic was changed and nothing was run,
+either through uwph or through stock Wine. Video:
+`/workspace/x64-run/videos/R4W-O5.mp4`.
+The archive's undefined symbols still include `fork`, `setsid`,
+`chdir`/`fchdir`, `atexit`, `exit`, `sigaction` and `ptrace`. These are the
+process-wide effects listed under O3, and O6 has to contain them.
+
+## R4W O6 hosted server thread
+
+`wineserver/server_thread.c` starts Wine's own `wine_server_main(-f -p)`
+on a pthread. `build.sh prepare` copies server C/headers under ignored `out/`
+and applies `patches/0001-hosted-lifecycle.patch`; the original `/tmp/wine-src`
+is untouched. The forced `patches/hosted.h` redirects server-only exit/_exit
+and atexit to a thread-local callback stack and pthread_exit. Normal and fatal
+shutdown run the socket cleanup; the retained lock fd is closed there rather
+than relying on process exit. A single server lifetime per process is supported;
+Wine's global objects and all allocations are not reset for a second start.
+
+Hosted main does not alter stderr buffering or install signal dispositions.
+Hosted init_signals creates only a Wine event-loop pipe handler for explicit
+shutdown; watchdog alarms are disabled. SIGPIPE is blocked on the server
+thread only. Stop writes to the control pipe; its callback invokes Wine's own shutdown_master_socket(), which drains/kills
+its remaining clients and then flushes the registry and exits on the server
+thread through Wine's normal socket timeout. Readiness is a byte on a CLOEXEC pipe after
+socket listen and all main initialization, before main_loop, with EOF on startup
+failure. It does not use a fixed startup sleep or spawn a separate server.
+
+O6 uses the explicitly permitted retained-cwd policy: Wine keeps its original
+config/server directory fds and its existing temporary fchdir operations in
+fd.c, registry.c and mapping.c. Start must precede client threads; all host and
+client filesystem paths must be absolute while the server runs (including the
+prefix, executable and any host resources). Relative cwd-dependent host I/O is
+unsupported during this lifetime. The shim restores the caller's saved cwd after
+join. This policy is sufficient for this isolated protocol test; this step does
+not claim arbitrary cwd-dependent applications are integrated into the loader.
+The WINEPREFIX environment update likewise occurs before clients start.
+
+`test_host --prefix ABSOLUTE_PATH --selftest` makes a disposable writable copy
+of the prebuilt prefix, starts the hosted server and consumes readiness, then
+runs one stock `WINESERVER=/bin/false WINEPREFIX=<copy> wine cmd /c echo
+R4W-O6-OK`. It checks /proc for wineserver64 throughout, sends the pipe stop
+request, joins, restores cwd and removes the copy. A pre-existing unrelated
+wineserver64 also fails that strict acceptance check; it is never killed by
+the test. Evidence is **our uwp-host server shim + an expressly allowed stock
+Wine protocol client**, not THROUGH-uwph PE launcher/loader integration (O7),
+and not an Xbox/UWP runtime proof. No verifier changes.
+
+O6 final exact test: `R4W-O6-OK` and `server thread joined rc=0`, but exit 1
+because an unrelated existing `/usr/lib/wine/wineserver64 -p0 -p 180`
+(PID 339142, PPID 53) violates the global no-server-process gate. No unrelated
+process was terminated. Status is BLOCKED, not DONE. Final output and details:
+`/workspace/x64-run/lanes/R4W/R4W-O6.result`; proof video:
+`/workspace/x64-run/videos/R4W-O6.mp4` (under 60 seconds). Final normal
+shutdown leaves no registry-save errors. No commit or remote operation.
+
+## R4W O7 loader integration — BLOCKED on matching Wine protocol
+
+`make -C x64/uwp-host/harness wine-test-inproc-build` links the O6 archive
+and server thread host into the Wine routing shim and a separate control-only
+library. `run-wine.sh --inproc-server` copies the read-only packaged prefix into
+a fresh writable evidence directory and never backgrounds a stock server.
+A gated constructor starts only in wine64 after Wine's normal loader re-exec
+(`WINELOADERNOEXEC`), waits for readiness before ntdll connects, and marks the
+owner so descendants connect to that server. Launcher/control execution remains
+separate from THROUGH-uwph attribution. Process exit tears down the server
+thread; no destructor join is attempted while ntdll may still be connected.
+
+The prerequisite rerun initially produced O6's expected echo/join but failed
+the global server-absence check. Investigation found a more substantial issue:
+the installed Debian ntdll uses Debian's `fixes/temporary-directory.patch`, while
+the original private server copies used upstream `/tmp/.wine-UID`. Thus earlier
+O6/O7 runs could silently connect the client to a different stock server. O7
+now applies the server portion of Debian's own patch and its helper header to
+private copies only, preserving attribution. No installed binary/source is
+modified. After this correction, the O6 client and both O7 modes connect to the
+hosted server but fail closed with `version mismatch 855/1`.
+
+Correction to O5 above: identical Wine release strings do NOT prove protocol
+identity. The archive/source header reports 855, but installed ntdll expects 1.
+No protocol constant or version check has been changed to mask this mismatch.
+The O6 prerequisite remains failed (readiness PASS, protocol error, join rc=0,
+client/absence combined FAIL). O7's exact make target returns 2; independent
+`verify_wine.py` returns 1: `control-hello_k32: nonzero exit`. The verifier is
+unchanged, including its wineboot check and its hard-coded separate-server
+summary (the latter is not a measurement of this mode).
+
+Final traces show the constructor/server thread in the same loader PID and no
+exec of wineserver/wineserver64. Neither PE reaches its hello output against the
+hosted server: this is attempted THROUGH-uwph integration, not successful guest
+execution proof. Earlier hello successes used a separate server and are not O7
+acceptance. O8 event creation and O9 jail changes were not implemented. Video:
+`/workspace/x64-run/videos/R4W-O7.mp4` (free Xvfb display, failed exact test).
+
+## R4W O8 prebuilt-prefix startup event — BLOCKED on O7 protocol mismatch
+
+The hosted start now validates the prefix `.update-timestamp` against the
+installed `/usr/share/wine/wine.inf` mtime (the same INF used by O2 packaging)
+before changing cwd, opening the server socket, or creating its thread. It accepts
+Wine CRT CRLF and native LF decimal stamps; missing, malformed, and stale stamps
+fail with EINVAL and an explicit instruction to rerun `make prebuilt-prefix`.
+The private-source directory patch creates Wine's own permanent manual-reset,
+signalled `\KernelObjects\__wineboot_event` during namespace initialization,
+before the ready handshake. Retaining the event for the hosted server lifetime
+models an already completed packaged-prefix boot. No verifier or wineboot binary
+was changed.
+
+The archive and host shim libraries build. Direct host-entry negative checks for
+missing and `0` stamps return EINVAL with ready fd unchanged, before server
+startup. The exact O8 test was run: make returns 2, all four launcher cases exit
+1, and its verifier reports `BLOCKED: control-hello_k32: nonzero exit`.
+The valid CRLF stamp passes startup; the installed ntdll then reports the existing
+`version mismatch 855/1`. Because make fails, the exact command's `&&` skips the
+explicit verifier/tee, so `/tmp/r4w-o8.txt` is absent and grep fails. An independent
+verifier invocation confirms the same BLOCKED result. Evidence is
+`harness/out/wine-o4/run-F801pWg2`; video is
+`/workspace/x64-run/videos/R4W-O8.mp4` (private free Xvfb, Linux host only).
+This is attempted THROUGH-uwph launcher/Wine-loader integration, with no successful
+hello or hello_k32 execution proof, no stock-Wine-only acceptance, and no claim
+that the wineboot-free gate is green. Resolving the O7 protocol prerequisite is
+outside this O8 change.
+
+## R4W O9 real nofork jail acceptance — BLOCKED at shell startup
+
+The external `/workspace/xbox-readiness/tests/uwp_run.sh` now honors the
+opt-in `UWPH_INPROC_SERVER=1` by skipping its stock-server concession (including
+its sleep). Default behavior and jail flags/filter are unchanged. The external
+change is retained as `R4W-O9.uwp_run.patch` in the lane evidence directory.
+
+With that environment exported, the exact O9 build succeeds outside the jail.
+The real jail reports `uwpjail: seccomp wx=0 nofork=1 (16 insns)`, then
+`./run-wine.sh: fork: Operation not permitted` and `rc=254`. A separate strace
+confirms the first shell command substitution at `cd "$(dirname "$0")"`
+at run-wine.sh line 4 attempts `clone(... SIGCHLD)` and receives EPERM.
+No new run directory is created; the independent newest-directory verifier is
+therefore on O8's `run-F801pWg2`, and returns 1 with
+`BLOCKED: control-hello_k32: nonzero exit`. This is not fresh guest proof.
+Global `pgrep -f wineserver64` is also nonempty before/after the exact run;
+existing unrelated servers were not terminated. No separate server is spawned
+by the opt-in invocation, as confirmed by the diagnostic exec trace.
+
+Evidence: `/workspace/x64-run/lanes/R4W/R4W-O9.exact.log`,
+`R4W-O9.spawn.trace`, and `/workspace/x64-run/videos/R4W-O9.mp4`
+(4.14 seconds, free Xvfb display). Build-only PASS; attempted THROUGH-uwph
+jail acceptance stops before our launcher/Wine loader. No successful stock-Wine
+or THROUGH-uwph execution claim. No seccomp/verifier changes, commit, or remote
+operation. O9 remains BLOCKED; removing this first shell spawn alone would not
+resolve the harness's subsequent helper spawns or O7's protocol prerequisite.
 ## B10
 
 O1 **BLOCKED** before Steam installation. Neither readiness prefix contained
