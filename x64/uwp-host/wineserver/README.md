@@ -23,9 +23,12 @@ Inputs (overridable): `WINE_SRC=/tmp/wine-src` (Debian 10.0~repack source),
   `server/`: `-D__WINESRC__ -DWINE_UNIX_LIB`, and for `unicode.c` the
   `BINDIR`/`DATADIR` from `unicode_EXTRADEFS`. The one addition is `-fPIC`,
   so the archive can go into a PIE or shared host.
-- `out/protocol_version` records `SERVER_PROTOCOL_VERSION` (855 for Wine
-  10.0). This is the version clients check, and it matches the stock Debian
-  `wine64 10.0~repack-6` server.
+- `out/protocol_version` records `SERVER_PROTOCOL_VERSION`. `build.sh prepare`
+  regenerates `wine/server_protocol.h`, `request_handlers.h` and
+  `request_trace.h` with Wine's own `tools/make_requests`, as the Debian
+  repack does, so the version is 1 rather than upstream 10.0's 855. This is
+  the version clients check, and it matches the installed Debian
+  `wine64 10.0~repack-6` ntdll.so and wineserver64.
 
 Every undefined symbol in the archive is a libc symbol, so the archive links
 against libc alone. That list includes process-wide calls (`fork`, `setsid`,

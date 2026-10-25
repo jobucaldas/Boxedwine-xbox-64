@@ -44,6 +44,23 @@ if [ "${1:-}" = prepare ]; then
         patch --batch -d "$dest" -p1 < "$patchfile"
     done
     cp "$HERE/patches/server_tmpdir.h" "$dest/server_tmpdir.h"
+    # The Debian repack drops generated files and debian/rules reruns
+    # tools/make_requests, which restarts SERVER_PROTOCOL_VERSION at 1; the
+    # installed ntdll.so checks for 1. Regenerate the protocol files the same
+    # way (from Wine's own protocol.def and server/*.c) so the hosted server
+    # speaks the installed client's protocol. -I$(COPYDIR) picks up
+    # wine/server_protocol.h ahead of $WINE_SRC/include.
+    gen=$dest/.make_requests
+    rm -rf "$gen"
+    mkdir -p "$gen/tools" "$gen/server" "$gen/include/wine"
+    cp "$WINE_SRC/tools/make_requests" "$gen/tools/"
+    cp "$WINE_SRC"/server/protocol.def "$WINE_SRC"/server/*.c "$gen/server/"
+    (cd "$gen" && perl tools/make_requests >/dev/null)
+    grep -qx '#define SERVER_PROTOCOL_VERSION 1' "$gen/include/wine/server_protocol.h"
+    mkdir -p "$dest/wine"
+    cp "$gen/include/wine/server_protocol.h" "$dest/wine/server_protocol.h"
+    cp "$gen/server/request_handlers.h" "$gen/server/request_trace.h" "$dest/"
+    rm -rf "$gen"
     exit 0
 fi
 exec make -C "$HERE" WINE_SRC="$WINE_SRC" WINE_BUILD="$WINE_BUILD" ${1:+OUT="$1"} lib

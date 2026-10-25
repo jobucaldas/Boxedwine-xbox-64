@@ -1613,6 +1613,95 @@ installer blocker, not a running Steam client. No commits or remotes touched.
 
 Literal last installer log line: `44367.703:0030:0034:trace:module:MODULE_InitDLL (00006FFFFFC20000,PROCESS_DETACH,0000000000000001) - RETURN 1`.
 
+## B19 O1
+
+ROOT CAUSE: Genuine protocol-number mismatch: hosted Wine server is compiled with upstream SERVER_PROTOCOL_VERSION 855; installed Debian ntdll expects 1. The client does not read 1 from the socket.
+
+/tmp/wine-src/include/wine/server_protocol.h:6778 defines 855; /tmp/wine-src/VERSION is Wine version 10.0. dpkg -s wine64 reports Source: wine, Version: 10.0~repack-6. Installed ntdll strings line 4604 is version mismatch %d/%d.
+
+Wine dlls/ntdll/unix/server.c:1583 calls receive_fd(&version). receive_fd at lines 935-970 receives sizeof(obj_handle_t) bytes with recvmsg and extracts the SCM_RIGHTS fd. server_init_process:1593-1599 compares the received version against SERVER_PROTOCOL_VERSION and prints received-version / compiled-client-version, in that order. Wine server/thread.c:313 sends SERVER_PROTOCOL_VERSION alongside the first request fd.
+
+Installed ntdll disassembly: 0x38784 loads received version into esi; 0x38788 compares esi with literal 1; 0x3878b branches to mismatch at 0x39442. 0x39452 loads literal 1 into edx (second numeric printf argument), 0x39457 selects format at 0x6d258, 0x39460 calls the error routine. Thus 1 is a compiled constant, not erroneous received data.
+
+Fresh control-hello: WINEDEBUG=+server, UWPH_INPROC_SERVER=1, LD_PRELOAD=B19/out/libuwph_inproc_server.so, isolated copy of R4W prebuilt-prefix, B19 run_via_wine -> /usr/lib/wine/wine64 -> Wine own loader. Exit 1, server-ready marker and version mismatch 855/1. strace thread 556809 sendmsg and client 556808 recvmsg both carry W\3\0\0 (hex 57 03 00 00 = 855), with SCM_RIGHTS for the same request pipe. No separate wineserver exec appears. Protocol fails before ordinary request/server debug traffic. Logs retained as control-hello.log, control-hello.strace, control-hello.exit.
+
+nm -D --defined-only captured for libuwph_wine_shim.so (shim.nm), libuwph_inproc_server.so (hosted.nm), installed ntdll.so (ntdll.nm). Overlapping global symbols with ntdll: shim (none); hosted (none). See overlaps.txt. This evidence does not support symbol interposition as the cause.
+
+Existing harness/prepare-wine-wx.sh explicitly documents Debian repack regeneration with make_requests restarting SERVER_PROTOCOL_VERSION at 1; its private loader source in R4W also defines 1. Package version alone cannot prove protocol identity; installed machine code and live wire bytes prove this mismatch.
+
+Scope: THROUGH x64/uwp-host hosted server + our launcher + Wine own loader; stock Debian ntdll client control, not stock Wine alone. No routed uwph syscall-backend or Xbox/UWP acceptance claim. No runtime fixes, protocol bypasses, verifier changes, commits, or remote operations.
+
+Evidence directory: `x64/uwp-host/harness/out/b19-o1/` (ignored build output). Video: `/workspace/x64-run/videos/B19-O1.mp4` (terminal evidence replay).
+
+Independent re-verification (second pass): fresh rerun in out/b19-o1/rerun/ (same path: our run_via_wine launcher -> /usr/lib/wine/wine64 -> Wine's own loader, LD_PRELOAD libuwph_inproc_server.so, WINEDEBUG=+server, WINESERVER=/bin/false) again exits 1 with "version mismatch 855/1"; hosted server thread sendmsg carries W\3\0\0 (855); 0 wineserver execs. Overlap recomputed with comm over nm -D --defined-only global symbols: shim/ntdll none, hosted/ntdll none.
+Stock-Wine control (NOT uwph, out/b19-o1/stock-control/): installed Debian /usr/lib/wine/wineserver64 sends iov "\1\0\0\0" (protocol 1) with the request fd, and hello.exe runs to completion (rc=0). So Debian 10.0~repack-6 server and client both use protocol 1; /tmp/wine-src (upstream 10.0 headers, 855) is the odd one out.
+Implication for O2 (not done here): build the hosted server against a server_protocol.h regenerated the Debian way (perl tools/make_requests, as prepare-wine-wx.sh already does -> 1), or from the exact Debian source tree. Never patch the version check.
+
+## B19 O2
+
+Fix for the O1 root cause: `wineserver/build.sh prepare` now regenerates `wine/server_protocol.h`, `request_handlers.h` and `request_trace.h` into the private server copy with Wine's own `tools/make_requests`, run on a scratch tree holding only upstream `server/protocol.def` and `server/*.c` (no existing header). That is what debian/rules does for the repack, so `SERVER_PROTOCOL_VERSION` comes out as 1, matching the installed Debian ntdll.so and wineserver64. The prepare step asserts the value is 1. `-I$(COPYDIR)` puts the regenerated header ahead of `$WINE_SRC/include`. Apart from the version line, the generated header is byte-identical to upstream's, and `request_handlers.h`/`request_trace.h` are byte-identical too, so the request layout is unchanged. The version check is not patched.
+
+Exact test (`make -C x64/uwp-host/harness wine-test-inproc` + `verify_wine.py`, run `out/wine-o4/run-jPpVvIIe`): control-hello, control-hello_k32, routed-hello and routed-hello_k32 all exit 0. Each logs `[inproc] Wine loader pid=... server thread ready; no separate server process`, there are 0 wineserver execve in the traces, and the verifier prints PASS. A 0.1 s `pgrep -x wineserver64` monitor never saw a server for this run's prefix. The global pgrep was not empty, though: other lanes' live prefixes (xbox-readiness, B21) had their own servers. Evidence: `x64/uwp-host/harness/out/b19-o2/` (ignored). Video: `/workspace/x64-run/videos/B19-O2.mp4`.
+
+## B19 O3
+
+The existing hosted server validates `.update-timestamp` against the installed
+`/usr/share/wine/wine.inf` mtime before starting; its directory patch creates
+signalled permanent `\KernelObjects\__wineboot_event` only after that validation.
+Missing and mismatched stamps both return EINVAL (22), leave ready_fd untouched,
+and tell the packager to rerun `make prebuilt-prefix`.
+
+Completed the pre-existing uncommitted `run-wine.sh --nofork` path: a staged
+absolute `--run DIR`, `--case routed-hello|routed-hello_k32` and
+`--inproc-server` select one guest using Bash builtins/parameter expansion and
+plain exec, before the orchestration path's command substitutions. The normal
+harness stages the prefix and traces each guest through this same path. Removed
+the inherited wineboot.exe disable override and clear inherited DLL overrides;
+Wineboot remains available and the named event prevents its attempted launch.
+No verifier changes. Prefix preparation and tracing remain outside the jail.
+
+O3 exact command passed (exit 0), evidence `out/wine-o4/run-wG5V4c1j`:
+all four guests exit 0; verifier PASS, no wineboot in guest logs or exec traces.
+Routed guests go THROUGH our launcher, Wine's own W^X loader/ntdll and uwph's
+selected six syscall families; controls use stock Wine plus our launcher and
+hosted server, without uwph counters. This is Linux evidence, not Xbox acceptance.
+The verifier's fixed separate-stock-server sentence is generic text, not a
+measurement of this run; all four logs contain the in-process ready marker.
+
+Additional real `uwpjail --nofork` staged-path checks pass for routed hello and
+hello_k32, with nofork=1 and exit 0. Logs: `out/b19-o3/nofork.txt` and guest
+subdirectories. They reuse the exact run's writable prefix. An initial attempt
+to make extra prefix copies exhausted disk space; only those new proof copies
+were removed, then the successful checks reused the existing prefix. Video
+`/workspace/x64-run/videos/B19-O3.mp4` (3.2 seconds) records the live jail checks
+and explicitly labels the exact verifier output as from the previous run.
+O4's full acceptance command/global process check is not claimed here.
+
+
+## B19 O4 — exact nofork acceptance BLOCKED
+
+Ran the R4W O9 exact command unchanged, with `UWPH_INPROC_SERVER=1`
+exported outside it to skip uwp_run.sh's stock-server concession. Build succeeds;
+real uwpjail prints `seccomp wx=0 nofork=1 (16 insns)`, then run-wine.sh reports
+`fork: Operation not permitted`, rc=254. The exact invocation selects the
+multi-guest orchestration branch, whose first command substitution is
+`cd "$(dirname "$0")"` (line 45). The staged single-guest `--nofork` branch
+from O3 is not selected by that invocation. Further orchestration also needs
+subprocesses, so replacing only dirname would not complete acceptance.
+
+No new run directory was created (runs-before.txt and runs-after.txt identical).
+The requested newest-dir verifier PASS belongs to the prior O3 run-JRpnFEiG,
+not this jailed attempt. O4 did not reach our launcher, Wine's loader, or uwph;
+only the build passed. No fresh guest child_processes=0 proof exists. The global
+wineserver check is also nonempty: six pre-existing PIDs are listed unchanged
+before/after in the log; no other lane's server was stopped.
+
+Evidence: `x64/uwp-host/harness/out/b19-o4/{acceptance.sh,exact-test.txt,
+runs-before.txt,runs-after.txt,xvfb.log,ffmpeg.log}`. Free-display Xvfb recording:
+`/workspace/x64-run/videos/B19-O4.mp4` (5.583333 s, 274208 bytes). The recording
+shows the failed exact test and explicitly labels the old verifier evidence.
+No DONE-R4W.inproc marker was created, because O9 requires all acceptance gates.
+No runtime, verifier, jail, remotes, or prior evidence was changed.
 ## B21 O1
 
 Reproduced on x64-spike @5f28e621 (R4S+R4X+R4W merged) in worktree
