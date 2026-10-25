@@ -652,6 +652,127 @@ uwp-host build/surface check. No uwp-host runtime, launcher or stock Wine
 execution is exercised; UI routing evidence and Linux-box video are deferred
 to their respective later orders. See x64/ui/README.md for the exact checks.
 
+## R4G O1
+
+Documented the exact dzn and isolated DComp commands and cited retained stock
+Wine logs in `x64/graphics/RESULT-dzn.md` (raw copies under
+`x64/graphics/evidence/R4G-O1/`). O1 evidence check PASS; runtime BLOCKED:
+DCompositionCreateDevice returns E_NOTIMPL (0x80004001), NULL device; dzn
+instance succeeds but physical-device enumeration returns -3 (process exit 10).
+Mesa 25.1.9 source root `/workspace/xbox-readiness/dzn/src/mesa-25.1.9`:
+`src/vulkan/wsi/wsi_common_win32.cpp:954` is the DComp call; NULL maps to
+initialization failure at :992. `src/microsoft/vulkan/dzn_device.c:1164`
+initializes WSI during device creation, before any requested surface.
+Next missing integration piece: composition swapchain (:795), then HWND target
+(:802), visual/SetRoot/SetContent/Commit (:806–809), all in that WSI file.
+These later dependencies are source-inspected and untested, not measured
+failures. A UWP CoreWindow path remains unimplemented. Evidence classification:
+cited STOCK WINE only; THROUGH-uwph/launcher not exercised, no new build.
+Lavapipe is not Xbox D3D12; no GPU/presentation or console proof. O1 only.
+
+## R4G O2
+
+Added an opt-in, enumeration-only `x64/graphics/dcomp_stub.cpp`: exported
+DCompositionCreateDevice returns S_OK and a real reference-counted
+IDCompositionDevice for Mesa's NULL-DXGI request. COM identity, unsupported
+IIDs, output clearing, lifetime and E_NOTIMPL presentation behavior are unit
+tested. All composition operations remain unimplemented; input arrays are
+preserved. Build `make -C x64/graphics` exit 0; test
+`x64/graphics/tests/run.sh` exit 0 with
+`PASS DCompositionCreateDevice HRESULT=0x00000000; COM identity/lifetime/errors; compositor E_NOTIMPL`.
+Evidence: `x64/graphics/evidence/R4G-O2/`. Proof is THROUGH our launcher,
+Wine's own PE loader and selected ntdll Unix calls routed via uwp-host shim;
+stock separate wineserver remains, no full uwph acceptance claim. This is a
+Linux stand-in unit proof only: actual dzn enumeration, swapchain/presentation,
+UWP deployment/API authorization and Xbox GPU execution remain untested.
+No platform DComp API is invoked by the compatibility DLL. Lavapipe is not
+Xbox D3D12. No visual output/video for this textual unit test. O2 only.
+
+## R4G O3
+
+Off-device offscreen Vulkan clear/readback PASS (2026-10-24). Added
+`x64/graphics/vulkan_clear.c` and `tests/run-clear.sh`; `make -C x64/graphics`
+builds/links the x64 PE against the repository's Vulkan headers (exit 0,
+-Wall -Wextra -Werror). Direct ICD loading uses the existing local Mesa
+25.1.9 vulkan_dzn.dll and official DXIL dependency, plus VKD3D-Proton and the
+O2 enumeration-only dcomp.dll. No ICD registration or loader replacement.
+Exact runtime: `DISPLAY=:99 x64/graphics/tests/run-clear.sh` (exit 0);
+repeat `VK_LOADER_DEBUG=driver DISPLAY=:99 x64/graphics/tests/run-clear.sh`
+also exits 0. Logs/hashes/PID-specific reports: `x64/graphics/evidence/R4G-O3/`.
+
+Measured output: physicalDeviceCount=1; vkCreateDevice=0; vkQueueSubmit=0;
+vkQueueWaitIdle=0; `red clear readback: pixels=4096 mismatches=0`;
+`PASS offscreen clear/readback only; no presentation or Xbox proof`.
+A 64x64 RGBA8 optimal image is cleared to red, copied to a coherent staging
+buffer, synchronized to host access, and all 4096 pixels checked. No shader,
+triangle, window, surface, swapchain or presentation was exercised.
+
+Proof classification: THROUGH our run_via_wine launcher -> Wine's own PE
+loader, with selected ntdll Unix calls routed via the uwp-host preload shim
+(positive open/read/close/mmap/munmap counters). A separate stock Linux
+wineserver and initialized O2 desktop prefix remain dependencies. This is not
+full uwph acceptance or an in-process UWP deployment. The guest's adapter name
+`Microsoft Direct3D12 (NVIDIA GeForce GTX 470)` is Wine's reported identity,
+not hardware evidence: loader diagnostics identify lvp_icd.json,
+libvulkan_lvp.so and llvmpipe (LLVM 19.1.7, 256 bits). **lavapipe ≠ Xbox D3D12**.
+
+Proposed STATUS dzn row update text:
+`dzn | off-device clear/readback PASS through launcher + selected uwph routing;
+4096/4096 pixels correct on lavapipe; presentation/CoreWindow, UWP authorization
+and Xbox D3D12 UNPROVEN (lavapipe ≠ Xbox D3D12).`
+The earlier O1 E_NOTIMPL wall is passed only by opting into O2's compatibility
+object. Its compositor methods remain E_NOTIMPL; this does not resolve WSI.
+
+Artifacts: `/workspace/x64-run/videos/R4G-O3.mp4` (6 seconds) and
+`/workspace/x64-run/videos/R4G-O3.png`: Xvfb :177 terminal capture explicitly
+labeled SAVED RESULTS FROM LIVE LAUNCHER TEST, displaying real retained output,
+not a rendered clear or fake game screenshot. Original executions used :99.
+No console access, commits, pushes or remote operations. O3 only.
+
+## R4G O4
+
+On-device D3D12 probe exe for R4D packaging (2026-10-24). Added
+`x64/graphics/probe_d3d12.c`, Makefile rule `out/probe_d3d12.exe` and
+`tests/run-probe.sh`; README "O4" section carries the R4D packaging snippet
+(args, log locations, RESULT line format, exit codes).
+
+Exact test: `x86_64-w64-mingw32-gcc -O2 -std=c11 -Wall -Wextra -Werror
+-municode -static-libgcc -s x64/graphics/probe_d3d12.c -o
+x64/graphics/out/probe_d3d12.exe -ldxguid` exit 0; file is `PE32+ executable
+(console) x86-64`, 82432 bytes, imports KERNEL32/msvcrt/USER32 only, sha256
+eaee3624...7219. Log: `x64/graphics/evidence/R4G-O4/exact-test.log`.
+
+Linux smoke of that same binary (hash in artifacts.sha256):
+`DISPLAY=:104 x64/graphics/tests/run-probe.sh --frames 3600` exit 0, THROUGH
+run_via_wine -> Wine's own PE loader with selected uwph routing (positive
+counters in PID reports) and a separate stock wineserver on the O2 prefix.
+Output: `offscreen: 64x64 RGBA8 clear expect=0xffff00ff pixels=4096
+mismatches=0`, `present: PASS (3600 frames, 640x360 flip-discard HWND
+swapchain)`, `RESULT: PASS adapter="NVIDIA GeForce GTX 470" feature_level=11_1`.
+That adapter is Wine's reported identity; backend is Wine builtin d3d12
+(vkd3d) over lavapipe. **lavapipe ≠ Xbox D3D12**: nothing here proves the
+probe runs, creates a device, or presents on Xbox. HWND presentation is
+expected to SKIP under UWP; CoreWindow presentation is not implemented.
+
+Video: `/workspace/x64-run/videos/R4G-O4.mp4` (6.6 s, Xvfb :104) shows the
+live probe window clearing green -> blue during the run above.
+
+O4 resume verification (2026-10-24): independently reran the exact MinGW
+command above, exit 0; PE32+ x86-64 output exists (82432 bytes). Fresh output
+and hash: `x64/graphics/evidence/R4G-O4/exact-test-resume.log`. This is
+build-only; earlier smoke/video and their hashes remain historical evidence,
+not a runtime test of this fresh rebuild. Recreated lane result/commitmsg;
+no commit or remote operations.
+
+O4 reviewer fixes (2026-10-25): initialize each EnumAdapters1 output and
+check its HRESULT before dereferencing; unexpected enumeration failures log
+the HRESULT and exit via RESULT: FAIL. Reject oversized PROBE_D3D12_LOG
+values and failed/truncated explicit-path formatting before adding candidates.
+Exact MinGW command rerun with -Wall -Wextra -Werror: exit 0, PE32+ x86-64
+output exists (82432 bytes). Fresh evidence and SHA256:
+`x64/graphics/evidence/R4G-O4/exact-test-review-fix.log`. Classification:
+build-only; retained THROUGH-uwph smoke/video are historical and do not
+validate this revised binary. Xbox execution remains unverified.
 ## R4S O1 trace
 
 `x64/uwp-host/harness/surface-trace.tsv` records the unsupported ntdll.so
