@@ -783,3 +783,33 @@ Evidence classification: **build-only and source inspection**, no THROUGH-uwph
 runtime proof and no stock Wine execution in O3. Recording
 `/workspace/x64-run/videos/R4W-O3.mp4` shows the blocked exact test only.
 No runtime code was changed, no commits created and no remotes accessed.
+
+## R4W O5 Wine 10.0 server as a static library (build-only)
+
+`x64/uwp-host/wineserver/` (`Makefile`, `build.sh`, `README.md`) builds Wine
+10.0's server sources from `/tmp/wine-src` (Debian 10.0~repack), with no
+changes, into `x64/uwp-host/wineserver/out/libwineserver.a` (42 objects). The
+out-of-tree configure lives in `/workspace/wine-build`
+(`--enable-win64 --without-x --without-freetype --without-mingw` and the other
+optional libraries off); neither it nor `out/` is committed. Configure runs
+with `--no-create`, then `config.status include/config.h`. A full
+config.status run fails in makedep because the Debian repack strips the binary
+test resources (`dlls/amstream/tests/rsrc.rc: test.avi`), and the server needs
+only config.h. Compile flags are configure's CC/CFLAGS/EXTRACFLAGS plus
+makedep's `server/` defines (`-D__WINESRC__ -DWINE_UNIX_LIB`, unicode.c
+BINDIR/DATADIR), with `-fPIC` added. `main` is renamed with
+`objcopy --redefine-sym main=wine_server_main`. The archive has
+`T wine_server_main` and no `T main`, and it links into a dummy host with only
+libc. The dummy host was linked and never run.
+
+Protocol: `SERVER_PROTOCOL_VERSION 855` appears in
+`/tmp/wine-src/include/wine/server_protocol.h` and in `out/protocol_version`.
+It matches the stock server `/usr/lib/wine/wineserver64` ("Wine 10.0", dpkg
+`wine64 10.0~repack-6`), which is the same Wine release and Debian repack.
+
+Evidence: **build-only**. No server logic was changed and nothing was run,
+either through uwph or through stock Wine. Video:
+`/workspace/x64-run/videos/R4W-O5.mp4`.
+The archive's undefined symbols still include `fork`, `setsid`,
+`chdir`/`fchdir`, `atexit`, `exit`, `sigaction` and `ptrace`. These are the
+process-wide effects listed under O3, and O6 has to contain them.
