@@ -13,9 +13,9 @@ static void check(const char *feature, BOOL ok)
     fflush(stdout);
     if (!ok) ++failures;
 }
-int main(void)
+int main(int argc, char **argv)
 {
-    HWND desktop = GetDesktopWindow(), window, child, parent;
+    HWND desktop, window, child, parent;
     HDC dc;
     HBRUSH brush;
     RECT rect = {0, 0, 320, 240};
@@ -25,6 +25,16 @@ int main(void)
     const WCHAR text[] = L"desk_probe clipboard roundtrip";
     HGLOBAL data;
     WCHAR *ptr;
+    if (argc > 1 && !strcmp(argv[1], "--self-host")) {
+        HMODULE module = LoadLibraryW(L"uwpdesktop.dll");
+        LONG (WINAPI *start)(DWORD) = module ? (void *)GetProcAddress(module, "uwp_desktop_start") : NULL;
+        if (!module) printf("DESK self_host load_error=%lu\n", GetLastError());
+        LONG status = start ? start(10000) : (LONG)0xc0000135;
+        printf("DESK self_host status=%08lx\n", (unsigned long)status);
+        if (status) { check("result", FALSE); return 1; }
+        check("self_host_repeat", start(10000) == 0);
+    }
+    desktop = GetDesktopWindow();
     check("desktop_window", desktop != NULL);
     check("display_guid", desktop && GetPropW(desktop, L"__wine_display_device_guid") != NULL);
     window = CreateWindowExW(0, L"STATIC", L"Desk probe", WS_OVERLAPPEDWINDOW | WS_VISIBLE,
