@@ -151,6 +151,10 @@ wine-test-inproc: wine-test-inproc-build
 FORCE:
 .PHONY: wine-test-inproc wine-test-inproc-build FORCE
 
+# B35 O1: desktop PE DLL and matching opt-in user32/win32u callback ABI.
+$(OUT)/wine-wx/.desk-stamp: prepare-wine-desk.sh wine-desktop-thread.patch wine-inproc-desktop.patch $(OUT)/wine-wx/.stamp
+	./prepare-wine-desk.sh
+
 $(OUT)/test_bigfile: ../tests/test_bigfile.c $(OUT)/libuwph.a
 	$(CC) $(CFLAGS) $< $(OUT)/libuwph.a -ldl -o $@
 bigfile-test: $(OUT)/test_bigfile

@@ -2943,3 +2943,74 @@ Steam UI log: `[2026-10-25 17:20:57] Started webhelper process 0`. Wine trace re
 ## B50 O3
 
 Added `run-minimal.sh --uwph` via `run-wine.sh --guest`: launcher -> Wine own W^X loader -> shim -> uwph, constraints `wx,noproc`, nofork OFF, external stock wineserver concession. Linux only. Valve bootstrap reached “Suppressing Steam update” but no connection log/logged-on state appeared within 120s. Probe and game skipped by the login gate; no SteamAPI or game-progress proof. Webhelper count 0 (127 samples, max 0, matching CreateProcess lines 0). Exact test exited 1. Host tests and Windows smoke command exited 0 (500 smoke checks passed). Evidence and detailed limitations: `/workspace/x64-run/lanes/B50/o3`, `B50-O3.result`; video `/workspace/x64-run/videos/B50-O3.mp4` (8s). No alternate credential path or CEF attempted.
+
+## B34
+
+O2 implementation is **BLOCKED at runtime proof**, not DONE. The new
+`harness/wine-desktop-thread.patch` shares Wine's explorer initialization with
+`uwp_desktop_start`, using an atomic single owner and one ready event, and
+preserves the explorer process path. The desktop thread omits admin-token
+changes, launchers, cmdline execution, systray/appbar (B33 UNKNOWN), and Shell
+DDE. `desk_probe --self-host` loads and starts the DLL before user32 checks;
+`run-desk-probe.sh stock-selfhost` stages the DLL in its disposable prefix,
+sets the private loader/DLL path, and uses our launcher with stock wineserver.
+
+The exact O2 test exited **1** on a free Xvfb display. The DLL/PE builds passed,
+but self-host startup returned `c0000001` and `DESK result FAIL`, with
+`NtCreateUserProcess attempts: 9 (wine-internal: 9, guest: 0)` including
+wineboot and explorer. Wine 10.0 `dlls/ntdll/unix/env.c:build_initial_params`
+calls `run_wineboot` before PE entry; a fresh stock server has no boot event,
+so explorer starts before the probe can call the new export. DLL loading
+succeeded, but the existing explorer desktop prevents thread ownership.
+A bootstrap arrangement before PE entry remains necessary; no spawn metrics,
+security gates, verifier defaults, or nofork/wx/noproc constraints were changed.
+Successful initialization and repeated/concurrent caller behavior remain
+unverified at runtime.
+
+The remaining exact-chain checks were run separately: plain stock passed all
+DESK checks; `make -C x64/uwp-host test` passed (172/0 shim, 7/0 verifier);
+`run-acceptance.sh` passed. Build-only proof covers the DLL. The failed desktop
+proof used our launcher and Wine's own PE loader with a stock wineserver,
+without uwph. Existing hello acceptance passed THROUGH launcher -> Wine
+loader -> shim -> uwph under nofork,noproc,wx; that does not prove the desktop
+thread. Linux only; Xbox untested.
+
+Full output and reason: `/workspace/x64-run/lanes/B34/B34-O2.result`.
+Video: `/workspace/x64-run/videos/B34-O2.mp4` (14.67 seconds, free Xvfb and
+ffmpeg, no Encom). No commit, push, or remote operation was performed.
+
+## B35 O1
+
+Added `wine-inproc-desktop.patch`: append `NtUserStartInprocDesktop` before
+`NtUserCallCount`, with user32 and wow64 callback table entries. win32u reads
+`WINE_INPROC_DESKTOP=1` exactly once with `pthread_once`; only that opt-in
+selects the callback instead of the existing explorer process block. The
+unset path retains the original process block unchanged. user32 loads
+`uwpdesktop.dll` using Wine's loader and calls `uwp_desktop_start(10000)`,
+returning errors without a fallback spawn. A per-thread guard prevents callback
+recursion, the desktop thread returns `STATUS_POSSIBLE_DEADLOCK` rather than
+waiting on itself or forcing a premature desktop, and concurrent initial
+callers share the helper's atomic owner and readiness event. The ordinary
+callback completion uses the existing force=1 desktop re-query semantics.
+
+`prepare-wine-desk.sh` reproducibly applies both desktop patches and rebuilds
+and stages user32.dll, win32u.dll and win32u.so together with uwpdesktop.dll.
+The nofork probe and Megabonk scripts build this set, copy the private DLL to
+the disposable prefix, and export the opt-in beside UWPH_INPROC_SERVER=1.
+The probe now displays the actual uwpjail seccomp enforcement line.
+
+Built the missing generated probe with `bash x64/pe/tests/build.sh`, then ran
+the exact O1 command on a free Xvfb display (:4): exit 0, all mandatory DESK
+checks PASS, `DESK result PASS`, `NtCreateUserProcess attempts: 0
+(wine-internal: 0, guest: 0)`, `nofork=1`, and no failed-to-start-explorer
+message. Evidence: `x64/uwp-host/harness/out/desk-probe/evidence-wd9KrMCF`.
+This is THROUGH uwp_run.sh(nofork,wx,noproc) -> launcher -> Wine's own W^X
+loader -> shim -> uwph, with in-process server and desktop, without
+`--self-host`. Stock Wine was used only to package the prebuilt prefix, not
+as the runtime proof. Linux proof only; Xbox untested. The passing run still
+logs `err:menu:copy_sys_popup Unable to load default system menu`; systray
+is informational and absent. O2 regression gates and Megabonk runtime were
+not run under this O1-only order. Video:
+`/workspace/x64-run/videos/B35-O1.mp4` (6.2 seconds, Xvfb + ffmpeg; no Encom).
+No security constraints, verifier defaults, surface gates, or remotes were
+changed; no commit or push was performed.

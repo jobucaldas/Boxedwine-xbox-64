@@ -26,7 +26,7 @@ wrapper=${UWPH_UWP_RUN:-/workspace/xbox-readiness/tests/uwp_run.sh}
 : "${DISPLAY:?run-megabonk.sh needs DISPLAY (private Xvfb)}"
 [[ -f $game/Megabonk.exe && -f $game/GameAssembly.dll ]]
 
-make -s out/libuwph_wine_shim.so out/run_via_wine out/wine-wx/.stamp
+make -s out/libuwph_wine_shim.so out/run_via_wine out/wine-wx/.desk-stamp
 # Packaging-time step (stock wineboot, outside the jail); reused when current.
 make -s prebuilt-prefix
 out=$here/out
@@ -39,6 +39,7 @@ flock -n 9
 if [[ -d $work/prefix ]]; then chmod -R u+w "$work/prefix"; rm -rf "$work/prefix"; fi
 cp -a --reflink=auto "$here/prebuilt-prefix" "$work/prefix"
 chmod -R u+w "$work/prefix"
+cp "$out/wine-wx/lib/wine/x86_64-windows/uwpdesktop.dll" "$work/prefix/drive_c/windows/system32/uwpdesktop.dll"
 run=$(mktemp -d "$work/run-XXXXXXXX")
 printf 'Copied read-only prebuilt prefix: %s\n' "$here/prebuilt-prefix" > "$run/fixture.txt"
 echo "run=$run"
@@ -48,7 +49,7 @@ echo "IL2CPP: $(ls "$game"/GameAssembly.dll) present; no Mono JIT runtime is shi
 # Hosted in-process server (linked into the shim); uwp_run.sh then skips its
 # stock-server concession. WINESERVER is only a never-taken fallback.
 unset WINEDLLOVERRIDES UWPH_INPROC_OWNER
-export WINEPREFIX=$work/prefix EXTRA_RW=$out UWPH_INPROC_SERVER=1 WINESERVER=/bin/false
+export WINEPREFIX=$work/prefix EXTRA_RW=$out UWPH_INPROC_SERVER=1 WINE_INPROC_DESKTOP=1 WINESERVER=/bin/false
 
 rc=0
 timeout --kill-after=5s "${secs}s" "$wrapper" "$constraints" "$game" -- env \
