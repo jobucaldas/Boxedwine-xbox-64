@@ -23,3 +23,16 @@ run-probe: probe
 
 clean:
 	rm -rf $(OUT)
+
+.PHONY: teb-test
+teb-test: $(OUT)/teb_boundary.exe
+
+../uwp-host/out/win/libuwph.a: FORCE
+	$(MAKE) -C ../uwp-host out/win/libuwph.a
+
+.PHONY: FORCE
+FORCE:
+
+$(OUT)/teb_boundary.exe: tests/teb_boundary.c ../uwp-host/out/win/libuwph.a
+	@mkdir -p $(@D)
+	$(CC_WIN) $(CFLAGS) -I../uwp-host/include -o $@ $< ../uwp-host/out/win/libuwph.a -lbcrypt -lsynchronization -lwindowsapp
