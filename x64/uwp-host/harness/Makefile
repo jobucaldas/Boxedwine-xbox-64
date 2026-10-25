@@ -145,3 +145,7 @@ wine-test-inproc: wine-test-inproc-build
 	./run-wine.sh --inproc-server
 FORCE:
 .PHONY: wine-test-inproc wine-test-inproc-build FORCE
+
+# B34 O1: explorer sources built as a separate, currently unused PE DLL.
+$(OUT)/wine-wx/.desk-stamp: prepare-wine-desk.sh $(OUT)/wine-wx/.stamp
+	./prepare-wine-desk.sh
