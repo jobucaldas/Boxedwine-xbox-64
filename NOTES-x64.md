@@ -1543,3 +1543,65 @@ Video /workspace/x64-run/videos/B10-O1.mp4 (30 seconds) shows the routed
 installer blocker, not a running Steam client. No commits or remotes touched.
 
 Literal last installer log line: `44367.703:0030:0034:trace:module:MODULE_InitDLL (00006FFFFFC20000,PROCESS_DETACH,0000000000000001) - RETURN 1`.
+
+## B21 O1
+
+Reproduced on x64-spike @5f28e621 (R4S+R4X+R4W merged) in worktree
+/workspace/wt/B21: `x64/uwp-host/harness/run-acceptance.sh` still fails, rc=1,
+`hello_k32 constraints=nofork,noproc,wx exit=13`, Wine prints
+`wine: failed to load start.exe: c000000d`. (Setup notes: in a fresh worktree
+the very first run fails earlier, rc=2, because the Makefile rule for
+`out/wine_linux_backend.o` has no `mkdir -p $(@D)`; also `out/wine-o4/prefix`
+must be copied from `/workspace/megabonk/pfx-stock` as run-wine.sh does.)
+
+**Failing call.** Rerunning the same invocation with `WINEDEBUG=+virtual,+module`:
+
+    err:virtual:map_fixed_area mmap error Permission denied for 0x140000000-0x140006000, unix_prot 0x7
+    err:virtual:try_map_free_area mmap() error Permission denied, range 0x100000000-0x100006000, unix_prot 0x7.
+    err:virtual:map_view anon mmap error Permission denied, size 0x16000, unix_prot 0x7
+    (same three again for start.exe, 0x43000 / 0x53000)
+    wine: failed to load start.exe: c000000d
+
+- Offending request: anonymous `mmap(0x140000000, 0x6000,
+  PROT_READ|PROT_WRITE|PROT_EXEC (0x7), MAP_FIXED|MAP_PRIVATE|MAP_ANONYMOUS)`
+  for the hello_k32.exe image view at its preferred base, then the same RWX
+  prot for the free-area retries (size 0x6000, then 0x16000 with alignment
+  slack). Errno EACCES. Wine then falls back to start.exe
+  (env.c:1973), whose image view hits the same RWX map, and gives up with
+  STATUS_INVALID_PARAMETER.
+- Call site (Wine 10.0, dlls/ntdll/unix/virtual.c): `map_image_view()` line
+  3019 `vprot = SEC_IMAGE|SEC_FILE|VPROT_COMMITTED|VPROT_READ|VPROT_EXEC|VPROT_WRITECOPY`
+  -> `map_view()` -> `map_fixed_area()` (anon mmap, ERR at line 1990), then
+  `map_free_area()`/`try_map_free_area()` (line 1325) and the `map_view()`
+  anon fallback (line 2072); `get_unix_prot()` turns that vprot into 0x7.
+- Who rejects it: **the uwph shim, not the seccomp filter.** `shim.c:56`
+  (`mmap` wrapper, added by R4X O2) returns EACCES for any WRITE|EXEC before a
+  backend or kernel call. `strace -f -e trace=mmap,mprotect -e status=failed`
+  around the jailed run shows no RWX mmap reaching the kernel (only Wine's
+  normal address-space probes failing with ENOMEM). So with the same shim, a
+  run without `wx` (`nofork,noproc`) fails the same way today (exit 13,
+  same ERR lines). R4S's "passes without wx" result predates the R4X merge.
+  uwpjail `--wx` would reject the same mmap (prot & 6 == 6 -> EACCES) if the
+  shim allowed it.
+- Why: `run-acceptance.sh` exports `WINE_LOADER=/usr/lib/wine/wine64`, the
+  **stock** Debian loader + ntdll.so. R4X's fix (`wine-image-wx.patch`, hunk
+  @@ -3016, drops VPROT_EXEC from exactly this vprot and sets per-section RX
+  later) only exists in the private `out/wine-wx` tree built by
+  prepare-wine-wx.sh, which run-wine.sh/run_hello use but run-acceptance.sh
+  does not.
+- Diagnostic only (not a fix, acceptance script unchanged): the same jailed
+  hello_k32 run with `WINE_LOADER=out/wine-wx/lib/wine/wine64` (stamp
+  6a05b8a0... matches this tree's prepare-wine-wx.sh) exits 0 and prints
+  `hello from a native x86-64 PE (kernel32 only)` under nofork,noproc,wx.
+
+O2 implication: no new mapping change seems to be needed for hello_k32. The
+acceptance run has to reach Wine's loader with the W^X ntdll.so. O2 forbids
+editing run-acceptance.sh, and `run_via_wine` only uses its built-in
+`/usr/lib/wine/wine64` default when `WINE_LOADER` is unset, so the driver
+needs to choose where that selection should live.
+
+Evidence: /workspace/x64-run/lanes/B21/O1-evidence/ (run-acceptance.log,
+trace-stock-wx.log, trace-stock-nofork-noproc.log, trace-wxntdll-wx.log,
+strace-failed-mmap.txt, scripts). Video /workspace/x64-run/videos/B21-O1.mp4
+(20 s, private Xvfb). Linux box only, THROUGH our launcher -> Wine's own loader ->
+shim -> uwph inside uwp_run.sh/uwpjail; not Xbox proof.
