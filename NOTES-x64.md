@@ -899,3 +899,31 @@ hosted server: this is attempted THROUGH-uwph integration, not successful guest
 execution proof. Earlier hello successes used a separate server and are not O7
 acceptance. O8 event creation and O9 jail changes were not implemented. Video:
 `/workspace/x64-run/videos/R4W-O7.mp4` (free Xvfb display, failed exact test).
+
+## R4W O8 prebuilt-prefix startup event — BLOCKED on O7 protocol mismatch
+
+The hosted start now validates the prefix `.update-timestamp` against the
+installed `/usr/share/wine/wine.inf` mtime (the same INF used by O2 packaging)
+before changing cwd, opening the server socket, or creating its thread. It accepts
+Wine CRT CRLF and native LF decimal stamps; missing, malformed, and stale stamps
+fail with EINVAL and an explicit instruction to rerun `make prebuilt-prefix`.
+The private-source directory patch creates Wine's own permanent manual-reset,
+signalled `\KernelObjects\__wineboot_event` during namespace initialization,
+before the ready handshake. Retaining the event for the hosted server lifetime
+models an already completed packaged-prefix boot. No verifier or wineboot binary
+was changed.
+
+The archive and host shim libraries build. Direct host-entry negative checks for
+missing and `0` stamps return EINVAL with ready fd unchanged, before server
+startup. The exact O8 test was run: make returns 2, all four launcher cases exit
+1, and its verifier reports `BLOCKED: control-hello_k32: nonzero exit`.
+The valid CRLF stamp passes startup; the installed ntdll then reports the existing
+`version mismatch 855/1`. Because make fails, the exact command's `&&` skips the
+explicit verifier/tee, so `/tmp/r4w-o8.txt` is absent and grep fails. An independent
+verifier invocation confirms the same BLOCKED result. Evidence is
+`harness/out/wine-o4/run-F801pWg2`; video is
+`/workspace/x64-run/videos/R4W-O8.mp4` (private free Xvfb, Linux host only).
+This is attempted THROUGH-uwph launcher/Wine-loader integration, with no successful
+hello or hello_k32 execution proof, no stock-Wine-only acceptance, and no claim
+that the wineboot-free gate is green. Resolving the O7 protocol prerequisite is
+outside this O8 change.

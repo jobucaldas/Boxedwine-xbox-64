@@ -9,6 +9,9 @@
 #include <signal.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 extern int wine_server_main(int, char **);
@@ -48,11 +51,44 @@ static void *server_main(void *unused)
     pthread_sigmask(SIG_BLOCK, &mask, NULL);
     uwph_host_exit(wine_server_main(3, argv));
 }
+/* Match the installed Wine used by prepare-wine.sh; never accept a stale or
+ * missing packaging stamp. Check before the server changes cwd or listens. */
+static int validate_prebuilt_prefix(const char *prefix)
+{
+    char *path;
+    char stamp[64], expected[64];
+    struct stat inf;
+    FILE *file;
+    size_t length;
+    int valid = 0;
+    if (asprintf(&path, "%s/.update-timestamp", prefix) == -1) return ENOMEM;
+    file = fopen(path, "r");
+    free(path);
+    if (file)
+    {
+        length = fread(stamp, 1, sizeof(stamp), file);
+        if (!ferror(file) && !stat("/usr/share/wine/wine.inf", &inf))
+        {
+            int n = snprintf(expected, sizeof(expected), "%lld\n", (long long)inf.st_mtime);
+            /* Wine writes through its text-mode CRT: packaged stamps use
+             * CRLF on disk; also accept LF from native packaging tools. */
+            if (length >= 2 && stamp[length - 2] == '\r' && stamp[length - 1] == '\n')
+                stamp[--length - 1] = '\n';
+            valid = n > 0 && (size_t)n == length && !memcmp(stamp, expected, length);
+        }
+        fclose(file);
+    }
+    if (valid) return 0;
+    fprintf(stderr, "uwph: prebuilt prefix timestamp missing or mismatched against "
+                    "/usr/share/wine/wine.inf; rerun make prebuilt-prefix before packaging\n");
+    return EINVAL;
+}
 int uwph_server_start(const char *prefix, int *ready_fd)
 {
     int p[2], rc;
     if (!prefix || prefix[0] != '/' || !ready_fd) return EINVAL;
     if (started) return EALREADY;
+    if ((rc = validate_prebuilt_prefix(prefix))) return rc;
     saved_cwd = open(".", O_RDONLY | O_DIRECTORY | O_CLOEXEC);
     if (saved_cwd == -1) return errno;
     if (setenv("WINEPREFIX", prefix, 1) || pipe2(p, O_CLOEXEC))
