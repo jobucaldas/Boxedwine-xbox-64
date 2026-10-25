@@ -105,7 +105,7 @@ static int write_active_process(const char *dll) {
     return ok;
 }
 
-static int logon(HMODULE client, void *engine, const char *dll, int wait_s) {
+static int logon(HMODULE client, void *engine, const char *dll, int wait_s, int serve_s) {
     bgetcb_fn bget = (bgetcb_fn)(void *)GetProcAddress(client, "Steam_BGetCallback");
     freecb_fn bfree = (freecb_fn)(void *)GetProcAddress(client, "Steam_FreeLastCallback");
     char account[128];
@@ -145,7 +145,18 @@ static int logon(HMODULE client, void *engine, const char *dll, int wait_s) {
         printf("activeprocess_written_by=steamhost ok=%d\n", wrote);
     } else puts("activeprocess_written_by=valve");
     printf("activeprocess_pid_is_self=%d\n", active_pid_is_self());
-    return result == 1 ? 0 : 9;
+    if (result != 1) return 9;
+    /* --serve (B73): stay the master for the game's steam_api; same pump, callbacks discarded. */
+    if (serve_s > 0) {
+        printf("serving=%d\n", serve_s);
+        for (start = GetTickCount(); GetTickCount() - start < (DWORD)serve_s * 1000u; Sleep(100)) {
+            CallbackMsg_t msg;
+            ((void (*)(void *))SLOT(engine, ENGINE_RUNFRAME))(engine);
+            while (bget(pipe, &msg)) bfree(pipe);
+        }
+        puts("serve_done=1");
+    }
+    return 0;
 }
 
 int main(int argc, char **argv) {
@@ -153,14 +164,16 @@ int main(int argc, char **argv) {
     HMODULE client;
     typedef void *(__cdecl *factory_fn)(const char *, int *);
     factory_fn factory;
-    int rc = 0, selftest = 0, check = 0, wait_s = 0;
+    int rc = 0, selftest = 0, check = 0, wait_s = 0, serve_s = 0;
     DWORD len;
     setvbuf(stdout, NULL, _IONBF, 0);
     if (argc == 2 && !strcmp(argv[1], "--selftest")) selftest = 1;
     else if (argc == 2 && !strcmp(argv[1], "--check-pin")) check = 1;
-    else if (!(argc == 4 && !strcmp(argv[1], "--logon") && !strcmp(argv[2], "--wait") &&
+    else if (!((argc == 4 || (argc == 6 && !strcmp(argv[4], "--serve") &&
+                (serve_s = atoi(argv[5])) > 0 && serve_s <= 3600)) &&
+               !strcmp(argv[1], "--logon") && !strcmp(argv[2], "--wait") &&
                (wait_s = atoi(argv[3])) > 0 && wait_s <= 3600)) {
-        fprintf(stderr, "usage: steamhost64.exe --selftest | --check-pin | --logon --wait SECONDS\n");
+        fprintf(stderr, "usage: steamhost64.exe --selftest | --check-pin | --logon --wait SECONDS [--serve SECONDS]\n");
         return 2;
     }
     /* steamhost spawns no process; there is no webhelper (or any child) code path. */
@@ -197,5 +210,5 @@ int main(int argc, char **argv) {
     printf("engine=%d\n", engine != NULL);
     if (!engine) return 5;
     /* --selftest: no vtable calls, users, logon, or credentials. Process exit unloads DLL. */
-    return selftest ? 0 : logon(client, engine, dll, wait_s);
+    return selftest ? 0 : logon(client, engine, dll, wait_s, serve_s);
 }
