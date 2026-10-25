@@ -79,12 +79,12 @@ routing of smoke.exe, UWP activation, or Xbox behaviour.
 ## Hosted ladder (O2)
 
 `make -C x64/on-device ladder && ./x64/on-device/out/ladder --offline` prints
-sixteen STAGE lines (a–h, n0–n7) and overwrites `LocalState/ladder.log`, flushing each
+twenty-three STAGE lines (a–h, p1–p6, n0–n8) and overwrites `LocalState/ladder.log`, flushing each
 line. Use `--local-state PATH` to pick another LocalState directory. Each stage
 times out after 20 seconds by default (`--timeout 1..60`). A stage FAIL or SKIP
 doesn't stop the run, and the exit code stays 0. An unwritable log is an error.
 Offline mode runs only stage a, which is the public uwph Linux backend test.
-Stages b–h and n0–n7 stay SKIP. This is a hosted Python tool, so it doesn't run on the
+Stages b–h and n0–n8 stay SKIP. This is a hosted Python tool, so it doesn't run on the
 console.
 
 LocalState layout (Git-ignored):
@@ -271,3 +271,18 @@ checks the four ports plus failures creating the first worker, ping-pong
 worker, release event and either ping-pong event. Injected failures must
 return probe failure without hanging. Production `rungs.exe` contains no
 fault wrappers. These are desktop diagnostics, not UWP/console PASS evidence.
+
+## Gamepad rung n8 (B03 O1)
+
+| Rung | Probe | Native action / current limitation |
+| --- | --- | --- |
+| n8 | Windows.Gaming.Input.Gamepad | Verified Xbox UWP activation only: RoGetActivationFactory, fresh Gamepads vector each second for 10 seconds, count and every mapped XINPUT_STATE logged. Zero controllers is valid; API errors FAIL. Off-device always SKIP. Device read is build-only until console validation. |
+
+`make -C x64/on-device input-test && ./x64/on-device/out/input_test`
+checks 28 mapping cases on the host. Buttons map to XInput, unsupported paddles
+are ignored, triggers round to 0..255, and sticks round using 32768 for negatives
+and 32767 for positives. No deadzone is applied. Inputs are clamped, with
+nonfinite values mapped to zero. Packet number is zero: this stateless mapper
+does not track changes. No Wine xinput integration is included. The probe uses
+the installed SDK-compatible MinGW Gamepad ABI declarations. Host mapping tests
+are native C tests, not THROUGH-uwph or stock Wine runtime evidence.

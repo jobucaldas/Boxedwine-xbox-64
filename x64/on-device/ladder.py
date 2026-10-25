@@ -73,11 +73,11 @@ def main():
             ('seh_probe', 'thread_probe', 'fs_probe', 'net_probe', 'jit_probe', 'uwph-self-test'), 1)] + [('n0', 'probe-native')] + [
             ('n1', 'd3d11-device'), ('n2', 'd3d12-device'),
             ('n3', 'corewindow-swapchain'), ('n4', 'audio'),
-            ('n5', 'game-memory'), ('n6', 'gaming-device-model'), ('n7', 'big-file')]
+            ('n5', 'game-memory'), ('n6', 'gaming-device-model'), ('n7', 'big-file'), ('n8', 'gamepad')]
         for ident, name in native:
             if args.offline:
                 status, reason = 'SKIP', 'offline: native console APIs require UWP activation; no Xbox proof'
-            elif ident.startswith('p'):
+            elif ident.startswith('p') or ident == 'n8':
                 status, reason = 'SKIP', 'run packaged rungs.exe with verified Xbox UWP activation; hosted adapters cannot attest readiness'
             elif ident == 'n7' and not args.big_file:
                 status, reason = 'SKIP', 'requires --big-file'
