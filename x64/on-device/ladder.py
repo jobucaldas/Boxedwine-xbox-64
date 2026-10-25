@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import signal
 import subprocess
+import tempfile
 
 STAGES = (
     ('a', 'uwph-smoke'), ('b', 'hello'), ('c', 'hello_k32'),
@@ -14,11 +15,11 @@ STAGES = (
 )
 
 
-def execute(command, cwd, timeout):
+def execute(command, cwd, timeout, env=None):
     # Adapter output may contain private application data: never copy it to logs.
     try:
         child = subprocess.Popen(command, cwd=cwd, stdout=subprocess.DEVNULL,
-                                 stderr=subprocess.DEVNULL, start_new_session=True)
+                                 stderr=subprocess.DEVNULL, start_new_session=True, env=env)
         try:
             rc = child.wait(timeout=timeout)
         except subprocess.TimeoutExpired:
@@ -30,6 +31,41 @@ def execute(command, cwd, timeout):
         return ('PASS', 'exit=0') if rc == 0 else ('FAIL', f'exit={rc}')
     except OSError:
         return 'FAIL', 'could not execute adapter'
+
+
+def n10_standin(base, timeout):
+    """Only the packaged, fixed n10 probe may supply public probe sub-lines."""
+    payload = base / 'payload'
+    if not (payload / 'rungs.exe').is_file():
+        payload = base / 'out/payload'
+    launcher = payload / 'combo/run_via_wine'
+    if not launcher.is_file() or not Path('/usr/lib/wine/wine64').is_file():
+        return [], 'standin unavailable: launcher/payload or desktop Wine missing'
+    with tempfile.TemporaryDirectory(prefix='n10-standin-') as temp:
+        root = Path(temp)
+        env = os.environ.copy()
+        env.update(WINEPREFIX=str(root / 'prefix'), WINEDEBUG='-all',
+                   WINEDLLOVERRIDES='mscoree,mshtml=', WINE_LOADER='/usr/lib/wine/wine64')
+        state = root / 'state'
+        state.mkdir()
+        try:
+            status, reason = execute(
+                [str(launcher.resolve()), str((payload / 'rungs.exe').resolve()),
+                 '--n10-standin', '--local-state', 'Z:' + str(state)], root, timeout,
+                env=env)
+            # Read only our bounded n10 public diagnostics, never adapter stdout.
+            evidence = state / 'ladder-native.log'
+            lines = evidence.read_text(errors='replace').splitlines() if evidence.is_file() else []
+            lines = [line for line in lines if line.startswith('# n10 | standin ')]
+            # Never echo the adapter verdict word: a hosted n10 line must not read as PASS.
+            collected = 'collected' if status == 'PASS' and lines else f'not collected ({reason})'
+            return lines, f'standin {collected}; THROUGH our launcher -> stock Wine loader; no uwph or Xbox proof'
+        finally:
+            try:
+                subprocess.run(['/usr/lib/wine/wineserver', '-k'], env=env,
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
+            except (OSError, subprocess.TimeoutExpired):
+                pass
 
 
 def main():
@@ -101,6 +137,14 @@ def main():
             print(line, flush=True)
             log.write(line + '\n')
             log.flush()
+        lines, reason = n10_standin(base, 60)  # first run may create a Wine prefix
+        for line in lines:
+            print(line, flush=True)
+            log.write(line + '\n')
+        line = f'STAGE n10 platform-allow SKIP: {reason}; console verdict=SKIP'
+        print(line, flush=True)
+        log.write(line + '\n')
+        log.flush()
     # Diagnostic collection completes despite individual failures/skips.
     return 0
 

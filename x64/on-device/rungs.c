@@ -943,15 +943,16 @@ static HRESULT packaged_state_dir(void)
 
 int main(int argc, char **argv)
 {
-    int console = 0;
+    int console = 0, n10_only = 0;
     wcscpy(g_state, L"LocalState");
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--console")) console = 1;
+        else if (!strcmp(argv[i], "--n10-standin")) { console = 1; n10_only = 1; }
         else if (!strcmp(argv[i], "--big-file")) g_big_file = 1;
         else if (!strcmp(argv[i], "--local-state") && i + 1 < argc)
             MultiByteToWideChar(CP_ACP, 0, argv[++i], -1, g_state, MAX_PATH);
         else {
-            fprintf(stderr, "usage: rungs.exe [--console] [--local-state DIR] [--big-file]\n");
+            fprintf(stderr, "usage: rungs.exe [--console] [--n10-standin] [--local-state DIR] [--big-file]\n");
             return 2;
         }
     }
@@ -1001,7 +1002,8 @@ int main(int argc, char **argv)
             fprintf(stderr, "rungs.exe: cannot write ladder-native.log in --local-state\n");
             return 1;
         }
-        run_all(NULL);
+        if (n10_only) rung_n10();
+        else run_all(NULL);
     }
     if (g_log) fclose(g_log);
     return 0;
