@@ -27,7 +27,8 @@ for line in pathlib.Path(sys.argv[1]).read_text().splitlines():
 assert pid and pid > 0
 assert classes == dict(recursion='0', unattributed='0', module_overflow='0',
                        instrumentation_raw_io='1'), classes
-assert set(totals) == {'open', 'read', 'close', 'mmap', 'munmap'}, totals
+# mprotect: R4X shim counter; W^X ntdll's RW->RX section flips must route too.
+assert set(totals) == {'open', 'read', 'close', 'mmap', 'munmap', 'mprotect'}, totals
 for op, (backend, bypass) in totals.items():
     assert backend > 0 and bypass == 0, (op, backend, bypass)
     entries = [(name, counts) for (name, operation), counts in modules.items()
@@ -36,4 +37,4 @@ for op, (backend, bypass) in totals.items():
     assert all(calls == routed and calls >= 0 for _, (calls, routed) in entries)
     assert any(pathlib.Path(name).name == 'ntdll.so' and counts[1] > 0
                for name, counts in entries), (op, entries)
-print(f'PASS fresh noproc routing report pid={pid}; ntdll open/read/close/mmap/munmap positive; bypass/recursion/unattributed/module_overflow=0')
+print(f'PASS fresh noproc routing report pid={pid}; ntdll open/read/close/mmap/munmap/mprotect positive; bypass/recursion/unattributed/module_overflow=0')

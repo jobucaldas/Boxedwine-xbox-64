@@ -1,6 +1,63 @@
 phase	kind	symbol_or_surface	count	evidence
-installer	disabled-helper	wineboot.exe	1	44365.391:0020:0024:err:environ:run_wineboot failed to start wineboot c0000135
-installer	architecture-limit	wow64	1	44367.695:0038:003c:err:environ:init_peb starting L"Z:\\workspace\\steam-owned\\SteamSetup.exe" in experimental wow64 mode
-installer	missing-module	C:\windows\syswow64\ntdll.dll	1	wine: failed to load L"\\??\\C:\\windows\\syswow64\\ntdll.dll" error c0000135
-installer	startup-failure	ShellExecuteEx	1	ShellExecuteEx failed: 44367.701:0020:0024:err:start:fatal_error flags 0x1, load_path 0000000000000000, dll_characteristics 0000000000000000, name 00007FFFFE2FE870, base 00007FFFFE2FE868.
-steam	not-run	steam.exe -silent -no-browser	0	No installed executable; 180-second client trace unavailable
+installer	run	SteamSetup.exe /S; WINEDLLPATH=/usr/lib/i386-linux-gnu/wine	1	exit=0
+installer	wine-err	environ:run_wineboot	1	err:environ:run_wineboot failed to start wineboot c0000135
+installer	child-process	conhost.exe	2	trace:process:NtCreateUserProcess L"\\??\\C:\\windows\\system32\\conhost.exe" pid 0030 tid 0034 handles 0x40/0x44
+installer	wow64-in-process	SteamSetup.exe	1	err:environ:init_peb starting L"Z:\\workspace\\steam-owned\\SteamSetup.exe" in experimental wow64 mode
+installer	child-process	SteamSetup.exe	1	trace:process:NtCreateUserProcess L"\\??\\Z:\\workspace\\steam-owned\\SteamSetup.exe" pid 0038 tid 003c handles 0x68/0x6c
+installer	child-process	explorer.exe	1	trace:process:NtCreateUserProcess L"\\??\\C:\\windows\\system32\\explorer.exe" pid 0040 tid 0044 handles 0x6c/0x70
+installer	missing-module	winemac.drv c0000135	1	warn:module:load_dll Failed to load module L"winemac.drv"; status=c0000135
+installer	missing-export	ole32.dll!DllCanUnloadNow	1	warn:module:LdrGetProcedureAddress "DllCanUnloadNow" (ordinal 0) not found in L"C:\\windows\\system32\\ole32.dll"
+installer	wine-err	ole:start_rpcss	2	err:ole:start_rpcss Failed to open service manager
+installer	missing-unixlib	winex11.so	2	warn:module:get_builtin_unix_funcs failed to load "/usr/lib/i386-linux-gnu/wine/x86_64-unix/winex11.so": /usr/lib/i386-linux-gnu/wine/x86_64-unix/winex11.so: cannot open shared object file: No such file or directory
+installer	missing-module	CRYPTBASE.dll c0000135	1	warn:module:load_dll Failed to load module L"C:\\windows\\system32\\CRYPTBASE.dll"; status=c0000135
+installer	missing-module	CLBCATQ.dll c0000135	1	warn:module:load_dll Failed to load module L"C:\\windows\\system32\\CLBCATQ.dll"; status=c0000135
+installer	missing-export	kernel32.dll!CreateMutexWW	1	warn:module:LdrGetProcedureAddress "CreateMutexWW" (ordinal 0) not found in L"C:\\windows\\system32\\kernel32.dll"
+installer	child-process	winemenubuilder.exe	2	trace:process:NtCreateUserProcess L"\\??\\C:\\windows\\system32\\winemenubuilder.exe" pid 0054 tid 0058 handles 0x9c/0xa0
+installer	wow64-in-process	steamservice.exe	1	err:environ:init_peb starting L"C:\\Program Files (x86)\\Steam\\bin\\steamservice.exe" in experimental wow64 mode
+installer	child-process	steamservice.exe	1	trace:process:NtCreateUserProcess L"\\??\\C:\\Program Files (x86)\\Steam\\bin\\steamservice.exe" pid 0064 tid 0068 handles 0xac/0xb0
+installer	missing-unixlib	ws2_32.so	1	warn:module:get_builtin_unix_funcs failed to load "/usr/lib/i386-linux-gnu/wine/x86_64-unix/ws2_32.so": /usr/lib/i386-linux-gnu/wine/x86_64-unix/ws2_32.so: cannot open shared object file: No such file or directory
+installer	wine-err	module:loader_init	2	err:module:loader_init "WS2_32.dll" failed to initialize, aborting
+installer	linux-exec	chmod	1	strace execve success; i386 ELF loader execs = 0
+installer	linux-exec	env	1	strace execve success; i386 ELF loader execs = 0
+installer	linux-exec	run_via_wine	1	strace execve success; i386 ELF loader execs = 0
+installer	linux-exec	wine64	5	strace execve success; i386 ELF loader execs = 0
+installer	uwph-routed	shim calls close,mmap,mprotect,munmap,open,read	417834	19 per-pid counter reports; close=106251 mmap=86782 mprotect=12742 munmap=69914 open=57274 read=84871
+installer	last-log-line	wine log	1	trace:module:MODULE_InitDLL (00006FFFFFC20000,PROCESS_DETACH,0000000000000001) - RETURN 1
+client-run1	run	Steam.exe -silent -no-browser; WINEDLLPATH=/usr/lib/i386-linux-gnu/wine	1	exit=66
+client-run1	wine-err	environ:run_wineboot	1	err:environ:run_wineboot failed to start wineboot c0000135
+client-run1	child-process	conhost.exe	1	trace:process:NtCreateUserProcess L"\\??\\C:\\windows\\system32\\conhost.exe" pid 0030 tid 0034 handles 0x40/0x44
+client-run1	wow64-in-process	Steam.exe	1	err:environ:init_peb starting L"C:\\Program Files (x86)\\Steam\\Steam.exe" in experimental wow64 mode
+client-run1	child-process	Steam.exe	1	trace:process:NtCreateUserProcess L"\\??\\C:\\Program Files (x86)\\Steam\\Steam.exe" pid 0038 tid 003c handles 0x68/0x6c
+client-run1	child-process	explorer.exe	1	trace:process:NtCreateUserProcess L"\\??\\C:\\windows\\system32\\explorer.exe" pid 0040 tid 0044 handles 0x6c/0x70
+client-run1	missing-module	winemac.drv c0000135	1	warn:module:load_dll Failed to load module L"winemac.drv"; status=c0000135
+client-run1	missing-export	ole32.dll!DllCanUnloadNow	1	warn:module:LdrGetProcedureAddress "DllCanUnloadNow" (ordinal 0) not found in L"C:\\windows\\system32\\ole32.dll"
+client-run1	wine-err	ole:start_rpcss	2	err:ole:start_rpcss Failed to open service manager
+client-run1	missing-unixlib	winex11.so	2	warn:module:get_builtin_unix_funcs failed to load "/usr/lib/i386-linux-gnu/wine/x86_64-unix/winex11.so": /usr/lib/i386-linux-gnu/wine/x86_64-unix/winex11.so: cannot open shared object file: No such file or directory
+client-run1	missing-unixlib	bcrypt.so	1	warn:module:get_builtin_unix_funcs failed to load "/usr/lib/i386-linux-gnu/wine/x86_64-unix/bcrypt.so": /usr/lib/i386-linux-gnu/wine/x86_64-unix/bcrypt.so: cannot open shared object file: No such file or directory
+client-run1	missing-unixlib	crypt32.so	1	warn:module:get_builtin_unix_funcs failed to load "/usr/lib/i386-linux-gnu/wine/x86_64-unix/crypt32.so": /usr/lib/i386-linux-gnu/wine/x86_64-unix/crypt32.so: cannot open shared object file: No such file or directory
+client-run1	wine-err	module:loader_init	2	err:module:loader_init "CRYPT32.dll" failed to initialize, aborting
+client-run1	linux-exec	env	1	strace execve success; i386 ELF loader execs = 0
+client-run1	linux-exec	run_via_wine	1	strace execve success; i386 ELF loader execs = 0
+client-run1	linux-exec	wine64	4	strace execve success; i386 ELF loader execs = 0
+client-run1	uwph-routed	shim calls close,mmap,mprotect,munmap,open,read	171862	9 per-pid counter reports; close=44212 mmap=36156 mprotect=4535 munmap=29205 open=23419 read=34335
+client-run1	last-log-line	wine log	1	trace:module:MODULE_InitDLL (00006FFFFFC20000,PROCESS_DETACH,0000000000000001) - RETURN 1
+client	run	Steam.exe -silent -no-browser; WINEDLLPATH=out/b20/wow64-dlls overlay	1	exit=124 (180 s cap reached, process still alive)
+client	wine-err	environ:run_wineboot	1	err:environ:run_wineboot failed to start wineboot c0000135
+client	child-process	conhost.exe	1	trace:process:NtCreateUserProcess L"\\??\\C:\\windows\\system32\\conhost.exe" pid 0030 tid 0034 handles 0x40/0x44
+client	wow64-in-process	Steam.exe	1	err:environ:init_peb starting L"C:\\Program Files (x86)\\Steam\\Steam.exe" in experimental wow64 mode
+client	child-process	Steam.exe	1	trace:process:NtCreateUserProcess L"\\??\\C:\\Program Files (x86)\\Steam\\Steam.exe" pid 0038 tid 003c handles 0x88/0x8c
+client	child-process	explorer.exe	1	trace:process:NtCreateUserProcess L"\\??\\C:\\windows\\system32\\explorer.exe" pid 0040 tid 0044 handles 0x6c/0x70
+client	missing-module	winemac.drv c0000135	1	warn:module:load_dll Failed to load module L"winemac.drv"; status=c0000135
+client	missing-export	ole32.dll!DllCanUnloadNow	1	warn:module:LdrGetProcedureAddress "DllCanUnloadNow" (ordinal 0) not found in L"C:\\windows\\system32\\ole32.dll"
+client	wine-err	ole:start_rpcss	2	err:ole:start_rpcss Failed to open service manager
+client	missing-module	crashhandler.dll c0000135	2	warn:module:load_dll Failed to load module L"C:\\Program Files (x86)\\Steam\\crashhandler.dll"; status=c0000135
+client	wine-err	wininet:open_http_connection	3	err:wininet:open_http_connection create_netconn failed: 12029
+client	linux-exec	env	1	strace execve success; i386 ELF loader execs = 0
+client	linux-exec	run_via_wine	1	strace execve success; i386 ELF loader execs = 0
+client	linux-exec	wine64	4	strace execve success; i386 ELF loader execs = 0
+client	uwph-routed	shim calls close,mmap,mprotect,munmap,open,read	116213	7 per-pid counter reports; close=29464 mmap=24127 mprotect=2991 munmap=19473 open=15823 read=24335
+client	last-log-line	wine log	1	trace:module:MODULE_InitDLL (00006FFFFFC20000,PROCESS_DETACH,0000000000000001) - RETURN 1
+client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 06:11:51] Manifest download: waiting for download to finish
+client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 06:12:51] Error: Download failed: http error 0
+client	steam-bootstrap	bootstrap_log.txt	1	[2026-10-25 06:12:51] Error: Steam needs to be online to update. Please confirm your network connection and try again.
+client	not-reached	steamwebhelper.exe	0	bootstrapper never got its client package (download failed, same under stock Wine control); Chromium multi-process wall unmeasured
