@@ -78,6 +78,16 @@ struct uwph_object *uwph_fd_get(int fd, enum uwph_fd_kind *kind, int *flags)
     return o;
 }
 
+int uwph_fd_ids(int *ids, int capacity)
+{
+    int n = 0;
+    uwph_lock(&fd_lock);
+    for (int i = 0; i < UWPH_MAX_FDS && n < capacity; i++)
+        if (fds[i].kind != UWPH_FD_FREE) ids[n++] = i;
+    uwph_unlock(&fd_lock);
+    return n;
+}
+
 int uwph_fd_count(void)
 {
     int n = 0;
@@ -120,7 +130,14 @@ static int dup_from(int fd, int start, int cloexec)
     return nfd;
 }
 
-UWPH_API int uwph_dup(int fd) { return dup_from(fd, 0, 0); }
+UWPH_API int uwph_dup(int fd) {
+    uwph_trace_hit(UWPH_TRACE_DUP);
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    return uwph_linux_dup(fd);
+#else
+    return dup_from(fd, 0, 0);
+#endif
+}
 
 UWPH_API int uwph_dup2(int fd, int newfd)
 {

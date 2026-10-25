@@ -9,8 +9,14 @@
 
 UWPH_API uwph_pid_t uwph_getpid(void)
 {
+    uwph_trace_hit(UWPH_TRACE_GETPID);
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    UWPH_NATIVE(uwph_pid_t, "getpid", (void));
+    UWPH_NATIVE_RETURN(fn());
+#endif
 #ifdef UWPH_BACKEND_WIN32
     return (uwph_pid_t)GetCurrentProcessId();
+
 #else
     return 1;
 #endif
@@ -269,7 +275,16 @@ UWPH_API void uwph_exit(int code) { exit(code); }
 UWPH_API void uwph_abort(void) { abort(); }
 
 /* ---- no process creation in a UWP app ---- */
-UWPH_API uwph_pid_t uwph_fork(void) { return UWPH_ENOSYS_INT(); }
+UWPH_API uwph_pid_t uwph_fork(void)
+{
+    uwph_trace_hit(UWPH_TRACE_FORK);
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    UWPH_NATIVE(uwph_pid_t, "fork", (void));
+    UWPH_NATIVE_RETURN(fn());
+#else
+    return UWPH_ENOSYS_INT();
+#endif
+}
 UWPH_API int uwph_execve(const char *p, char *const a[], char *const e[]) { (void)p; (void)a; (void)e; return UWPH_ENOSYS_INT(); }
 UWPH_API int uwph_execv(const char *p, char *const a[])
 {

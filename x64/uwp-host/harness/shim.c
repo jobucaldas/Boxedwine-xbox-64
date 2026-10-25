@@ -1,6 +1,12 @@
 #define _GNU_SOURCE
 #include "uwph/uwph.h"
 #include "counters.h"
+#include "../src/fake_proc.h"
+#include "../src/linux_backend.h"
+#include <dirent.h>
+#include <stddef.h>
+#include <pthread.h>
+#include <string.h>
 #include <sys/mman.h>
 #include <sys/syscall.h>
 #include <unistd.h>
@@ -158,6 +164,32 @@ _Static_assert(sizeof(sigset_t)==sizeof(uwph_sigset_t),"sigset ABI");
 ssize_t readlink(const char *p, char *b, size_t n)
 { ssize_t r = uwph_readlink(p,b,n); if (r < 0) errno=uwph_errno; return r; }
 
+_Static_assert(sizeof(struct dirent)==sizeof(struct uwph_dirent) &&
+               offsetof(struct dirent,d_type)==offsetof(struct uwph_dirent,d_type) &&
+               offsetof(struct dirent,d_name)==offsetof(struct uwph_dirent,d_name),"dirent ABI");
+DIR *opendir(const char *path)
+{
+    DIR *d = (DIR *)uwph_opendir(path);
+    if (!d) errno = uwph_errno;
+    return d;
+}
+struct dirent *readdir(DIR *dir)
+{
+    if (uwph_fake_dir_owned(dir)) return (struct dirent *)uwph_readdir((uwph_DIR *)dir);
+    struct dirent *(*native_fn)(DIR *) = uwph_linux_symbol("readdir");
+    return native_fn(dir);
+}
+int closedir(DIR *dir)
+{
+    if (uwph_fake_dir_owned(dir)) return uwph_closedir((uwph_DIR *)dir);
+    int (*native_fn)(DIR *) = uwph_linux_symbol("closedir");
+    return native_fn(dir);
+}
+
+int pthread_create(pthread_t *out, const pthread_attr_t *attr, void *(*start)(void *), void *arg)
+{
+    return uwph_proc_pthread_create(out, attr, start, arg);
+}
 #include <sys/socket.h>
 #include <sys/resource.h>
 #include <dlfcn.h>
@@ -182,3 +214,22 @@ long sysconf(int n) { long r=uwph_sysconf(n); if(r<0) errno=uwph_errno; return r
 _Static_assert(sizeof(struct msghdr)==sizeof(struct uwph_msghdr),"msghdr ABI");
 _Static_assert(sizeof(struct rlimit)==sizeof(struct uwph_rlimit),"rlimit ABI");
 _Static_assert(sizeof(Dl_info)==sizeof(uwph_Dl_info),"dladdr ABI");
+
+#include <dirent.h>
+#include <langinfo.h>
+extern char *uwph_trace_nl_langinfo(int);
+mode_t umask(mode_t m) { return uwph_umask(m); }
+ssize_t __getdelim(char **p,size_t *n,int d,FILE *f)
+{ ssize_t r=uwph___getdelim(p,n,d,(uwph_FILE *)f); if(r<0) errno=uwph_errno; return r; }
+int access(const char *p,int m) { B06_INT(uwph_access(p,m)); }
+int connect(int fd,const struct sockaddr *a,socklen_t n)
+{ B06_INT(uwph_connect(fd,(const struct uwph_sockaddr *)a,n)); }
+void *dlsym(void *h,const char *n) { return uwph_dlsym(h,n); }
+int dup(int fd) { B06_INT(uwph_dup(fd)); }
+int fchdir(int fd) { B06_INT(uwph_fchdir(fd)); }
+pid_t fork(void) { B06_INT(uwph_fork()); }
+char *getcwd(char *p,size_t n) { char *r=uwph_getcwd(p,n); if(!r) errno=uwph_errno; return r; }
+pid_t getpid(void) { return uwph_getpid(); }
+int lstat(const char *p,struct stat *s) { B06_INT(uwph_lstat(p,(struct uwph_stat *)s)); }
+int mkdir(const char *p,mode_t m) { B06_INT(uwph_mkdir(p,m)); }
+char *nl_langinfo(nl_item item) { char *r=uwph_trace_nl_langinfo(item); if(!r) errno=uwph_errno; return r; }

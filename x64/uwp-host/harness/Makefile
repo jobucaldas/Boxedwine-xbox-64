@@ -5,7 +5,7 @@ SOURCES := $(wildcard ../src/*.c) linux_backend.c
 HEADERS := $(wildcard ../include/uwph/*.h ../src/*.h)
 OBJECTS := $(patsubst %.c,$(OUT)/%.o,$(notdir $(SOURCES)))
 vpath %.c ../src .
-$(OUT)/%.o: %.c $(HEADERS) counters.h
+$(OUT)/%.o: %.c $(HEADERS) counters.h bigfile.inc
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) -c $< -o $@
 $(OUT)/libuwph.a: $(OBJECTS)
@@ -122,6 +122,11 @@ prebuilt-prefix:
 	./prepare-wine.sh --prebuilt-prefix
 .PHONY: prebuilt-prefix
 
+proc-unit-test: $(OUT)/fake_proc_test
+	$(OUT)/fake_proc_test --host-proc
+	bwrap --ro-bind / / --tmpfs /proc -- $(OUT)/fake_proc_test
+.PHONY: proc-unit-test
+
 # B18: two intentionally absent exports; never execute the generated stubs.
 $(OUT)/stub_probe.def:
 	@mkdir -p $(OUT)
@@ -139,8 +144,15 @@ stub-test: $(OUT)/run_hello $(OUT)/stub_probe.exe
 	$(MAKE) -C ../wineserver lib
 $(OUT)/libuwph_inproc_server.so: inproc_server.c ../wineserver/server_thread.c ../wineserver/out/libwineserver.a
 	$(CC) $(CFLAGS) -shared $^ -Wl,-z,defs -o $@
-wine-test-inproc-build: $(OUT)/libuwph_wine_shim.so $(OUT)/libuwph_inproc_server.so $(OUT)/run_via_wine
+wine-test-inproc-build: $(OUT)/libuwph_wine_shim.so $(OUT)/libuwph_inproc_server.so $(OUT)/run_via_wine prebuilt-prefix
+	./run-wine.sh --stage-inproc
 wine-test-inproc: wine-test-inproc-build
 	./run-wine.sh --inproc-server
 FORCE:
 .PHONY: wine-test-inproc wine-test-inproc-build FORCE
+
+$(OUT)/test_bigfile: ../tests/test_bigfile.c $(OUT)/libuwph.a
+	$(CC) $(CFLAGS) $< $(OUT)/libuwph.a -ldl -o $@
+bigfile-test: $(OUT)/test_bigfile
+	timeout 30s $(OUT)/test_bigfile
+.PHONY: bigfile-test

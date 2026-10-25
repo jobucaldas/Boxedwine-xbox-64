@@ -1651,6 +1651,46 @@ Video /workspace/x64-run/videos/B10-O1.mp4 (30 seconds) shows the routed
 installer blocker, not a running Steam client. No commits or remotes touched.
 
 Literal last installer log line: `44367.703:0030:0034:trace:module:MODULE_InitDLL (00006FFFFFC20000,PROCESS_DETACH,0000000000000001) - RETURN 1`.
+## B09 O1 — fake proc snapshots (2026-10-25)
+
+The provider now supplies self status/stat/auxv, meminfo, fd links and fd/task
+directory snapshots from uwph's descriptor, mapping and thread registries.
+Own numeric PID status/stat and task-stat paths are supported. Unknown proc
+paths fail closed. Memory budgets are 1024 MiB by default or 5120 MiB with
+UWPH_MEM_BUDGET_MB=5120; other values fail meminfo with EINVAL. Residency and
+CPU counters are unknown (zero), and this is not full Linux proc fidelity.
+Tests exercise Wine's process.c fill_vm_counters, system.c meminfo and
+thread.c get_thread_times parsing, binary auxv termination, descriptor links,
+thread lifecycle and mapping accounting with host procfs hidden.
+
+`make -C x64/uwp-host test` exits 0; complete output is
+/workspace/x64-run/lanes/B09/O1-make-test.log. Linux provider tests run THROUGH
+uwph; Windows backend unit tests run under stock Wine, not on Xbox.
+
+Exact acceptance reproduction (from /workspace/wt/B09):
+`DISPLAY=:2 WINEPREFIX=$PWD/x64/uwp-host/harness/out/wine-o4/prefix EXTRA_RW=$PWD /workspace/xbox-readiness/tests/uwp_run.sh noproc "$PWD/x64/uwp-host/harness" -- ./run-wine.sh`.
+Output: /workspace/x64-run/lanes/B09/O1-exact-noproc.log.
+Both routed hellos exit 0 THROUGH launcher -> Wine's own private W^X loader
+-> shim -> uwph. The command nevertheless exits 1: both stock controls exit
+1 with `wine: could not load ntdll.so: (null)` and the unchanged verifier
+reports `BLOCKED: control-hello_k32: nonzero exit`. This is not an exact-test PASS.
+
+Openat proof: harness/out/wine-o4/run-ZmdWtgjx/routed-hello.exec and
+routed-hello_k32.exec contain `strace -f -e trace=execve,openat` output;
+neither contains a /proc path. Fresh noproc probe traces are
+harness/out/b09-probes/fs_probe.strace and thread_probe.strace, collected
+with `strace -f -e openat`; neither contains a /proc path. Their logs report
+`SUMMARY fs_probe pass=7 fail=0` and `SUMMARY thread_probe pass=10 fail=0`,
+both exit 0 THROUGH the same launcher/loader/shim/uwph route. The thread
+probe's sysinfo memory value remains host-derived; the requested fake
+meminfo budget is tested separately and does not claim sysinfo coverage.
+
+All these routed processes see empty tmpfs /proc. The separately prestarted
+stock Linux wineserver remains outside the namespace and outside these
+traces. Therefore no global no-host-proc claim or concession removal is made;
+the shared readiness STATUS row is not upgraded. Xbox remains untested.
+Video: /workspace/x64-run/videos/B09-O1.mp4 (24.2 seconds, Xvfb).
+
 
 ## B06
 
@@ -2115,3 +2155,434 @@ The status lines above describe prerequisite failures, not runtime stages.
 The exact O2 test is **BLOCKED**: both status lines are recorded here, but
 `/workspace/x64-run/videos/B13-O2a.mp4` and `B13-O2b.mp4` are absent because
 there was no game to capture. No placeholder videos were generated.
+
+## B24 O1 — fresh RWX caller investigation (blocked)
+
+Restored the missing B12 run-megabonk.sh locally; K_TIMEOUT now selects its
+existing timeout (45 seconds for the exact command). No runtime policy changed.
+Fresh B24 run: harness/out/megabonk/run-QFSDJnAt, wine.log and report.778103;
+raw evidence copied to /workspace/x64-run/lanes/B24/evidence/first-run/.
+THROUGH uwp_run.sh -> our launcher -> Wine own private W^X loader -> shim ->
+uwph Linux backend, with a separate stock Linux wineserver outside the jail.
+This is Linux routed proof, not stock-Wine-only, build-only, or Xbox proof.
+Video: /workspace/x64-run/videos/B24-O1.mp4 (private Xvfb, <=60 seconds).
+
+Fresh wine.log lines:
+```
+1:uwpjail: seccomp wx=1 nofork=1 (34 insns)
+2:[launcher] exec /workspace/wt/B24/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64 -> /workspace/steam-owned/games/megabonk/Megabonk.exe (handing guest to Wine's loader)
+4:0024:err:environ:run_wineboot failed to start wineboot c0000017
+```
+Fresh report lines:
+```
+5:total mmap 8997 0
+7:total mprotect 1530 0
+```
+The report's ntdll.so mmap calls/backend counts are 1080/1080 and mprotect
+1530/1530. Zero matches for UWPH_RWX, unix_prot, or Permission denied in the
+fresh wine.log. The existing shim report_wx logs module + return offset before
+rejecting PROT_WRITE|PROT_EXEC, so a refused shim mmap would be visible even
+though it never reaches kernel strace. Run exited 1; MEGABONK reached=unityplayer.
+
+Historical B12 final-evidence/wine.log (not fresh B24 evidence):
+```
+96:0024:err:virtual:map_view anon mmap error Permission denied, size 0x20000, unix_prot 0x7
+97:0024:err:virtual:map_view anon mmap error Permission denied, size 0x20000, unix_prot 0x7
+```
+These identify Wine Unix ntdll's map_view diagnostic, but give no exact mmap
+return offset. Fresh B24 did not reproduce that RWX denial, so no fresh module
++ call site can honestly be named. c0000017 persists without the historical
+RWX message; its asserted causal relationship is unproven. O1 BLOCKED on
+reproducing the denied request on the current merged baseline; O2 not attempted.
+
+Exact-test repeat: run-OleHKkKS/report.781582 also has zero UWPH_RWX,
+unix_prot, or Permission denied matches, mmap=8997, mprotect=1530,
+c0000017 for wineboot/explorer, and MEGABONK reached=unityplayer.
+Full exact-test output: /workspace/x64-run/lanes/B24/evidence/exact-test.txt
+(command completed with status 0; harness reports guest exit=1).
+Video verified by ffprobe: 30.400000 seconds. bash -n and git diff --check pass.
+
+
+## B24 O2 — blocked: no remaining RWX caller reproduced
+
+Exact test on 2026-10-25: `make -C x64/uwp-host test && K_TIMEOUT=45 x64/uwp-host/harness/run-megabonk.sh 2>&1 | tee /tmp/b24.log; ! grep -q c0000017 /tmp/b24.log`.
+Host tests passed (including 70 passed, 0 failed / 20 traced symbols); final
+exact-test exit=1. Guest exit=1, MEGABONK reached=unityplayer; wineboot and
+explorer still return c0000017. Run: harness/out/megabonk/run-2eimxvqZ.
+Zero UWPH_RWX/unix_prot/Permission denied lines; mmap=8997, mprotect=1530.
+Evidence and full exact output: /workspace/x64-run/lanes/B24/evidence/O2/.
+Video: /workspace/x64-run/videos/B24-O2.mp4, 10.2 seconds, free Xvfb :0.
+THROUGH uwp_run.sh(nofork,wx,noproc) -> our launcher -> Wine own private
+W^X loader -> shim -> uwph Linux backend; separate stock Linux wineserver.
+This is routed Linux proof, not stock-Wine-only, build-only, or Xbox proof.
+
+Source inspection: Wine 10.0 dlls/ntdll/unix/process.c spawn_process calls
+fork at line 439 and returns STATUS_NO_MEMORY at line 479 when it fails;
+NtCreateUserProcess calls spawn_process at line 916. uwpjail.c lines 114–124
+reject fork/vfork/non-thread clone with EPERM. This is consistent with the
+observed child-start errors, independently of W^X. An attempted strace inside
+the unchanged jail failed before launcher startup (test_ptrace_seize: fork:
+Operation not permitted); it is not runtime attribution proof. Its separate
+diagnostic run reached=none and is not the exact test result.
+
+No runtime patch is justified by a reproduced RWX call. Existing image patch
+already maps the historical image-view/header sites RW, then applies section
+protections. No constraint was relaxed, no child-process emulation, graphics,
+or B19 in-process-server work was attempted. O2 remains blocked by missing
+caller reproduction and child-process startup under mandatory nofork.
+## B22 O1
+
+**Diagnosis: WINEDLLPATH/install-layout gap. No fix applied.** Reproduced with
+an i386 build of the existing `x64/on-device/readiness/net_probe.c` through
+this worktree's compiled `x64/pe/launcher/run_via_wine.c`, B20's uwph shim and
+private Wine W^X loader, in the existing
+`/workspace/wt/B20/x64/uwp-host/harness/out/b20/pfx-wow64-uwph` prefix.
+B22 has no harness/out build; the shared B20 binaries/prefix are used explicitly
+by `x64/uwp-host/harness/steam-evidence/b22-o1/repro.sh` (override assets with
+B20_HARNESS). Shim source is identical between B20 and B22. This is Linux
+harness evidence THROUGH uwph, not an Xbox on-device run or stock Wine proof.
+Separate wineserver64 is infrastructure. No Steam binary or login is needed.
+
+Environment: `WINEDEBUG=+winsock,+module,+loaddll`,
+`WINEDLLPATH=/usr/lib/i386-linux-gnu/wine` (the original installer setting),
+`WINEDLLOVERRIDES=wineboot.exe=d`, `WINESERVER=/bin/false`, and
+`LD_PRELOAD=<B20 harness>/out/libuwph_wine_shim.so` on the launcher/loader.
+Wine reports experimental wow64 mode and loads builtin WS2_32.dll at
+`0x7b250000`. The actual failing attach is
+`DllMain(instance=0x7b250000, reason=DLL_PROCESS_ATTACH=1, reserved=0x0022fd24)`.
+Its `__wine_init_unix_call()` requests the WoW64 Unix function table;
+`get_builtin_unix_funcs(module=0x7b250000, wow=TRUE, funcs=<output pointer>)`
+at Wine `dlls/ntdll/unix/virtual.c:642` calls
+`dlopen("/usr/lib/i386-linux-gnu/wine/x86_64-unix/ws2_32.so", RTLD_NOW)`.
+The loader logs “cannot open shared object file: No such file or directory”.
+The corresponding observed system call is
+`openat(AT_FDCWD, "/usr/lib/i386-linux-gnu/wine/x86_64-unix/ws2_32.so", O_RDONLY|O_CLOEXEC) = -1 ENOENT`.
+The function returns STATUS_DLL_NOT_FOUND (0xc0000135, source-derived),
+WS2_32 DllMain returns FALSE (`dlls/ws2_32/socket.c:580-585`), and the guest
+loader aborts with STATUS_DLL_INIT_FAILED (0xc0000142), process exit 66.
+The output pointer value is not logged; function arguments/status above are
+identified from the matching loader source and observed module mapping.
+
+This is the same missing path logged during B20's steamservice.exe attach.
+The probe never reaches main/WSAStartup(0x0202, &wd), so it does not reach its
+`socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)` call. There is no evidence here
+of a refused socket family or a missing uwph socket syscall. The missing
+file is the **x86-64 Unix companion of an i386 Windows PE**, not an i386 ELF
+library: `<B20 harness>/out/wine-wx/lib/x86_64-linux-gnu/wine/x86_64-unix/ws2_32.so`
+exists (links to Debian's x86-64 library) and `nm -D` shows both
+`__wine_unix_call_funcs` and `__wine_unix_call_wow64_funcs`. O1 deliberately
+uses the failing DLL path and does not activate/change the B20 overlay.
+
+Evidence: `/workspace/x64-run/lanes/B22/o1/{probe.log,probe.strace,probe.exit,probe.file,probe.counters.*}`;
+small extracted logs are retained beside the repro script. Exec trace shows
+our launcher -> private wine64, unsuccessful i386 loader lookup -> wine64
+WoW64 fallback, no successful i386 ELF exec. Shim counters prove routing.
+Video: `/workspace/x64-run/videos/B22-O1.mp4`, 12 seconds on a free Xvfb
+display; diagnostic caption and DLL-init capture, no game/client UI expected.
+Exact test: `grep -q '## B22 O1' NOTES-x64.md` -> exit 0 (no stdout).
+
+## B22 O2
+
+Fixed the O1 WINEDLLPATH layout gap in our launcher. The opt-in
+`UWPH_WOW64_DLL_ROOT` validates both `i386-windows` and `x86_64-unix`
+directories and sets Wine's DLL root to that paired layout. An incomplete
+root fails before exec (exit 127); ordinary launcher use keeps its existing
+Wine configuration. The repro packages the distro's i386 Windows PEs beside
+B20's private W^X loader's x86-64 Unix companions using local symlinks.
+No Steam binary changes, W^X relaxation, or i386 Unix loader required.
+
+Proof is THROUGH uwph: B22-compiled launcher -> B20 private Wine W^X loader
+with B20's unchanged uwph shim, using B20's installer-created owned prefix.
+This is Linux harness evidence, not an Xbox device result. Separate
+wineserver64 is harness infrastructure. The i386 net_probe now reaches main:
+WSAStartup, bind/listen, connect, accept and TCP payload all PASS (5/0), exit 0.
+The previous missing ws2_32.so attach failure is resolved.
+
+`Steam.exe -no-browser -silent` was run through that same route with a
+90-second cap. Got as far as bootstrapper self-update: downloading
+`https://cdn.steamstatic.com/client/steam_client_win32`. The manifest request
+fails with `Download failed: http error 0`; the bootstrapper verifies the
+incomplete installation and retries. Next blocker: bootstrap manifest/network
+transport failure, not WS2_32 init. No steamclient.dll load or client UI was
+observed; no login attempted. No conclusion about later client compatibility.
+
+Repro and trace extractor: `x64/uwp-host/harness/steam-evidence/b22-o2/`.
+Trace: `x64/uwp-host/harness/surface-trace-steam-client.tsv` (same five columns
+as the existing trace, with real TSV separators). Full logs, exec/open/socket
+trace, exit codes, bootstrap log and per-PID routing counters:
+`/workspace/x64-run/lanes/B22/o2/`. Video:
+`/workspace/x64-run/videos/B22-O2.mp4`, free Xvfb display, 55 seconds,
+with a diagnostic caption; no client UI reached.
+
+Validation: launcher compiles with `-Wall -Wextra -Werror`; an invalid paired
+root is rejected. Exact O2 test output is retained in
+`/workspace/x64-run/lanes/B22/o2/exact-test.log`. Windows smoke uses a newly
+initialized dedicated stock-Wine fixture (setup only) and hosts the uwph
+Windows code under stock Wine; it is distinct from the THROUGH-uwph Steam
+and net_probe proofs above.
+Steam hit the cap (exit 124); shim totals: probe 62,241 calls / 5 reports,
+client 84,524 / 5 reports. Wine also logs `wininet:open_http_connection
+create_netconn failed: 12029`. Existing harness wineboot-init attempts remain
+visible (wineboot.exe disabled, c0000135); this order does not claim the
+separate no-wineboot runtime acceptance gate passes. No successful i386 ELF
+loader exec is present. O2 exact test: PASS, exit 0; make summaries 55/566
+smoke, 60/63/70 traced, all zero failures; Windows futex smoke 500 passed,
+0 failed.
+
+B22 O2 reviewer follow-up: the collector now creates a unique `o2/run.*`
+evidence directory for every invocation, so old per-PID counter reports cannot
+contribute to a later run. It passes the actual selected prefix's bootstrap
+log to the extractor and saves a byte-for-byte prelaunch snapshot. Only bytes
+appended during the client launch enter the trace; replacement/truncation
+fails extraction explicitly. Successful exec evidence now joins strace's
+unfinished/resumed execve records by PID before checking the return value.
+The collector regression fixture covers an alternate bootstrap path, stale
+sibling counter reports, zero current reports, successful resumed execve,
+failed execve exclusion, and bootstrap truncation rejection.
+
+Final reviewer-fix rerun evidence: `/workspace/x64-run/lanes/B22/o2/run.0L0qbguI/`
+(supersedes the fixed-directory counts above). THROUGH-uwph probe: exit 0,
+`SUMMARY net_probe pass=5 fail=0`, 62,285 routed calls / 5 reports. Client:
+exit 124 at the 90-second cap, 84,535 routed calls / 5 reports; WS2_32 attach
+observed. Again reached bootstrap manifest download, HTTP error 0, then
+verification/retry; next blocker remains bootstrap HTTP transport. No
+steamclient.dll load or client UI observed. An earlier isolated rerun
+`run.L9bSKzTz` timed out during probe initialization; its reports are excluded
+from this final trace. Video was regenerated with wall-clock capture timestamps
+and one encoder thread: `/workspace/x64-run/videos/B22-O2.mp4`, ffprobe 55.0 s.
+Collector regression: 1 test OK; shell syntax and diff whitespace checks pass.
+Exact O2 command passed, exit 0; complete output:
+`/workspace/x64-run/lanes/B22/o2/review-exact-test.log` (55/566 smoke,
+60/63/70 traced, Windows futex 500 passed, all zero failures).
+These remain Linux THROUGH-uwph client/probe proofs, with separate stock-Wine
+Windows smoke; no Xbox-device claim, Steam login, or client modification.
+
+
+B31 O1: added `x64/uwp-host/harness/run-battery.sh [CONSTRAINTS...]`.
+Default battery runs all six readiness probes for nofork, net, cpu6, noproc,
+appfs, wx and nofork,noproc,wx through run_via_wine -> Wine's own PE loader
+-> LD_PRELOAD shim -> uwph, using the acceptance fixture and explicit stock
+Linux wineserver outside the jail. Each stdout row has four TSV fields:
+constraints, probe, exit, report_traced_count. Missing/zero trace evidence,
+nonzero exit or probe SUMMARY failures fail the run. Per-run logs/reports
+are retained under harness/out/battery/run.*; diagnostics mark PASS/FAIL.
+The fixture lock descriptor is closed in children so the persistent server
+cannot retain it. Temporary report storage remains writable under appfs
+and noproc, without changing constraint gates or probes.
+
+Final exact battery command exited 0, 42/42 PASS, all guest exits 0 and all
+trace counts positive. Full TSV: /workspace/x64-run/lanes/B31/battery-exact.tsv;
+diagnostics: /workspace/x64-run/lanes/B31/battery-exact.log; reports/logs:
+/workspace/wt/B31/x64/uwp-host/harness/out/battery/run.bR1Z3vOb/.
+An initial exploratory run had noproc/thread_probe exit 124, traced 0,
+FAIL (empty log: harness/out/battery/noproc-thread_probe.log); 41/42 passed.
+This intermittent timeout is retained as a finding, not masked or retried
+inside the runner. It did not reproduce in the final full exact run.
+An initial concurrent Windows smoke failed to acquire the owned fixture;
+sequential rerun of `make -C x64/uwp-host test && bash
+x64/uwp-host/harness/run-windows-smoke.sh` exited 0. Full output:
+/workspace/x64-run/lanes/B31/host-smoke-exact.log; Windows futex 500 passed,
+0 failed. Battery proof is Linux THROUGH launcher/uwph; Windows smoke runs
+uwph Windows code hosted by stock Wine, not the Unix launcher. Build/static
+checks are not Xbox-device proof. Video: /workspace/x64-run/videos/B31-O1.mp4
+(45 seconds, free Xvfb display, live battery TSV; no Encom).
+B32 O2: run-isolated.sh uses a private user/PID namespace whose user runs as mapped uid 0 (host uid mapped by unshare -Urpf); this is namespace-local, not host root or Xbox privilege.
+
+## B29 O1
+
+**BLOCKED, exact test exit 2.** `make clean` now removes the whole
+`x64/on-device/out` directory (it used to keep payload, kit, certs and objects).
+From that clean directory `make package` passed. `make offline-smoke` then
+failed at the combo rung: `STAGE combo hello+hello_k32-nofork,noproc,wx FAIL: exit=1`.
+The cause is `x64/uwp-host/harness/verify_acceptance.py:17`
+(`assert set(traces) == set(selected)`). After B06, the shim report lists 35
+traced names, but the gate's selection has 20. Reproduced 3/3 by running
+`out/payload/combo/run` directly. This is the gate change lane B914 O1 is
+making. Per the B29 safety rule, the gate was not edited here. Once B914
+merges, rebase and rerun the exact test unchanged.
+
+`pack.sh --kit` now also writes `out/SHA256SUMS`, next to `out/kit.zip`.
+It covers `kit.zip` plus every extracted member under `out/kit/`, including
+the kit's own inner `SHA256SUMS`. Supplementary, not the exact test: a
+separate `make -C x64/on-device kit` built
+`/workspace/wt/B29/x64/on-device/out/kit.zip` (228,056,394 bytes, 959
+members, the same file list as `out/kit/`). `(cd x64/on-device/out &&
+sha256sum -c SHA256SUMS)` gave 960/960 OK, exit 0. Top level of the zip:
+`KIT-NOTES.txt README.md SHA256SUMS kit-manifest.txt ladder payload/ probes/
+test-cert.cer test-cert.pfx`. `make -C x64/uwp-host test` exit 0 (566 smoke;
+99/103/120 traced, 35 symbols; zero failures). The kit build and the checksum
+check are build-only. In the offline ladder, stage a ran THROUGH the public uwph
+Linux backend. No Xbox, UWP activation or device claim. Video:
+`/workspace/x64-run/videos/B29-O1.mp4` (51 s, free Xvfb display, shows the
+failing exact-test run).
+## B07
+
+O1 implements trace priorities 36–50, the next 15 imports after B06. Each has
+an entry counter, shim binding and direct regression coverage. No public
+function signatures changed; nl_langinfo uses an internal counted adapter.
+Linux uses native libc, except descriptor calls retain the existing explicit
+owned-slot versus native-Wine-fd backend. dup adopts the new descriptor into
+an owned slot and fchdir translates it while holding the namespace lock.
+The dlsym resolver bootstraps libc dlsym via versioned dlvsym so interposition
+cannot recurse through itself.
+
+| Import | Win32/UWP implementation and limits |
+| --- | --- |
+| umask | Existing virtual creation mask; Windows ACLs are not changed |
+| __getdelim | Private FILE buffer, growing allocation, delimiter and EOF semantics |
+| access | Mapped-path metadata and mode checks; write checks honor read-only mounts; no Windows ACL emulation |
+| connect | Existing in-process Unix endpoints; Linux native-fd domain stays explicit |
+| dlsym | Static registered Unix-library symbols; Linux native lookup |
+| dup | Shared private object with independent descriptor lifetime; Linux raw dup plus slot adoption |
+| fchdir | Virtual cwd from a private directory descriptor; Linux translated native directory descriptor |
+| fork | Counted ENOSYS: UWP has no documented POSIX process-cloning equivalent; Linux native fork |
+| getcwd | Virtual cwd; Linux actual process cwd |
+| getpid | GetCurrentProcessId; Linux actual PID |
+| lstat | Mapped-file/socket metadata; existing UWP backend has no symlink tree; Linux native no-follow stat |
+| mkdir | CreateDirectoryW after mount translation/read-only check; mode does not emulate POSIX ACLs |
+| mprotect | Existing memory backend, now counted; shim retains uwph_protect validation and RWX refusal |
+| nl_langinfo | C/POSIX CODESET (Linux nl_item 14); other UWP items/locales counted ENOSYS; Linux native locale |
+| opendir | GetFileAttributesW/FindFirstFileExW; private readdir/closedir use FindNextFileW/FindClose |
+
+Directory descriptors use virtual paths validated with GetFileAttributesW,
+not an unrestricted host-directory handle. Enumeration and mkdir remain
+inside the mount table. Tests cover created/empty directory lifecycle,
+owned-directory fchdir, dup lifetime after closing the original, invalid
+handles, delimiter/tail/EOF reads, static/native symbol resolution, C codeset,
+missing parent, native fork/reap, read-only protection, and the existing RWX
+gate. Protection tests exercise uwph_mprotect directly for read-only pages;
+strict uwph_protect still requires FromApp availability and is not relaxed.
+
+Exact command `make -C x64/uwp-host test && make -C x64/uwp-host/harness windows-smoke-test`
+exits 0. Stub smoke: 55 passed, 0 failed; normal Windows smoke: 566 passed,
+0 failed; traced tests: stub 139/0, Win32/UWP 154/0, Linux passthrough 172/0
+(50 counted symbols each); desktop full Windows smoke: 569 passed, 0 failed.
+Full exact output: `/workspace/x64-run/lanes/B07/B07-O1-fix.exact.log`.
+
+Actual launcher -> Wine's private W^X loader -> ntdll -> shim -> uwph runs
+both hello PEs successfully. `harness/verify_b07.py` checks all 50 real ntdll
+bindings, single-process counters, successful PE output, clean stock controls,
+and the >=10 new-entry delta. Both reports rise from B06's 34 to 49 (+15);
+all 15 new symbols have hits. Evidence: `harness/out/wine-o4/run-qRzznwUS/` (fresh run after review fixes);
+surface verification: `/workspace/x64-run/lanes/B07/B07-surface.log`.
+The broader `wine-test` still fails because execv is bound but unhit. Its
+all-symbols-hit assertion remains intact; only its traced set now includes
+mprotect as both a backend operation and a traced import. The static binding
+checker likewise requires all 57 shim exports and all 50 counters.
+
+Classification: Linux off-device THROUGH-uwph proof, with separate stock
+Wine launcher controls and a stock Linux wineserver. Windows tests execute
+uwph Windows code under stock Wine; the desktop exception artifact is separate
+from the UWP archive. The UWP archive compiles with APP headers; no Xbox device
+execution or full Wine/UWP compatibility is claimed. Video (12 seconds, free
+Xvfb display): `/workspace/x64-run/videos/B07-O1.mp4`.
+
+Review fixes. `uwph_dlsym` resolves registry handles (each registered
+library and the `dlopen(NULL)` main handle) only from the static registry;
+a registered miss fails rather than falling through. Under Linux passthrough,
+only handles the registry does not own (e.g. `RTLD_DEFAULT`) reach native
+`dlsym`, so registry pointers are never read as glibc link maps. On Win32/UWP,
+path stat/lstat/access answer directories from mapped-path metadata
+(`GetFileAttributesExW`) instead of a non-directory `CreateFile2`; regular files
+keep the handle-based fstat, and access W_OK still honours read-only mounts.
+Tests now cover registry/main-handle hit and miss on every backend plus
+access/stat/lstat of a newly created directory.
+## B28 O2
+
+Status: BLOCKED for an in-process desktop prototype; source investigation and
+design complete. No runtime change is made by this order.
+
+Spawn site (local Wine 10.0 source, `/tmp/wine-src/VERSION`):
+`/tmp/wine-src/dlls/win32u/winstation.c:775` defines `get_desktop_window()`.
+It queries the server at lines 792–801, then, if no top window exists,
+constructs `C:\\windows\\system32\\explorer.exe /desktop` at lines 805–809.
+The actual spawn is `NtCreateUserProcess()` at lines 855–857 (WOW64 branch)
+and 861–863 (normal x64 branch). It resumes the thread and waits for process
+input idle at 866–870; line 872 emits `failed to start explorer`. The forced
+server lookup at 874–883 is a fallback, not proof that explorer initialized.
+
+Wine's `/desktop` parser calls `manage_desktop()` in
+`/tmp/wine-src/programs/explorer/explorer.c:896` (quoted option: 902).
+`programs/explorer/desktop.c:1197` implements it: graphics-driver setup at
+1247–1249, desktop and message-parent windows at 1269–1277, clipboard thread
+at 1286, and the desktop message loop at 1326–1332. These are the existing
+Wine implementations to reuse, rather than inventing a substitute desktop.
+
+Proposed nofork design:
+
+1. Factor Wine explorer's desktop implementation into a private PE DLL with
+   an explicit desktop-thread entry and startup/stop result. Load that DLL
+   through Wine's own PE loader in the game process; do not invoke an EXE
+   entry point as a thread. Preserve explorer resource/module identity and
+   its desktop, appbar, clipboard and driver dependencies (see
+   `programs/explorer/Makefile.in:1–14`).
+2. Start the worker through a PE-side user32 initialization callback before
+   game window creation, outside the loader lock. Bind the worker to the
+   caller's window station/desktop before creating windows. Coordinate one
+   owner per desktop, with a recursion guard and an explicit ready/failure
+   event signaled after both server desktop windows exist. Wait with a
+   bounded timeout, then repeat the real server lookup. A thread readiness
+   handshake must replace the current process `NtUserWaitForInputIdle`.
+   Integrate the win32u spawn branch with that PE callback for explicit
+   nofork mode; do not directly call PE user32/explorer code from Unix code.
+3. Refactor process-lifetime assumptions first: desktop.c:1260 and 1336
+   call `ExitProcess`, and 1265–1267 changes the process token. Worker
+   failure/exit must return a status and clean up only worker resources;
+   it must not terminate or change privileges of the game. Audit callbacks,
+   clipboard and display-restorer threads for shutdown and module lifetime.
+   Use a desktop-only configuration without shell launchers, tray services,
+   DDE/COM shell startup or command execution; desktop.c:1312 otherwise
+   invokes `CreateProcessW`. Preserve window and graphics initialization.
+4. Extend the private Wine build/staging to compile the affected win32u,
+   PE support and desktop DLL together. `harness/prepare-wine-wx.sh` currently
+   builds only Unix/PE ntdll and stages other DLLs from installed Wine; a
+   source-only win32u edit would not exercise the changed code.
+
+This spans a new PE module, process-to-thread lifecycle refactoring and
+reproducible Wine staging, so it does not fit a small prototype in this
+session. Keep nofork/wx/noproc and all gates unchanged. Future acceptance
+must rerun `K_TIMEOUT=45 x64/uwp-host/harness/run-megabonk.sh` through our
+launcher and Wine loader, show zero `failed to start explorer` entries and
+a non-black `shot-*.png`, and record an Xvfb/ffmpeg video <=60 seconds at
+`/workspace/x64-run/videos/B28-O2.mp4`. No game run or video is claimed here.
+
+Validation: `grep -q '## B28 O2' NOTES-x64.md && make -C x64/uwp-host test`.
+This exercises uwph Linux/Windows library tests (the Windows tests use stock
+Wine) and harness checks; it cannot prove an in-process desktop or Xbox UWP
+graphics. Record the exact output and exit status in the lane result files.
+
+## B11 O1 — Megabonk THROUGH-uwph (Linux only)
+
+`x64/uwp-host/harness/run-megabonk-wx.sh` (originally B11's
+`run-megabonk.sh`; renamed in the B916 merge so B12's nofork,wx,noproc
+`run-megabonk.sh` keeps its name) uses the same launcher, private W^X
+Wine loader and native-fd uwph shim as `run-hello.sh`, with a private copied
+prefix, external stock wineserver, a free Xvfb display and a 120-second guest
+timeout. It records at most 58 seconds to
+`/workspace/x64-run/videos/B11-O1.mp4` and appends measured wrapper/backend
+hits to `x64/uwp-host/harness/surface-trace-megabonk-wx.tsv` (kept apart
+from `surface-trace.tsv`, whose priority schema `verify_*.py` read).
+The recorder writes a fresh temporary MP4, and the harness waits for its exit,
+requires a nonempty video stream with a finite duration of at most 60 seconds,
+and decodes the full capture before publishing the required video path.
+Recording or validation failures fail the test while preserving the printed
+guest-stage report. A recorder that exits during startup fails the run before
+the guest launches. The run lock fd is not inherited by Xvfb, ffmpeg,
+wineserver or the guest, and cleanup reaps processes left in the private
+prefix (an orphaned explorer.exe/UnityCrashHandler64 previously held the lock
+and made later runs exit silently).
+Counters and diagnostic logs
+are in `harness/out/megabonk/`. Only `--wx` is applied: R4W O3 still marks the
+in-process server blocked; nofork/noproc are not claimed. This is selected-call
+routing on Linux, not an Xbox/UWP device pass or complete syscall coverage.
+
+The owned game ships `GameAssembly.dll` and
+`Megabonk_Data/il2cpp_data/Metadata/global-metadata.dat`: it is IL2CPP, with
+native ahead-of-time code, so no Mono JIT is needed. No Steam/DRM components
+were replaced or modified. The first missing service reported by Unity is
+`SteamAPI_Init() failed`; audio also lacks a host device and falls back to
+silent software output. Neither prevented the observed main menu. The script
+reports the conservative log-proven `gfx-init` stage (D3D11 device created);
+manual inspection of `out/megabonk/screen.png` during the same run confirmed
+the rendered MEGABONK title, PLAY, SETTINGS and EXIT menu. Gameplay was not
+tested. No credentials were read, no remotes accessed, no commit created.
