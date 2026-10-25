@@ -498,3 +498,17 @@ informational only), `isolated.status`, `isolated.cmd`. It never relaxes uwpjail
     UWPH_INPROC_SERVER=1 x64/uwp-host/harness/run-isolated.sh \
       /workspace/xbox-readiness/tests/uwp_run.sh nofork "$PWD/x64/uwp-host/harness" \
       -- ./run-wine.sh --inproc-server --no-build
+
+## B32: `verify_wine.py --inproc`
+
+`verify_wine.py --inproc RUN` (or with `UWPH_INPROC_SERVER=1` in the
+environment) verifies an in-process-server run. Only `execv` is treated
+differently, and the rule is stricter than the default one: each routed case
+must report exactly `trace execv 0`, no case's `.exec` trace may contain an
+`execve` of any wineserver (failed attempts count too), and the routed log must
+carry the `[inproc] ... no separate server process` banner from
+`inproc_server.c`. Every other routed symbol still needs >0 uwph entries. With no
+flag and no env var, the behaviour is the same as before: a run with
+`execv:0` still fails "O2 traced symbol with zero uwph entries". Fixture tests:
+`python3 x64/uwp-host/harness/test_verify_wine_inproc.py` (also part of
+`make -C x64/uwp-host test`).

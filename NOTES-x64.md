@@ -2296,6 +2296,35 @@ Exact O2 command passed, exit 0; complete output:
 These remain Linux THROUGH-uwph client/probe proofs, with separate stock-Wine
 Windows smoke; no Xbox-device claim, Steam login, or client modification.
 
+B32 O2: run-isolated.sh uses a private user/PID namespace whose user runs as mapped uid 0 (host uid mapped by unshare -Urpf); this is namespace-local, not host root or Xbox privilege.
+
+## B29 O1
+
+**BLOCKED, exact test exit 2.** `make clean` now removes the whole
+`x64/on-device/out` directory (it used to keep payload, kit, certs and objects).
+From that clean directory `make package` passed. `make offline-smoke` then
+failed at the combo rung: `STAGE combo hello+hello_k32-nofork,noproc,wx FAIL: exit=1`.
+The cause is `x64/uwp-host/harness/verify_acceptance.py:17`
+(`assert set(traces) == set(selected)`). After B06, the shim report lists 35
+traced names, but the gate's selection has 20. Reproduced 3/3 by running
+`out/payload/combo/run` directly. This is the gate change lane B914 O1 is
+making. Per the B29 safety rule, the gate was not edited here. Once B914
+merges, rebase and rerun the exact test unchanged.
+
+`pack.sh --kit` now also writes `out/SHA256SUMS`, next to `out/kit.zip`.
+It covers `kit.zip` plus every extracted member under `out/kit/`, including
+the kit's own inner `SHA256SUMS`. Supplementary, not the exact test: a
+separate `make -C x64/on-device kit` built
+`/workspace/wt/B29/x64/on-device/out/kit.zip` (228,056,394 bytes, 959
+members, the same file list as `out/kit/`). `(cd x64/on-device/out &&
+sha256sum -c SHA256SUMS)` gave 960/960 OK, exit 0. Top level of the zip:
+`KIT-NOTES.txt README.md SHA256SUMS kit-manifest.txt ladder payload/ probes/
+test-cert.cer test-cert.pfx`. `make -C x64/uwp-host test` exit 0 (566 smoke;
+99/103/120 traced, 35 symbols; zero failures). The kit build and the checksum
+check are build-only. In the offline ladder, stage a ran THROUGH the public uwph
+Linux backend. No Xbox, UWP activation or device claim. Video:
+`/workspace/x64-run/videos/B29-O1.mp4` (51 s, free Xvfb display, shows the
+failing exact-test run).
 ## B07
 
 O1 implements trace priorities 36–50, the next 15 imports after B06. Each has
@@ -2431,3 +2460,39 @@ Validation: `grep -q '## B28 O2' NOTES-x64.md && make -C x64/uwp-host test`.
 This exercises uwph Linux/Windows library tests (the Windows tests use stock
 Wine) and harness checks; it cannot prove an in-process desktop or Xbox UWP
 graphics. Record the exact output and exit status in the lane result files.
+
+## B11 O1 — Megabonk THROUGH-uwph (Linux only)
+
+`x64/uwp-host/harness/run-megabonk-wx.sh` (originally B11's
+`run-megabonk.sh`; renamed in the B916 merge so B12's nofork,wx,noproc
+`run-megabonk.sh` keeps its name) uses the same launcher, private W^X
+Wine loader and native-fd uwph shim as `run-hello.sh`, with a private copied
+prefix, external stock wineserver, a free Xvfb display and a 120-second guest
+timeout. It records at most 58 seconds to
+`/workspace/x64-run/videos/B11-O1.mp4` and appends measured wrapper/backend
+hits to `x64/uwp-host/harness/surface-trace-megabonk-wx.tsv` (kept apart
+from `surface-trace.tsv`, whose priority schema `verify_*.py` read).
+The recorder writes a fresh temporary MP4, and the harness waits for its exit,
+requires a nonempty video stream with a finite duration of at most 60 seconds,
+and decodes the full capture before publishing the required video path.
+Recording or validation failures fail the test while preserving the printed
+guest-stage report. A recorder that exits during startup fails the run before
+the guest launches. The run lock fd is not inherited by Xvfb, ffmpeg,
+wineserver or the guest, and cleanup reaps processes left in the private
+prefix (an orphaned explorer.exe/UnityCrashHandler64 previously held the lock
+and made later runs exit silently).
+Counters and diagnostic logs
+are in `harness/out/megabonk/`. Only `--wx` is applied: R4W O3 still marks the
+in-process server blocked; nofork/noproc are not claimed. This is selected-call
+routing on Linux, not an Xbox/UWP device pass or complete syscall coverage.
+
+The owned game ships `GameAssembly.dll` and
+`Megabonk_Data/il2cpp_data/Metadata/global-metadata.dat`: it is IL2CPP, with
+native ahead-of-time code, so no Mono JIT is needed. No Steam/DRM components
+were replaced or modified. The first missing service reported by Unity is
+`SteamAPI_Init() failed`; audio also lacks a host device and falls back to
+silent software output. Neither prevented the observed main menu. The script
+reports the conservative log-proven `gfx-init` stage (D3D11 device created);
+manual inspection of `out/megabonk/screen.png` during the same run confirmed
+the rendered MEGABONK title, PLAY, SETTINGS and EXIT menu. Gameplay was not
+tested. No credentials were read, no remotes accessed, no commit created.
