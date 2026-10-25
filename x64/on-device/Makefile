@@ -19,7 +19,7 @@ $(OUT)/smoke.exe: main.c Makefile
 	$(CC_WIN) $(CFLAGS) -m64 -mconsole -static -o $@ $<
 
 clean:
-	rm -f $(OUT)/smoke.exe $(OUT)/rungs.exe $(OUT)/ladder $(OUT)/run_via_wine
+	rm -f $(OUT)/smoke.exe $(OUT)/rungs.exe $(OUT)/ladder $(OUT)/run_via_wine $(OUT)/input_test
 
 # Hosted Linux diagnostic; device activation remains separate.
 ladder: $(OUT)/ladder $(OUT)/rungs.exe
@@ -33,9 +33,9 @@ $(OUT)/ladder: ladder.py Makefile
 offline-smoke: ladder
 	./offline-smoke.sh
 
-$(OUT)/rungs.exe: rungs.c Makefile
+$(OUT)/rungs.exe: rungs.c input/mapping.c input/mapping.h input/probe.inc Makefile
 	mkdir -p $(OUT)
-	$(CC_WIN) $(CFLAGS) -Wno-missing-field-initializers -m64 -mconsole -static -o $@ $< $(UWPH_OBJS) $(OUT)/readiness/unixside.o $(OUT)/readiness/smoke.o $(READINESS_OBJS) -lws2_32 -lbcrypt -lsynchronization -lwindowsapp -lole32 -lruntimeobject -luuid -ldxguid -lm
+	$(CC_WIN) $(CFLAGS) -Wno-missing-field-initializers -m64 -mconsole -static -o $@ $< input/mapping.c $(UWPH_OBJS) $(OUT)/readiness/unixside.o $(OUT)/readiness/smoke.o $(READINESS_OBJS) -lws2_32 -lbcrypt -lsynchronization -lwindowsapp -lole32 -lruntimeobject -luuid -ldxguid -lm
 
 READINESS_OBJS := $(addprefix $(OUT)/readiness/,thread.o seh.o fs.o net.o)
 
@@ -65,3 +65,10 @@ $(OUT)/readiness/thread-check.o: readiness/thread_probe.c readiness/common.h
 	$(CC_WIN) $(READINESS_FLAGS) -Dmain=readiness_thread_main -DCreateThread=probe_CreateThread -DCreateEventExW=probe_CreateEventExW -c $< -o $@
 $(OUT)/readiness-check.exe: readiness/check.c $(OUT)/readiness/thread-check.o $(filter-out $(OUT)/readiness/thread.o,$(READINESS_OBJS))
 	$(CC_WIN) $(READINESS_FLAGS) -static -o $@ $^ -lws2_32 -lwindowsapp -lsynchronization
+
+.PHONY: input-test
+input-test: $(OUT)/input_test $(OUT)/ladder
+
+$(OUT)/input_test: input/input_test.c input/mapping.c input/mapping.h
+	mkdir -p $(OUT)
+	$(CC) $(CFLAGS) -o $@ input/input_test.c input/mapping.c -lm
