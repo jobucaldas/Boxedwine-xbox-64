@@ -13,6 +13,7 @@
 #include <string.h>
 #ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
 # include <time.h>
+# include <sys/socket.h>
 # include <unistd.h>
 #endif
 
@@ -242,6 +243,102 @@ static void test_files(void)
 #endif
 }
 
+static void test_b06(void)
+{
+    struct uwph_rlimit lim;
+    struct uwph_stat st;
+    uwph_Dl_info info;
+    uwph_sigset_t set;
+    int p[2], value=1024;
+    char *argv[] = { "missing", NULL };
+    static char env[] = "UWPH_B06=value";
+    CHECK(uwph_putenv(env)==0 && !strcmp(uwph_getenv("UWPH_B06"),"value"), "B06 putenv shares getenv table");
+    uwph_unsetenv("UWPH_B06");
+    CHECK(uwph_getrlimit(UWPH_RLIMIT_NOFILE,&lim)==0 && lim.rlim_cur>0, "B06 getrlimit NOFILE");
+    CHECK(uwph_setrlimit(UWPH_RLIMIT_NOFILE,&lim)==0, "B06 setrlimit unchanged NOFILE");
+#ifndef UWPH_BACKEND_LINUX_PASSTHROUGH
+    CHECK(uwph_setrlimit(UWPH_RLIMIT_STACK,&lim)==-1 && uwph_errno==UWPH_ENOSYS,
+          "B06 setrlimit unsupported host limit -> ENOSYS");
+    struct uwph_rlimit invalid={2,1};
+    CHECK(uwph_setrlimit(UWPH_RLIMIT_NOFILE,&invalid)==-1 && uwph_errno==UWPH_EINVAL,
+          "B06 setrlimit rejects soft greater than hard");
+#endif
+    CHECK(uwph_sysconf(UWPH_SC_PAGESIZE)==4096, "B06 sysconf page size");
+    CHECK(uwph_sigemptyset(&set)==0 && uwph_sigismember(&set,UWPH_SIGUSR2)==0, "B06 sigemptyset clears membership");
+    CHECK(uwph_execv("/uwph-b06-missing",argv)==-1 && uwph_errno==
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+          UWPH_ENOENT,
+#else
+          UWPH_ENOSYS,
+#endif
+          "B06 execv missing / UWP ENOSYS");
+    CHECK(uwph_dladdr(NULL,&info)==0, "B06 dladdr unknown address");
+    CHECK(uwph_chdir("/")==0, "B06 chdir root");
+    CHECK(uwph_fstat(-1,&st)==-1 && uwph_errno==UWPH_EBADF, "B06 fstat invalid descriptor");
+    CHECK(uwph_isatty(-1)==0 && uwph_errno==UWPH_EBADF, "B06 isatty invalid descriptor");
+    CHECK(uwph_pipe2(p,UWPH_O_CLOEXEC)==0, "B06 pipe2 CLOEXEC");
+    CHECK(uwph_fcntl(p[0],UWPH_F_GETFD)==UWPH_FD_CLOEXEC, "B06 pipe2 preserves CLOEXEC");
+    CHECK(uwph_write(p[1],"b",1)==1, "B06 pipe write");
+    char b=0;
+    CHECK(uwph_read(p[0],&b,1)==1 && b=='b', "B06 pipe read");
+    uwph_close(p[0]); uwph_close(p[1]);
+    struct uwph_msghdr msg; memset(&msg,0,sizeof(msg));
+    CHECK(uwph_sendmsg(-1,&msg,0)==-1 && uwph_errno==UWPH_EBADF, "B06 sendmsg invalid descriptor");
+    CHECK(uwph_recvmsg(-1,&msg,0)==-1 && uwph_errno==UWPH_EBADF, "B06 recvmsg invalid descriptor");
+    CHECK(uwph_setsockopt(-1,1,8,&value,sizeof(value))==-1 && uwph_errno==UWPH_EBADF, "B06 setsockopt invalid descriptor");
+    int sv[2];
+    int pair_ok=uwph_socketpair(UWPH_AF_UNIX,UWPH_SOCK_STREAM,0,sv);
+    CHECK(pair_ok==0, "B06 socket pair fixture");
+    if (pair_ok==0) {
+        struct uwph_iovec v={ (void *)"ok", 2 };
+        msg.msg_iov=&v; msg.msg_iovlen=1;
+        CHECK(uwph_setsockopt(sv[0],UWPH_SOL_SOCKET,8,&value,sizeof(value))==0, "B06 setsockopt receive buffer");
+        CHECK(uwph_sendmsg(sv[0],&msg,0)==2, "B06 sendmsg payload");
+        char received[3]={0}; v.iov_base=received;
+        CHECK(uwph_recvmsg(sv[1],&msg,0)==2 && !strcmp(received,"ok"), "B06 recvmsg payload");
+        CHECK(uwph_close(sv[0])==0 && uwph_close(sv[1])==0, "B06 socket pair uwph close");
+    }
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    /* Exercise the other descriptor producers, not just a native fixture. */
+    struct uwph_sockaddr_un address={UWPH_AF_UNIX,{0}};
+    uwph_snprintf(address.sun_path,sizeof(address.sun_path),"/tmp/uwph-b06-%d.sock",uwph_getpid());
+    int listener=uwph_socket(UWPH_AF_UNIX,UWPH_SOCK_STREAM,0);
+    int client=uwph_socket(UWPH_AF_UNIX,UWPH_SOCK_STREAM,0);
+    CHECK(listener>=0 && client>=0, "B06 uwph socket producers");
+    int bound=uwph_bind(listener,(struct uwph_sockaddr *)&address,sizeof(address));
+    CHECK(bound==0, "B06 uwph bind native lifecycle");
+    if (bound==0) {
+        CHECK(uwph_listen(listener,1)==0, "B06 uwph listen native lifecycle");
+        int connected=uwph_connect(client,(struct uwph_sockaddr *)&address,sizeof(address));
+        CHECK(connected==0, "B06 uwph connect native lifecycle");
+        if (connected==0) {
+            int peer=uwph_accept(listener,NULL,NULL);
+            CHECK(peer>=0, "B06 uwph accept producer");
+            int kind=0; uwph_socklen_t length=sizeof(kind);
+            CHECK(uwph_getsockopt(peer,UWPH_SOL_SOCKET,UWPH_SO_TYPE,&kind,&length)==0 && kind==UWPH_SOCK_STREAM,
+                  "B06 uwph getsockopt accepted descriptor");
+            struct uwph_sockaddr_un name; length=sizeof(name);
+            CHECK(uwph_getsockname(peer,(struct uwph_sockaddr *)&name,&length)==0, "B06 uwph getsockname");
+            length=sizeof(name);
+            CHECK(uwph_getpeername(peer,(struct uwph_sockaddr *)&name,&length)==0, "B06 uwph getpeername");
+            CHECK(uwph_send(client,"x",1,0)==1, "B06 uwph send created descriptor");
+            char payload=0;
+            CHECK(uwph_recv(peer,&payload,1,0)==1 && payload=='x', "B06 uwph recv accepted descriptor");
+            CHECK(uwph_shutdown(client,UWPH_SHUT_WR)==0 && uwph_recv(peer,&payload,1,0)==0,
+                  "B06 uwph shutdown delivers EOF");
+            CHECK(uwph_close(peer)==0, "B06 uwph close accepted descriptor");
+        }
+        uwph_unlink(address.sun_path);
+    }
+    uwph_close(client); uwph_close(listener);
+#endif
+    uwph_FILE *f=uwph_fopen(input,"r");
+    if (f) { uwph_setbuf(f,NULL); CHECK(uwph_fread(&b,1,1,f)==1 && b=='u', "B06 setbuf stream remains readable"); uwph_fclose(f); }
+#if !HOST
+    else { int q[2]; uwph_pipe(q); f=uwph_fdopen(q[0],"r"); uwph_setbuf(f,NULL); uwph_close(q[1]); uwph_fclose(f); }
+#endif
+}
+
 int main(int argc, char **argv)
 {
     uwph_snprintf(root, sizeof(root), "%s", argc > 1 ? argv[1] : "x64/uwp-host/tests");
@@ -255,6 +352,7 @@ int main(int argc, char **argv)
     printf("uwph traced-set test, backend: %s (built as %s)\n", uwph_backend_name(), BACKEND);
     for (int s = 0; s < UWPH_TRACE_COUNT; s++) base[s] = uwph_trace_count(s);
 
+    test_b06();
     test_format();
     test_threads();
     test_process();

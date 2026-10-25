@@ -62,6 +62,12 @@ UWPH_API char *uwph_dlerror(void)
 
 UWPH_API int uwph_dladdr(const void *addr, uwph_Dl_info *info)
 {
+    uwph_trace_hit(UWPH_TRACE_DLADDR);
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    UWPH_NATIVE(int, "dladdr", (const void *, uwph_Dl_info *));
+    UWPH_NATIVE_RETURN(fn(addr, info));
+#endif
+
     for (int i = 0; i < nlibs; i++) {
         const struct uwph_dl_library *l = libs[i];
         if ((const char *)addr < (const char *)l->text_start || (const char *)addr >= (const char *)l->text_end) continue;
