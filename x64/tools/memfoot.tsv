@@ -1,0 +1,4 @@
+stage	peak_rss_mb	peak_commit_estimate_mb	peak_mb	fits_app	fits_game	status	samples	read_errors	routing
+hello	17.73	17.27	17.73	yes	yes	exit_0	2	1	observed
+hello_k32	17.66	17.27	17.66	yes	yes	exit_0	2	1	observed
+Megabonk	1378.87	1778.52	1778.52	no	yes	timeout	121	0	observed

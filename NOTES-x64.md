@@ -1212,3 +1212,37 @@ Evidence classification: **build-only and source inspection**, no THROUGH-uwph
 runtime proof and no stock Wine execution in O3. Recording
 `/workspace/x64-run/videos/R4W-O3.mp4` shows the blocked exact test only.
 No runtime code was changed, no commits created and no remotes accessed.
+
+## B15
+
+O1: measured THROUGH our launcher -> Wine's own private W^X loader -> selected
+uwph shim calls/Linux backend, with the separate stock Linux wineserver and
+all processes in both dedicated sessions included. Not stock-Wine-only,
+build-only, or on-device UWP proof. B10 is not merged in this checkout, so
+Steam was skipped; when its trace is merged the script requires the real
+installed client via MEMFOOT_STEAM_EXE. No tokens or credentials accessed.
+
+Exact test `bash x64/tools/memfoot.sh && column -t x64/tools/memfoot.tsv`
+exited 0. hello: RSS 17.73 MiB, commit estimate 17.27 MiB, exit 0;
+hello_k32: RSS 17.66 MiB, commit estimate 17.27 MiB, exit 0.
+Megabonk: 120-second observation, 121 samples, timeout; aggregate RSS peak
+1378.87 MiB, aggregate estimated commit peak 1778.52 MiB. Using the larger
+peak, both hello stages fit 1024/5120 MiB; observed Megabonk exceeds the
+App budget and fits the Game budget. This is a sampled Linux verdict, not
+Xbox capacity acceptance or a gameplay/Steam authentication success claim.
+
+Top 3 consumers by individual sampled RSS peak: Megabonk.exe PID 534948,
+1363.48 MiB; its wineserver64 PID 534934, 15.38 MiB; hello's wineserver64
+PID 534708, 15.12 MiB. Per-process maxima are not summed to compute totals.
+Raw per-tick/process evidence, logs and routing counters:
+`x64/uwp-host/harness/out/memfoot/`; summary `x64/tools/memfoot.tsv`.
+Video `/workspace/x64-run/videos/B15-O1.mp4`: free Xvfb via -displayfd,
+55 seconds of the measurement (not the entire 120-second game observation).
+
+Linux smaps_rollup supplies RSS, not commit. The explicitly labelled commit
+estimate comes from summing smaps mapping Size with VmFlags ac (Linux
+accountable allocation), sampled alongside rollup at 1 Hz. It cannot measure
+Windows/UWP commit. Shared RSS can double count; between-tick peaks and very
+short-lived clients can be missed. hello stages each had one transient
+smaps read error; Megabonk had none. See `x64/tools/memfoot.md` for scope.
+No optimization, verifier change, commit, push or remote operation performed.
