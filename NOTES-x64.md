@@ -1779,3 +1779,54 @@ the normal ntdll PROCESS_DETACH.
 Video /workspace/x64-run/videos/B20-O2.mp4 (60 s, Xvfb :122): routed client
 run 2, the 32-bit Steam updater window under uwph. Run 1 (installer + crypt32
 failure) is kept as /workspace/x64-run/lanes/B20/B20-O2-run1.mp4.
+
+## B22 O1
+
+**Diagnosis: WINEDLLPATH/install-layout gap. No fix applied.** Reproduced with
+an i386 build of the existing `x64/on-device/readiness/net_probe.c` through
+this worktree's compiled `x64/pe/launcher/run_via_wine.c`, B20's uwph shim and
+private Wine W^X loader, in the existing
+`/workspace/wt/B20/x64/uwp-host/harness/out/b20/pfx-wow64-uwph` prefix.
+B22 has no harness/out build; the shared B20 binaries/prefix are used explicitly
+by `x64/uwp-host/harness/steam-evidence/b22-o1/repro.sh` (override assets with
+B20_HARNESS). Shim source is identical between B20 and B22. This is Linux
+harness evidence THROUGH uwph, not an Xbox on-device run or stock Wine proof.
+Separate wineserver64 is infrastructure. No Steam binary or login is needed.
+
+Environment: `WINEDEBUG=+winsock,+module,+loaddll`,
+`WINEDLLPATH=/usr/lib/i386-linux-gnu/wine` (the original installer setting),
+`WINEDLLOVERRIDES=wineboot.exe=d`, `WINESERVER=/bin/false`, and
+`LD_PRELOAD=<B20 harness>/out/libuwph_wine_shim.so` on the launcher/loader.
+Wine reports experimental wow64 mode and loads builtin WS2_32.dll at
+`0x7b250000`. The actual failing attach is
+`DllMain(instance=0x7b250000, reason=DLL_PROCESS_ATTACH=1, reserved=0x0022fd24)`.
+Its `__wine_init_unix_call()` requests the WoW64 Unix function table;
+`get_builtin_unix_funcs(module=0x7b250000, wow=TRUE, funcs=<output pointer>)`
+at Wine `dlls/ntdll/unix/virtual.c:642` calls
+`dlopen("/usr/lib/i386-linux-gnu/wine/x86_64-unix/ws2_32.so", RTLD_NOW)`.
+The loader logs “cannot open shared object file: No such file or directory”.
+The corresponding observed system call is
+`openat(AT_FDCWD, "/usr/lib/i386-linux-gnu/wine/x86_64-unix/ws2_32.so", O_RDONLY|O_CLOEXEC) = -1 ENOENT`.
+The function returns STATUS_DLL_NOT_FOUND (0xc0000135, source-derived),
+WS2_32 DllMain returns FALSE (`dlls/ws2_32/socket.c:580-585`), and the guest
+loader aborts with STATUS_DLL_INIT_FAILED (0xc0000142), process exit 66.
+The output pointer value is not logged; function arguments/status above are
+identified from the matching loader source and observed module mapping.
+
+This is the same missing path logged during B20's steamservice.exe attach.
+The probe never reaches main/WSAStartup(0x0202, &wd), so it does not reach its
+`socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)` call. There is no evidence here
+of a refused socket family or a missing uwph socket syscall. The missing
+file is the **x86-64 Unix companion of an i386 Windows PE**, not an i386 ELF
+library: `<B20 harness>/out/wine-wx/lib/x86_64-linux-gnu/wine/x86_64-unix/ws2_32.so`
+exists (links to Debian's x86-64 library) and `nm -D` shows both
+`__wine_unix_call_funcs` and `__wine_unix_call_wow64_funcs`. O1 deliberately
+uses the failing DLL path and does not activate/change the B20 overlay.
+
+Evidence: `/workspace/x64-run/lanes/B22/o1/{probe.log,probe.strace,probe.exit,probe.file,probe.counters.*}`;
+small extracted logs are retained beside the repro script. Exec trace shows
+our launcher -> private wine64, unsuccessful i386 loader lookup -> wine64
+WoW64 fallback, no successful i386 ELF exec. Shim counters prove routing.
+Video: `/workspace/x64-run/videos/B22-O1.mp4`, 12 seconds on a free Xvfb
+display; diagnostic caption and DLL-init capture, no game/client UI expected.
+Exact test: `grep -q '## B22 O1' NOTES-x64.md` -> exit 0 (no stdout).
