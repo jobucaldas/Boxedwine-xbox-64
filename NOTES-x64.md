@@ -2094,6 +2094,81 @@ Video /workspace/x64-run/videos/B20-O2.mp4 (60 s, Xvfb :122): routed client
 run 2, the 32-bit Steam updater window under uwph. Run 1 (installer + crypt32
 failure) is kept as /workspace/x64-run/lanes/B20/B20-O2-run1.mp4.
 
+
+## B24 O1 — fresh RWX caller investigation (blocked)
+
+Restored the missing B12 run-megabonk.sh locally; K_TIMEOUT now selects its
+existing timeout (45 seconds for the exact command). No runtime policy changed.
+Fresh B24 run: harness/out/megabonk/run-QFSDJnAt, wine.log and report.778103;
+raw evidence copied to /workspace/x64-run/lanes/B24/evidence/first-run/.
+THROUGH uwp_run.sh -> our launcher -> Wine own private W^X loader -> shim ->
+uwph Linux backend, with a separate stock Linux wineserver outside the jail.
+This is Linux routed proof, not stock-Wine-only, build-only, or Xbox proof.
+Video: /workspace/x64-run/videos/B24-O1.mp4 (private Xvfb, <=60 seconds).
+
+Fresh wine.log lines:
+```
+1:uwpjail: seccomp wx=1 nofork=1 (34 insns)
+2:[launcher] exec /workspace/wt/B24/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64 -> /workspace/steam-owned/games/megabonk/Megabonk.exe (handing guest to Wine's loader)
+4:0024:err:environ:run_wineboot failed to start wineboot c0000017
+```
+Fresh report lines:
+```
+5:total mmap 8997 0
+7:total mprotect 1530 0
+```
+The report's ntdll.so mmap calls/backend counts are 1080/1080 and mprotect
+1530/1530. Zero matches for UWPH_RWX, unix_prot, or Permission denied in the
+fresh wine.log. The existing shim report_wx logs module + return offset before
+rejecting PROT_WRITE|PROT_EXEC, so a refused shim mmap would be visible even
+though it never reaches kernel strace. Run exited 1; MEGABONK reached=unityplayer.
+
+Historical B12 final-evidence/wine.log (not fresh B24 evidence):
+```
+96:0024:err:virtual:map_view anon mmap error Permission denied, size 0x20000, unix_prot 0x7
+97:0024:err:virtual:map_view anon mmap error Permission denied, size 0x20000, unix_prot 0x7
+```
+These identify Wine Unix ntdll's map_view diagnostic, but give no exact mmap
+return offset. Fresh B24 did not reproduce that RWX denial, so no fresh module
++ call site can honestly be named. c0000017 persists without the historical
+RWX message; its asserted causal relationship is unproven. O1 BLOCKED on
+reproducing the denied request on the current merged baseline; O2 not attempted.
+
+Exact-test repeat: run-OleHKkKS/report.781582 also has zero UWPH_RWX,
+unix_prot, or Permission denied matches, mmap=8997, mprotect=1530,
+c0000017 for wineboot/explorer, and MEGABONK reached=unityplayer.
+Full exact-test output: /workspace/x64-run/lanes/B24/evidence/exact-test.txt
+(command completed with status 0; harness reports guest exit=1).
+Video verified by ffprobe: 30.400000 seconds. bash -n and git diff --check pass.
+
+
+## B24 O2 — blocked: no remaining RWX caller reproduced
+
+Exact test on 2026-10-25: `make -C x64/uwp-host test && K_TIMEOUT=45 x64/uwp-host/harness/run-megabonk.sh 2>&1 | tee /tmp/b24.log; ! grep -q c0000017 /tmp/b24.log`.
+Host tests passed (including 70 passed, 0 failed / 20 traced symbols); final
+exact-test exit=1. Guest exit=1, MEGABONK reached=unityplayer; wineboot and
+explorer still return c0000017. Run: harness/out/megabonk/run-2eimxvqZ.
+Zero UWPH_RWX/unix_prot/Permission denied lines; mmap=8997, mprotect=1530.
+Evidence and full exact output: /workspace/x64-run/lanes/B24/evidence/O2/.
+Video: /workspace/x64-run/videos/B24-O2.mp4, 10.2 seconds, free Xvfb :0.
+THROUGH uwp_run.sh(nofork,wx,noproc) -> our launcher -> Wine own private
+W^X loader -> shim -> uwph Linux backend; separate stock Linux wineserver.
+This is routed Linux proof, not stock-Wine-only, build-only, or Xbox proof.
+
+Source inspection: Wine 10.0 dlls/ntdll/unix/process.c spawn_process calls
+fork at line 439 and returns STATUS_NO_MEMORY at line 479 when it fails;
+NtCreateUserProcess calls spawn_process at line 916. uwpjail.c lines 114–124
+reject fork/vfork/non-thread clone with EPERM. This is consistent with the
+observed child-start errors, independently of W^X. An attempted strace inside
+the unchanged jail failed before launcher startup (test_ptrace_seize: fork:
+Operation not permitted); it is not runtime attribution proof. Its separate
+diagnostic run reached=none and is not the exact test result.
+
+No runtime patch is justified by a reproduced RWX call. Existing image patch
+already maps the historical image-view/header sites RW, then applies section
+protections. No constraint was relaxed, no child-process emulation, graphics,
+or B19 in-process-server work was attempted. O2 remains blocked by missing
+caller reproduction and child-process startup under mandatory nofork.
 ## B22 O1
 
 **Diagnosis: WINEDLLPATH/install-layout gap. No fix applied.** Reproduced with

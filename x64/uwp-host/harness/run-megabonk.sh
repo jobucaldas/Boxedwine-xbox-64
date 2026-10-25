@@ -17,7 +17,7 @@ for required in nofork wx noproc; do
         *) echo "B12 requires nofork,wx,noproc (missing $required)" >&2; exit 2 ;;
     esac
 done
-secs=${MEGABONK_TIMEOUT:-120}
+secs=${K_TIMEOUT:-${MEGABONK_TIMEOUT:-120}}
 wrapper=${UWPH_UWP_RUN:-/workspace/xbox-readiness/tests/uwp_run.sh}
 : "${DISPLAY:?run-megabonk.sh needs DISPLAY (private Xvfb)}"
 [[ -f $game/Megabonk.exe && -f $game/GameAssembly.dll ]]
