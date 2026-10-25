@@ -55,7 +55,14 @@ offline-smoke: ladder
 
 $(OUT)/rungs.exe: rungs.c input/mapping.c input/mapping.h input/probe.inc Makefile
 	mkdir -p $(OUT)
-	$(CC_WIN) $(CFLAGS) -Wno-missing-field-initializers -m64 -mconsole -static -o $@ $< input/mapping.c $(UWPH_OBJS) $(OUT)/readiness/unixside.o $(OUT)/readiness/smoke.o $(READINESS_OBJS) -lws2_32 -lbcrypt -lsynchronization -lwindowsapp -lole32 -lruntimeobject -luuid -ldxguid -lm
+	$(CC_WIN) $(CFLAGS) -Wno-missing-field-initializers -m64 $(UWP_EXE_FLAGS) -static -o $@ $< input/mapping.c $(UWPH_OBJS) $(OUT)/readiness/unixside.o $(OUT)/readiness/smoke.o $(READINESS_OBJS) $(OUT)/readiness/vp_shim.o $(OUT)/readiness/libntdll_seh.a -lws2_32 -lbcrypt -lsynchronization -lwindowsapp -lole32 -lruntimeobject -luuid -ldxguid -lm
+	python3 linux/pe-appcontainer.py $@
+
+# B61: Xbox activation contract (uwp-crossbuild gotchas 18-22): GUI subsystem >= 6.02,
+# UCRT app CRT instead of msvcrt.dll, AppContainer bit set post-link. Else 0x8027025B.
+# linux/vp_shim.c routes the CRT's VirtualProtect to VirtualProtectFromApp (no KERNEL32 import).
+UCRT_DEFS := -D_UCRT -D__MSVCRT_VERSION__=0xE00
+UWP_EXE_FLAGS := -m64 -mwindows -mcrtdll=ucrtapp $(UCRT_DEFS) -Wl,--major-subsystem-version,6,--minor-subsystem-version,2
 
 READINESS_OBJS := $(addprefix $(OUT)/readiness/,thread.o seh.o fs.o net.o)
 
@@ -64,7 +71,7 @@ APP_DEFS := -DWINAPI_FAMILY=2 -D_WIN32_WINNT=0x0A00 -DNTDDI_VERSION=0x0A000008
 UWPH_ROOT := ../uwp-host
 UWPH_SRCS := $(wildcard $(UWPH_ROOT)/src/*.c)
 UWPH_OBJS := $(patsubst $(UWPH_ROOT)/src/%.c,$(OUT)/readiness/uwph-%.o,$(UWPH_SRCS))
-READINESS_FLAGS := -O2 -std=gnu11 -Wall -Wextra -Wno-unused-parameter -Werror=implicit-function-declaration $(APP_DEFS)
+READINESS_FLAGS := -O2 -std=gnu11 -Wall -Wextra -Wno-unused-parameter -Werror=implicit-function-declaration $(APP_DEFS) $(UCRT_DEFS)
 $(OUT)/readiness/uwph-%.o: $(UWPH_ROOT)/src/%.c
 	mkdir -p $(@D)
 	$(CC_WIN) $(READINESS_FLAGS) -I$(UWPH_ROOT)/include -c $< -o $@
@@ -77,7 +84,17 @@ $(OUT)/readiness/smoke.o: $(UWPH_ROOT)/tests/smoke.c
 $(OUT)/readiness/%.o: readiness/%_probe.c readiness/common.h
 	mkdir -p $(@D)
 	$(CC_WIN) $(READINESS_FLAGS) -Dmain=readiness_$*_main -c $< -o $@
-$(OUT)/rungs.exe: $(UWPH_OBJS) $(OUT)/readiness/unixside.o $(OUT)/readiness/smoke.o $(READINESS_OBJS)
+# B61: mingw's static ucrtapp __C_specific_handler did not catch the p1 AV on the console
+# (unhandled 0xC0000005 dump); take the OS one from ntdll, as msvcrt.dll did before.
+$(OUT)/readiness/libntdll_seh.a: linux/ntdll-seh.def
+	mkdir -p $(OUT)/readiness
+	x86_64-w64-mingw32-dlltool -d $< -l $@ -D ntdll.dll
+
+$(OUT)/readiness/vp_shim.o: linux/vp_shim.c Makefile
+	mkdir -p $(OUT)/readiness
+	$(CC_WIN) $(READINESS_FLAGS) -c $< -o $@
+
+$(OUT)/rungs.exe: $(OUT)/readiness/libntdll_seh.a $(OUT)/readiness/vp_shim.o $(UWPH_OBJS) $(OUT)/readiness/unixside.o $(OUT)/readiness/smoke.o $(READINESS_OBJS)
 
 # Optional off-device regression PE; production objects have no fault injection.
 $(OUT)/readiness/thread-check.o: readiness/thread_probe.c readiness/common.h

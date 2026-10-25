@@ -350,7 +350,23 @@ UWPH_API int uwph_sched_setaffinity(uwph_pid_t pid, size_t size, const void *mas
     struct uwph_thread *t = pid ? uwph_thread_find(pid) : uwph_thread_current();
     memcpy(&m, mask, size < sizeof(m) ? size : sizeof(m));
     if (!t) return UWPH_FAIL(UWPH_ESRCH);
+#if defined(WINAPI_FAMILY) && WINAPI_FAMILY != WINAPI_FAMILY_DESKTOP_APP
+    /* B61: SetThreadAffinityMask is outside the app partition; a static import of it
+     * (api-ms-win-core-processtopology-obsolete) fails Xbox activation as 0x8027025B.
+     * Resolve it at run time where the OS still exports it; otherwise report ENOSYS. */
+    typedef DWORD_PTR (WINAPI *affinity_fn)(HANDLE, DWORD_PTR);
+    static affinity_fn fn;
+    if (!fn) {
+        HMODULE k = GetModuleHandleW(L"kernelbase.dll");
+        if (k) fn = (affinity_fn)(void (*)(void))GetProcAddress(k, "SetThreadAffinityMask");
+        if (!fn && (k = GetModuleHandleW(L"kernel32.dll")))
+            fn = (affinity_fn)(void (*)(void))GetProcAddress(k, "SetThreadAffinityMask");
+    }
+    if (!fn) return UWPH_FAIL(UWPH_ENOSYS);
+    return fn(t == self ? GetCurrentThread() : t->handle, m) ? 0 : UWPH_FAIL(UWPH_EINVAL);
+#else
     return SetThreadAffinityMask(t == self ? GetCurrentThread() : t->handle, m) ? 0 : UWPH_FAIL(UWPH_EINVAL);
+#endif
 }
 
 /* Only the target reads its signal mask; senders publish pending atomically. */

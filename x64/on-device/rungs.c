@@ -141,7 +141,7 @@ static unsigned long hx(HRESULT hr) { return (unsigned long)hr; }
 static FARPROC sym(const WCHAR *dll, const char *name)
 {
     HMODULE m = LoadLibraryExW(dll, NULL, LOAD_LIBRARY_SEARCH_SYSTEM32);
-    if (!m) m = LoadLibraryW(dll);
+    if (!m) m = LoadPackagedLibrary(dll, 0); /* B61: app-partition loader */
     return m ? GetProcAddress(m, name) : NULL;
 }
 
@@ -1224,6 +1224,9 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--big-file")) g_big_file = 1;
         else if (!strcmp(argv[i], "--local-state") && i + 1 < argc)
             MultiByteToWideChar(CP_ACP, 0, argv[++i], -1, g_state, MAX_PATH);
+        /* B61: UWP activation starts the exe as "rungs.exe -ServerName:<ActivatableClassId>";
+         * treating that as a usage error exited before CoreApplication.Run (0x8027025B). */
+        else if (!_strnicmp(argv[i], "-ServerName:", 12)) continue;
         else {
             fprintf(stderr, "usage: rungs.exe [--console] [--n10-standin] [--n11-standin] [--local-state DIR] [--big-file]\n");
             return 2;
@@ -1232,7 +1235,8 @@ int main(int argc, char **argv)
     typedef const char *(CDECL *wine_ver_fn)(void);
     wine_ver_fn wv = (wine_ver_fn)(void *)GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "wine_get_version");
     if (wv) snprintf(g_host, sizeof(g_host), "wine-%s(stand-in)", wv());
-    RoInitialize(RO_INIT_SINGLETHREADED);
+    /* B61: CoreApplication.Run from an STA fails 0x8001010E (RPC_E_WRONG_THREAD) on the console. */
+    RoInitialize(RO_INIT_MULTITHREADED);
     UINT32 len = 0;
     int packaged = GetCurrentPackageFullName(&len, NULL) != APPMODEL_ERROR_NO_PACKAGE;
     g_packaged = packaged;

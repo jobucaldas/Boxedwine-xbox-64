@@ -90,7 +90,7 @@ dp launch && dp launch BigFile && dp stop || die 'launch/stop'
 python3 - "$tmp/events.json" <<'PY' || die 'taskmanager args'
 import json, sys
 ev = [e for e in json.load(open(sys.argv[1])) if e.get('path') == '/api/taskmanager/app']
-assert [(e['method'], e['appid']) for e in ev] == [('POST', 'App'), ('POST', 'BigFile'), ('DELETE', None)], ev
+assert [(e['method'], e['appid']) for e in ev] == [('POST', 'Joao.Boxedwine.DevMode_mockpublisherid!App'), ('POST', 'Joao.Boxedwine.DevMode_mockpublisherid!BigFile'), ('DELETE', None)], ev
 assert all(e['package'].startswith('Joao.Boxedwine.DevMode_') for e in ev) and ev[-1]['forcestop'] == 'yes'
 PY
 ok 'launch App, launch BigFile, stop (base64 appid/package)'

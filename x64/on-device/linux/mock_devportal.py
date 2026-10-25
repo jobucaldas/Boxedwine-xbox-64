@@ -86,7 +86,7 @@ class H(BaseHTTPRequestHandler):
             pkg = base64.b64decode(q.get('package', '')).decode()
             appid = base64.b64decode(q['appid']).decode() if 'appid' in q else None
             self.ev(path=p, method=m, package=pkg, appid=appid, forcestop=q.get('forcestop'))
-            return self.send(200 if pkg == FULL and (m == 'DELETE' or appid in ('App', 'BigFile')) else 400, b'')
+            return self.send(200 if pkg == FULL and (m == 'DELETE' or appid in ('Joao.Boxedwine.DevMode_mockpublisherid!App', 'Joao.Boxedwine.DevMode_mockpublisherid!BigFile')) else 400, b'')
         if m == 'GET' and p == '/api/filesystem/apps/files':
             if q.get('packagefullname') != FULL or q.get('knownfolderid') != 'LocalAppData':
                 return self.send(404, b'{}')

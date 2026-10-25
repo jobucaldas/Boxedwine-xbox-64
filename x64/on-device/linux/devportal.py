@@ -152,7 +152,9 @@ class DevicePortal:
                 or p.get('Name') == identity_name]
         if not hits:
             raise DPError(f'package {identity_name} is not installed (run install first)')
-        return hits[0]
+        # B61: right after an upgrade the console briefly lists old and new versions; use the newest.
+        v = lambda p: tuple(p.get('Version', {}).get(k, 0) for k in ('Major', 'Minor', 'Build', 'Revision'))
+        return max(hits, key=v)
 
     def uninstall(self, full):
         self.prime()
@@ -178,6 +180,10 @@ class DevicePortal:
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_bytes(data)
         return len(data)
+
+def is_dir(it):
+    # B61: the console sets SubPath on files too; FILE_ATTRIBUTE_DIRECTORY (0x10) in Type decides.
+    return bool(int(it.get('Type', 0)) & 0x10)
 
 def manifest_identity(path):
     root = ET.parse(path).getroot()
@@ -240,12 +246,21 @@ def main(argv=None):
                 print(f'{p.get("PackageFullName")}\t{p.get("Name")}\t'
                       f'{v.get("Major")}.{v.get("Minor")}.{v.get("Build")}.{v.get("Revision")}\tappid={p.get("PackageRelativeId")}')
         elif a.cmd == 'launch':
-            full = dp.find(ident)['PackageFullName']
+            pkg = dp.find(ident)
+            full = pkg['PackageFullName']
             appid = a.app or apps[0]
             if appid not in apps:
                 raise DPError(f'app {appid!r} not in manifest applications {apps}')
-            dp.launch(full, appid)
-            print(f'launched {full} app {appid}')
+            # B61: the console wants the full AUMID (PackageFamilyName!AppId), not the bare
+            # manifest Id; a bare Id answers 0x8D160120 E_XTFAPP_APPLICATION_NOT_FOUND.
+            # Xbox lists PackageFamilyName WITHOUT the publisher hash ("Joao.Boxedwine.DevMode"),
+            # so take the family from PackageRelativeId ("Name_hash!App") instead.
+            family = pkg.get('PackageRelativeId', '').split('!')[0]
+            if '_' not in family:
+                raise DPError(f'installed package has no usable PackageRelativeId: {pkg.get("PackageRelativeId")!r}')
+            aumid = f'{family}!{appid}'
+            dp.launch(full, aumid)
+            print(f'launched {full} app {aumid}')
         elif a.cmd == 'stop':
             full = dp.find(ident)['PackageFullName']
             dp.stop(full)
@@ -253,7 +268,7 @@ def main(argv=None):
         elif a.cmd == 'files':
             full = dp.find(ident)['PackageFullName']
             for it in dp.files(full, a.path):
-                kind = 'dir ' if it.get('SubPath') or it.get('Type') == 16 else 'file'
+                kind = 'dir ' if is_dir(it) else 'file'
                 print(f'{kind}\t{it.get("FileSize", 0)}\t{it.get("Name")}')
         elif a.cmd in ('pull', 'pull-logs'):
             full = dp.find(ident)['PackageFullName']
@@ -261,7 +276,7 @@ def main(argv=None):
                 names = list(a.names)
             else:
                 names = [it['Name'] for it in dp.files(full, a.path)
-                         if not it.get('SubPath') and re.search(r'\.(log|txt|json)$', it.get('Name', ''), re.I)]
+                         if not is_dir(it) and re.search(r'\.(log|txt|json)$', it.get('Name', ''), re.I)]
                 if not names:
                     raise DPError(f'no log files in {a.path} (app not run yet, or log creation failed)')
             outdir = Path(a.out)
