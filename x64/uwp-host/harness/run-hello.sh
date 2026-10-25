@@ -3,6 +3,7 @@
 set -euo pipefail
 cd "$(dirname "$(realpath "$0")")"
 root=$(realpath ../../../..)
+pe=${1:-$root/x64/pe/tests/hello.exe}
 work=$PWD/wx-hello
 mkdir -p "$work"
 exec 9>"$work/lock"
@@ -19,7 +20,7 @@ server_pid=$!
 export WINESERVER=/bin/false WINE_LOADER=${WINE_LOADER:-$PWD/wine-wx/lib/wine/wine64}
 rm -f "$work"/counters*
 set +e
-timeout --kill-after=2s 15s env LD_PRELOAD="$PWD/libuwph_wine_shim.so" UWPH_REPORT="$work/counters" UWPH_REPORT_PID=1 ./run_via_wine "$root/x64/pe/tests/hello.exe"
+timeout --kill-after=2s 15s env LD_PRELOAD="$PWD/libuwph_wine_shim.so" UWPH_REPORT="$work/counters" UWPH_REPORT_PID=1 ./run_via_wine "$pe"
 rc=$?
 printf '%s\n' "$rc" > "$work/hello.exit"
 set -e

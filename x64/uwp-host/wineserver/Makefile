@@ -18,7 +18,7 @@ CONFIG_H   := $(WINE_BUILD)/include/config.h
 # Source list from Wine's own server/Makefile.in SOURCES.
 SRCS := $(filter %.c,$(shell sed -n '/^SOURCES/,/^$$/p' $(WINE_SRC)/server/Makefile.in))
 OBJS := $(SRCS:%.c=$(OBJDIR)/%.o)
-HDRS := $(wildcard $(WINE_SRC)/server/*.h $(WINE_SRC)/include/wine/server_protocol.h)
+HDRS := $(wildcard $(WINE_SRC)/server/*.h)
 
 # Compiler and flags as configured (the makefile variables config.status
 # carries), applied the way makedep does for server/ on x86_64
@@ -41,7 +41,7 @@ lib: $(OUT)/libwineserver.a $(OUT)/protocol_version
 $(CONFIG_H):
 	WINE_SRC=$(WINE_SRC) WINE_BUILD=$(WINE_BUILD) ./build.sh configure
 
-$(COPYDIR)/.prepared: build.sh $(wildcard patches/*) $(wildcard $(WINE_SRC)/server/*.[ch])
+$(COPYDIR)/.prepared: build.sh $(wildcard patches/*) $(wildcard $(WINE_SRC)/server/*.[ch] $(WINE_SRC)/server/protocol.def) $(WINE_SRC)/tools/make_requests
 	WINE_SRC=$(WINE_SRC) WINE_BUILD=$(WINE_BUILD) ./build.sh prepare $(abspath $(COPYDIR))
 	@touch $@
 
@@ -58,9 +58,10 @@ $(OUT)/libwineserver.a: $(filter-out $(OBJDIR)/main.o,$(OBJS)) $(OUT)/obj/wine_s
 	rm -f $@
 	$(AR) rcs $@ $^
 
-$(OUT)/protocol_version: $(WINE_SRC)/include/wine/server_protocol.h
+# build.sh prepare regenerates the protocol header as Debian does (version 1).
+$(OUT)/protocol_version: $(COPYDIR)/.prepared
 	@mkdir -p $(@D)
-	grep -h '#define SERVER_PROTOCOL_VERSION' $< > $@
+	grep -h '#define SERVER_PROTOCOL_VERSION' $(COPYDIR)/wine/server_protocol.h > $@
 
 clean:
 	rm -rf $(OUT) $(OBJS)
