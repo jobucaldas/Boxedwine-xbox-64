@@ -49,8 +49,12 @@ wine-surface-check: out/libuwph_shim.so out/run_hello
 $(OUT)/wine_linux_backend.o: linux_backend.c counters.h $(HEADERS)
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) -DUWPH_HARNESS_NATIVE_FDS -c $< -o $@
-$(OUT)/libuwph_wine_shim.so: inproc_server.c ../wineserver/server_thread.c ../wineserver/out/libwineserver.a shim.c counters.c counters.h $(OUT)/wine_linux_backend.o $(OUT)/libuwph.a $(OUT)/shim.map
-	$(CC) $(CFLAGS) -DUWPH_HARNESS_NATIVE_FDS -shared inproc_server.c ../wineserver/server_thread.c ../wineserver/out/libwineserver.a shim.c counters.c $(OUT)/wine_linux_backend.o $(OUT)/libuwph.a -ldl -Wl,--version-script=$(OUT)/shim.map -Wl,-z,defs -o $@
+# Only the Wine harness exports the test-only provider interception.
+$(OUT)/wine-shim.map: shim.map
+	@mkdir -p $(OUT)
+	sed 's/global:/global: dlopen;/' $< > $@
+$(OUT)/libuwph_wine_shim.so: inproc_server.c ../wineserver/server_thread.c ../wineserver/out/libwineserver.a shim.c counters.c counters.h $(OUT)/wine_linux_backend.o $(OUT)/libuwph.a $(OUT)/wine-shim.map
+	$(CC) $(CFLAGS) -DUWPH_HARNESS_NATIVE_FDS -shared inproc_server.c ../wineserver/server_thread.c ../wineserver/out/libwineserver.a shim.c counters.c $(OUT)/wine_linux_backend.o $(OUT)/libuwph.a -ldl -Wl,--version-script=$(OUT)/wine-shim.map -Wl,-z,defs -o $@
 # Bundles the private W^X loader: used instead of stock wine64 under the shim.
 $(OUT)/run_via_wine: ../../pe/launcher/run_via_wine.c $(OUT)/wine-wx/.stamp
 	$(CC) -O2 -Wall -Wextra -Werror -DRUN_VIA_WINE_WX_LOADER='"$(abspath $(OUT))/wine-wx/lib/wine/wine64"' $< -o $@
@@ -87,7 +91,7 @@ acceptance-test:
 	./run-acceptance.sh
 .PHONY: acceptance-test
 # R4X O2: private W^X ntdll.so (RW map/relocate, then per-section RX/R/RW).
-$(OUT)/wine-wx/.stamp: prepare-wine-wx.sh wine-image-wx.patch wine-loader-stub-wx.patch
+$(OUT)/wine-wx/.stamp: prepare-wine-wx.sh wine-image-wx.patch wine-loader-stub-wx.patch wine-desktop-bootstrap.patch
 	./prepare-wine-wx.sh
 $(OUT)/run_hello: run-hello.sh prefix-hygiene.sh $(OUT)/libuwph_wine_shim.so $(OUT)/run_via_wine $(OUT)/wine-wx/.stamp
 	cp $< $@

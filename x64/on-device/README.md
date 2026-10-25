@@ -50,7 +50,7 @@ this README and `/workspace/x64-run/ON-DEVICE-TOMORROW.md` exists in the built
 kit, and that every kit entry and rung is documented here. It's build-only.
 
 `package` stages files only and does not execute the ladder or print stage records. The packaged hosted
-`ladder` prints 26 STAGE lines (a–h, combo, p1–p6, n0–n8, n10, n11).
+`ladder` prints 27 STAGE lines (a–h, combo, p1–p6, n0–n8, n10, n11, s1).
 The current loose payload includes `probe_native.exe`; this remains optional
 and is copied only when the R4N build output exists. The generated
 `kit-manifest.txt` records the actual optional probes available at kit-build time.
@@ -173,7 +173,7 @@ routing of smoke.exe, UWP activation, or Xbox behaviour.
 ## Hosted ladder (O2)
 
 `make -C x64/on-device ladder && ./x64/on-device/out/ladder --offline` prints
-26 STAGE lines (a–h, combo, p1–p6, n0–n8, n10, n11) and overwrites `LocalState/ladder.log`, flushing each
+27 STAGE lines (a–h, combo, p1–p6, n0–n8, n10, n11, s1) and overwrites `LocalState/ladder.log`, flushing each
 line. Use `--local-state PATH` to pick another LocalState directory. Adapter stages
 time out after 20 seconds by default (`--timeout 1..60`); the offline combo
 has a 60-second bound with 20 seconds per guest. A stage FAIL or SKIP
@@ -369,7 +369,8 @@ result, not a failure to retry another way.
    date, tile and App/Game mode:
    - `LocalState/ladder-native.log` — required when created; save the normal
      tile's copies as `ladder-App.log` and `ladder-Game.log`, and use separate
-     run folders for the Big file opt-in tile.
+     run folders for the Big file opt-in tile and the Pick USB folder tiles
+     (`ladder-PickFolder.log`; keep every `# n14 |` line).
    - `LocalState/ladder.log` — only if hosted ladder evidence was placed here;
      otherwise report “not produced by console app”.
    - A directory listing of `LocalState` if an expected log is missing. Report
@@ -501,3 +502,103 @@ and uwph with `nofork,noproc,wx`, TEB/thread checks and routing counters verifie
 until that native combo adapter exists, report SKIP (the Linux runner cannot run
 inside UWP). Hosted online mode accepts `LocalState/adapters/combo` under the
 same exit-code/routing contract as the other loader adapters.
+
+## Steam download rung s1 (B54: blocked on UWP transport)
+
+The kit carries the B53 downloader at `payload/combo/steam-dl/steamdl.exe`,
+with DECISION.md and OWNED.md beside it. This is a desktop WinHTTP diagnostic,
+excluded from the console Appx with the other hosted combo assets. It is not
+activated by the console app. Rung s1 reports SKIP and appends the blocker to
+`LocalState/steam-dl.log`; no download or throughput result is claimed.
+
+Off device, list the plan without network, credentials or file writes:
+
+    ./x64/on-device/out/ladder --offline --dry-run
+
+| Console step | Required behavior | Current status |
+| --- | --- | --- |
+| s1 anonymous tile | Download app 1007 to a fresh LocalState/steam-downloads/1007 directory from steampipe.akamaized.net; verify chunk SHA-1 and reconstructed file SHA-1/size, then reopen and verify; log bytes/s and verified bytes to LocalState/steam-dl.log | BLOCKED: documented UWP TLS/WebSocket transport and in-process host integration missing |
+| s1 optional separate QR tile | João scans the QR on the TV with his phone and approves; session token stays in memory, never copied onto the console; download small owned app 3405340, verify and log as above | BLOCKED: same transport plus QR rendering and opt-in tile missing; no token-file input on console |
+| s1 foreground | Keep the screen on and this app in foreground; no background downloads in Game mode (DOCS-ANSWERS row 19) | Required for future console runs; suspension/checkpoint handling pending |
+
+Do not try launching the desktop downloader as a console child process. The
+next implementation must use documented UWP networking in process and preserve
+certificate checks, ownership checks and the B53 integrity checks. Failed or
+interrupted downloads cannot be reported VERIFIED. B53 currently requires a
+fresh destination after interruption. No credentials, QR challenges or tokens
+belong in logs or videos. Send back LocalState/steam-dl.log with the ladder logs.
+
+n12 `child-process` observes one `CreateProcessW` call to
+`Package InstalledLocation\child_probe.exe`, using `GetCurrentPackagePath`.
+The silent x64 helper writes `child-ok.txt` to the verified LocalState passed
+by the parent and exits 7. The parent clears any stale marker, waits at most
+5 seconds, and logs the creation result/GetLastError, wait result, exit code,
+and marker existence. ALLOWED requires exit 7 plus the fresh file; REFUSED
+records a platform error; INCOMPLETE records a timeout or inconsistent result.
+This rung is informational and never retries or uses another launch API.
+Unpackaged desktop runs report SKIP; they cannot establish Xbox permission.
+
+## Lifecycle log n13 (informational)
+
+João: during n13's **20 s observation window**, press **Home once**, then
+return to the app. Send the entire `LocalState/ladder-native.log` through Device
+Portal, with App/Game mode noted. The BEGIN/END lines identify the window;
+lifecycle handlers stay registered afterwards and the log stays open. A later
+launch replaces the log, so download it before relaunching.
+
+n13 registers ABI-level CoreApplication Suspending, Resuming and
+EnteredBackground handlers. Each event appends a UTC timestamp and monotonic
+`tick_ms` and flushes the log. Suspending takes a SuspendingDeferral, flushes its
+record, immediately calls Complete, and logs the HRESULT and elapsed milliseconds
+from obtaining the deferral. It does no artificial background work.
+
+While still in the foreground, n13 requests one ExtendedExecutionSession with
+Reason Unspecified and logs ExtendedExecutionResult Allowed/Denied or the
+original HRESULT. It pumps the dispatcher during the window, reports a pending
+request at the end, cancels it once if needed, and closes the session. Refusals
+are observations; there are no alternate APIs or retries. Extended execution
+is no guarantee of continued background operation, and missing lifecycle events
+are not a PASS or FAIL. This rung is informational. Off-device execution skips
+n13 and cannot prove Xbox suspension/resumption behavior.
+
+ABI references: [CoreApplication metadata](https://github.com/microsoft/windows-rs/blob/master/crates/libs/windows/src/Windows/ApplicationModel/Core/mod.rs)
+and [ExtendedExecution metadata](https://github.com/microsoft/windows-rs/blob/master/crates/libs/windows/src/Windows/ApplicationModel/ExtendedExecution/mod.rs).
+
+## Picked folder n14 (USB drive, B41 O3)
+
+João: plug the USB drive in first, then launch the separate
+**Boxedwine Pick USB folder** tile (manifest application PickFolder, EntryPoint
+`Boxedwine.PickFolder`, executable `rungs.exe`). A FolderPicker opens: go to the
+USB drive and pick (or create) a folder there. Only n14 runs on this tile. It
+writes, reads back and deletes one 64 MiB file in that folder. For the optional
+2304 MiB file as well, launch **Boxedwine USB big file opt-in** instead
+(application PickFolderBigFile, EntryPoint `Boxedwine.PickFolderBigFile`,
+executable `rungs.exe`). This is the same opt-in as n7: it sets `--big-file` for
+that run only, and the 2304 MiB file is written only after the 64 MiB file
+passes. Leave about 2.5 GiB free on the drive for it. FAT32 is fine because both
+files stay under 4 GiB.
+
+Each launch replaces `LocalState/ladder-native.log`. Download the log from the
+normal tile before launching this one, and save this run's log as
+`ladder-PickFolder.log` (or `ladder-PickFolderBigFile.log`). Cancelling the
+picker logs n14 SKIP and creates nothing.
+
+The flow is FolderPicker.PickSingleFolderAsync (file type filter `*`), then
+StorageApplicationPermissions.FutureAccessList.Add. The picked path and the
+returned token are logged, and the FutureAccessList entry is kept. Next comes
+CreateFile2FromAppW with CREATE_NEW on a new `boxedwine-n14-<MiB>-<GUID>.bin` in
+the picked folder, so an existing file is never overwritten. The rung writes
+4 MiB tagged blocks, flushes, checks the size and reads every block back. Then it
+closes the file and calls DeleteFileFromAppW. `# n14 |` lines log the path,
+bytes written, size and bytes verified, with milliseconds and the
+GetLastError/HRESULT for every step. The free space is also logged when
+GetDiskFreeSpaceExW answers. The single STAGE n14 line is PASS, FAIL (I/O or
+compare error), REFUSED (picker, FutureAccessList or CreateFile2FromAppW refused,
+with its code) or SKIP. A refusal is a result: n14 stops and tries no other
+access path. broadFileSystemAccess is not declared because Xbox does not support
+it. If DeleteFileFromAppW fails, the log says the file may remain. Delete it
+from the USB drive on a PC.
+
+The normal tiles log n14 SKIP. Off-device runs (`native-smoke.sh`, desktop
+Wine) also SKIP n14: there is no picker stand-in, so this is console-only
+evidence that still needs João's run.

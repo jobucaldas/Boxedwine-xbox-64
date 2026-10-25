@@ -9,10 +9,15 @@
 # validates .update-timestamp and pre-creates __wineboot_event, so ntdll's
 # run_wineboot waits on it instead of spawning wineboot.exe under nofork.
 # Requires DISPLAY (a private Xvfb). Linux proof only; Xbox untested.
+# MEGABONK_NO_CRASH_HANDLER=1 opts into a per-run symlink farm: every
+# top-level install entry is symlinked except UnityCrashHandler64.exe. Linked
+# directories retain their complete contents. The owned install is untouched;
+# this only tests whether Unity skips its reporter when that executable is absent.
 set -euo pipefail
 cd "$(dirname "$(realpath "$0")")"
 here=$PWD
 game=${MEGABONK_DIR:-/workspace/steam-owned/games/megabonk}
+install=$(realpath "$game")
 constraints=${UWPH_CONSTRAINTS:-nofork,wx,noproc}
 # B12 requires every constraint; reject partial runs before starting Wine.
 for required in nofork wx noproc; do
@@ -41,6 +46,15 @@ cp -a --reflink=auto "$here/prebuilt-prefix" "$work/prefix"
 chmod -R u+w "$work/prefix"
 cp "$out/wine-wx/lib/wine/x86_64-windows/uwpdesktop.dll" "$work/prefix/drive_c/windows/system32/uwpdesktop.dll"
 run=$(mktemp -d "$work/run-XXXXXXXX")
+if [[ ${MEGABONK_NO_CRASH_HANDLER:-0} == 1 ]]; then
+    game=$run/game
+    mkdir "$game"
+    while IFS= read -r -d '' entry; do
+        [[ ${entry##*/} == UnityCrashHandler64.exe ]] && continue
+        ln -s "$entry" "$game/${entry##*/}"
+    done < <(find "$install" -mindepth 1 -maxdepth 1 -print0)
+    echo "MEGABONK_NO_CRASH_HANDLER=1: staged symlinks at $game (UnityCrashHandler64.exe omitted)"
+fi
 printf 'Copied read-only prebuilt prefix: %s\n' "$here/prebuilt-prefix" > "$run/fixture.txt"
 echo "run=$run"
 echo "constraints=$constraints (all three required; enforcement evidence in wine.log)"
@@ -52,7 +66,9 @@ unset WINEDLLOVERRIDES UWPH_INPROC_OWNER
 export WINEPREFIX=$work/prefix EXTRA_RW=$out UWPH_INPROC_SERVER=1 WINE_INPROC_DESKTOP=1 WINESERVER=/bin/false
 
 rc=0
-timeout --kill-after=5s "${secs}s" "$wrapper" "$constraints" "$game" -- env \
+# Keep symlink targets visible read-only in the jail, then enter the staged
+# directory using env's in-process chdir before handing off to our launcher.
+timeout --kill-after=5s "${secs}s" "$wrapper" "$constraints" "$install" -- env -C "$game" \
     LD_PRELOAD="$out/libuwph_wine_shim.so" UWPH_REPORT="$run/report" UWPH_REPORT_PID=1 \
     WINE_LOADER="$out/wine-wx/lib/wine/wine64" WINEDEBUG=+loaddll,+process,err \
     "$out/run_via_wine" "$game/Megabonk.exe" -force-d3d11 -screen-fullscreen 0 \

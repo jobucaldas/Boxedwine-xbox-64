@@ -34,12 +34,14 @@ test "$(openssl x509 -inform DER -in out/test-cert.cer -noout -subject -nameopt 
 
 mkdir -p "$stage/payload/Assets"
 test -s out/probe_d3d12.exe
-cp AppxManifest.xml out/smoke.exe out/rungs.exe "$stage/payload/"
+cp AppxManifest.xml out/smoke.exe out/rungs.exe out/child_probe.exe "$stage/payload/"
 # Standalone D3D12 diagnostic built here from x64/graphics/probe_d3d12.c.
 cp out/probe_d3d12.exe "$stage/payload/"
 # Hosted combo assets: keep Linux runtime separate from the native UWP entry.
 combo="$stage/payload/combo"
-mkdir -p "$combo"
+mkdir -p "$combo/steam-dl"
+cp ../launcher-dl/out/steamdl.exe "$combo/steam-dl/"
+cp ../launcher-dl/DECISION.md ../launcher-dl/OWNED.md "$combo/steam-dl/"
 cp out/combo-guests/hello.exe out/combo-guests/hello_k32.exe "$combo/"
 cp ../uwp-host/harness/out/run_via_wine ../uwp-host/harness/out/libuwph_wine_shim.so "$combo/"
 cp -a ../uwp-host/harness/out/wine-wx "$combo/"
@@ -137,6 +139,8 @@ try:
     def role(name):
         if name in roles:
             return roles[name]
+        if name.startswith('payload/combo/steam-dl/'):
+            return 's1 (B53 desktop diagnostic; UWP transport pending)'
         if name.endswith('rungs.exe'):
             return 'n0-n11 (native ladder; console unverified)'
         if name.endswith('smoke.exe'):
