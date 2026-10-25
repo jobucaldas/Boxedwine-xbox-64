@@ -2,12 +2,15 @@ CC_WIN ?= x86_64-w64-mingw32-gcc
 OUT := out
 CFLAGS := -O2 -std=c11 -Wall -Wextra -Werror
 
-.PHONY: all smoke-exe ladder package offline-smoke clean
+.PHONY: all smoke-exe ladder package offline-smoke kit clean
 all: smoke-exe
 
 # Loose layout fallback; no SDK packer or device activation is implied.
 package: smoke-exe $(OUT)/rungs.exe
 	./pack.sh
+
+kit: smoke-exe ladder
+	./pack.sh --kit
 
 smoke-exe: $(OUT)/smoke.exe
 
