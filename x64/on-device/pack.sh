@@ -31,7 +31,7 @@ cmp out/test-cert.cer "$stage/pfx-cert.cer"
 test "$(openssl x509 -inform DER -in out/test-cert.cer -noout -subject -nameopt RFC2253)" = 'subject=CN=BoxedwineDev'
 
 mkdir -p "$stage/payload/Assets"
-cp AppxManifest.xml out/smoke.exe out/rungs.exe "$stage/payload/"
+cp AppxManifest.xml out/smoke.exe out/rungs.exe out/child_probe.exe "$stage/payload/"
 # Hosted combo assets: keep Linux runtime separate from the native UWP entry.
 combo="$stage/payload/combo"
 mkdir -p "$combo"

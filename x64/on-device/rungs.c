@@ -233,7 +233,7 @@ static void pump(void)
 static void rung_n0(void)
 {
     if (g_packaged) {
-        stage("n0", "probe_native", "SKIP", "packaged probe_native.exe present if supplied; UWP cannot launch a child executable via CreateProcess; INCOMPLETE O5 console n0: needs in-process probe adapter");
+        stage("n0", "probe_native", "SKIP", "packaged probe_native.exe present if supplied; see n12 for the packaged CreateProcessW observation; INCOMPLETE O5 console n0: needs in-process probe adapter");
         return;
     }
     WCHAR exe[MAX_PATH], dir[MAX_PATH], cmd[3 * MAX_PATH], logw[MAX_PATH];
@@ -862,6 +862,58 @@ static void rung_n11(void)
           where, ok ? "OK" : "FAIL", g_device ? (ok ? "PASS" : "FAIL") : "SKIP");
 }
 
+/* n12 is observational: one documented launch, with no alternate API/retry. */
+static void rung_n12(void)
+{
+    WCHAR exe[MAX_PATH], marker[MAX_PATH], cmd[MAX_PATH * 3];
+    UINT32 length = MAX_PATH;
+    LONG path_error = GetCurrentPackagePath(&length, exe);
+    if (path_error != ERROR_SUCCESS) {
+        stage("n12", "child-process", "SKIP",
+              "standin: Package InstalledLocation unavailable err=%ld; CreateProcessW not called; no Xbox proof", path_error);
+        return;
+    }
+    if (!g_packaged || !g_local_state) {
+        stage("n12", "child-process", "SKIP", "requires verified packaged activation and LocalState");
+        return;
+    }
+    if (wcslen(exe) + wcslen(L"\\child_probe.exe") >= MAX_PATH) {
+        stage("n12", "child-process", "REFUSED", "InstalledLocation path too long err=%u", ERROR_INSUFFICIENT_BUFFER);
+        return;
+    }
+    if (wcslen(g_state) + wcslen(L"\\child-ok.txt") >= MAX_PATH) {
+        stage("n12", "child-process", "REFUSED", "LocalState marker path too long err=%u", ERROR_INSUFFICIENT_BUFFER);
+        return;
+    }
+    wcscat(exe, L"\\child_probe.exe");
+    state_path(marker, MAX_PATH, L"child-ok.txt");
+    if (!DeleteFileW(marker) && GetLastError() != ERROR_FILE_NOT_FOUND) {
+        stage("n12", "child-process", "REFUSED", "cannot clear stale marker err=%lu; launch not attempted", GetLastError());
+        return;
+    }
+    _snwprintf(cmd, MAX_PATH * 3, L"\"%ls\" \"%ls\"", exe, g_state);
+    STARTUPINFOW si = {0};
+    PROCESS_INFORMATION pi = {0};
+    si.cb = sizeof(si);
+    SetLastError(ERROR_SUCCESS);
+    BOOL created = CreateProcessW(exe, cmd, NULL, NULL, FALSE, 0, NULL, g_state, &si, &pi);
+    DWORD error = GetLastError(), wait = WAIT_FAILED, code = STILL_ACTIVE;
+    DWORD wait_error = 0, exit_error = 0;
+    if (created) {
+        wait = WaitForSingleObject(pi.hProcess, 5000);
+        if (wait == WAIT_FAILED) wait_error = GetLastError();
+        if (!GetExitCodeProcess(pi.hProcess, &code)) exit_error = GetLastError();
+        CloseHandle(pi.hThread);
+        CloseHandle(pi.hProcess);
+    }
+    BOOL exists = GetFileAttributesW(marker) != INVALID_FILE_ATTRIBUTES;
+    const char *result = !created ? "REFUSED" :
+        wait == WAIT_OBJECT_0 && !exit_error && code == 7 && exists ? "ALLOWED" : "INCOMPLETE";
+    stage("n12", "child-process", result,
+          "CreateProcessW=%d GetLastError=%lu wait=%lu wait_error=%lu exit=%lu exit_error=%lu child-ok.txt=%s; informational only",
+          created, error, wait, wait_error, code, exit_error, exists ? "exists" : "absent");
+}
+
 #include "input/probe.inc"
 
 static void run_all(IUnknown *window)
@@ -879,6 +931,7 @@ static void run_all(IUnknown *window)
     rung_n8();
     rung_n10();
     rung_n11();
+    rung_n12();
     rung_n5(); /* last: the commit test may hit the app's memory limit */
     note("rungs done; run once as App and once as Game and keep both logs");
 }

@@ -399,3 +399,13 @@ and uwph with `nofork,noproc,wx`, TEB/thread checks and routing counters verifie
 until that native combo adapter exists, report SKIP (the Linux runner cannot run
 inside UWP). Hosted online mode accepts `LocalState/adapters/combo` under the
 same exit-code/routing contract as the other loader adapters.
+
+n12 `child-process` observes one `CreateProcessW` call to
+`Package InstalledLocation\child_probe.exe`, using `GetCurrentPackagePath`.
+The silent x64 helper writes `child-ok.txt` to the verified LocalState passed
+by the parent and exits 7. The parent clears any stale marker, waits at most
+5 seconds, and logs the creation result/GetLastError, wait result, exit code,
+and marker existence. ALLOWED requires exit 7 plus the fresh file; REFUSED
+records a platform error; INCOMPLETE records a timeout or inconsistent result.
+This rung is informational and never retries or uses another launch API.
+Unpackaged desktop runs report SKIP; they cannot establish Xbox permission.
