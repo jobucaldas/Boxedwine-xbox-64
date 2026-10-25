@@ -2,7 +2,8 @@
 # B11/B12: owned Megabonk THROUGH uwp_run.sh -> our launcher -> Wine's own
 # (W^X-patched) loader/ntdll.so -> uwph shim -> Linux backend.
 # Prints `MEGABONK reached=<stage>`; stage is the furthest of
-# loader|unityplayer|gfx-init|first-frame|menu (none if Wine never loaded a DLL).
+# loader|unityplayer|gfx-init (none if Wine never loaded a DLL).
+# Screenshots are diagnostic only; presentation is not instrumented.
 # Requires DISPLAY (a private Xvfb). Linux proof only; Xbox untested.
 set -euo pipefail
 cd "$(dirname "$(realpath "$0")")"
@@ -18,8 +19,6 @@ for required in nofork wx noproc; do
 done
 secs=${MEGABONK_TIMEOUT:-120}
 wrapper=${UWPH_UWP_RUN:-/workspace/xbox-readiness/tests/uwp_run.sh}
-# Visual template for the main menu: logo crop of an earlier owned run.
-menu_ref=${MEGABONK_MENU_REF:-/workspace/megabonk/shots/2-xbox-launcher-run_via_wine-menu.png}
 : "${DISPLAY:?run-megabonk.sh needs DISPLAY (private Xvfb)}"
 [[ -f $game/Megabonk.exe && -f $game/GameAssembly.dll ]]
 
@@ -79,25 +78,10 @@ touch "$player"
 grep -q 'loaddll:.*Loaded' "$log" && stage=loader
 { grep -q 'Loaded L".*UnityPlayer.dll"' "$log" || grep -q '^Initialize engine version' "$player"; } && stage=unityplayer
 grep -q '^    Version:  Direct3D 11' "$player" && stage=gfx-init
-# first-frame: a captured window image with more than one colour.
-best=
-for png in "$run"/shot-*.png; do
-    [[ -f $png ]] || continue
-    colors=$(identify -format '%k' "$png" 2>/dev/null || echo 0)
-    if [[ $stage == gfx-init || $stage == first-frame ]] && (( colors > 1 )); then
-        stage=first-frame best=$png
-    fi
-done
-# menu: the static MEGABONK logo region matches the earlier menu capture.
-if [[ $stage == first-frame && -f $menu_ref ]]; then
-    for png in "$run"/shot-*.png; do
-        err=$(compare -metric RMSE <(convert "$png" -resize '1280x720!' -crop 440x100+420+75 png:-) \
-              <(convert "$menu_ref" -crop 440x100+420+75 png:-) null: 2>&1 | sed -n 's/.*(\([0-9.e+-]*\)).*/\1/p' || true)
-        echo "menu-logo RMSE $(basename "$png") ${err:-?}" >> "$run/menu.txt"
-        if [[ -n $err ]] && awk -v e="$err" 'BEGIN { exit !(e < 0.10) }'; then stage=menu best=$png; fi
-    done
-fi
-[[ -n $best ]] && cp "$best" "$run/best.png"
+# A multicolour screenshot (or matching logo) does not prove that the game
+# presented a frame: window borders, startup/error UI and unpresented surfaces
+# can look similar. Until actual game presentation is instrumented, retain
+# gfx-init even when screenshots exist. Keep captures as diagnostic evidence.
 
 # Routing + surface: main-process reports written by the shim's _exit hook.
 reports=("$run"/report.*)
@@ -119,6 +103,6 @@ fi
 echo "CreateProcess attempts: $(grep -c 'CreateProcessInternalW' "$log" || true)"
 grep -m5 'err:\|Operation not permitted' "$log" || true
 tail -n 3 "$player" | sed 's/^/player: /'
-echo "evidence: $run (wine.log, player.log, shot-*.png${best:+, best.png})"
+echo "evidence: $run (wine.log, player.log, shot-*.png)"
 echo "THROUGH uwp_run.sh($constraints) -> launcher -> Wine own W^X loader -> shim -> uwph; separate stock wineserver"
 echo "MEGABONK reached=$stage"

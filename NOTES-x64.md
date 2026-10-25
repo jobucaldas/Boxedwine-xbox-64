@@ -1574,12 +1574,22 @@ This is off-device THROUGH-uwph: uwp_run.sh -> our launcher -> Wine's own
 private W^X loader -> shim -> Linux uwph backend, with the harness's explicitly
 retained separate stock Linux wineserver outside the jail. It is not an
 in-process server acceptance or Xbox execution proof, nor stock-Wine-only or
-build-only evidence. One shim report records open=10431, read=13512,
-close=14295, mmap=8993, munmap=7982, mprotect=1526.
+build-only evidence. One shim report records open=10431, read=13511,
+close=14295, mmap=8993, munmap=7984, mprotect=1526.
 
-Evidence: `/workspace/x64-run/lanes/B12/B12-O1.exact.log` and
-`/workspace/x64-run/lanes/B12/final-evidence/`; original run is
-`harness/out/megabonk/run-EN9wu9kh`. Video:
+Evidence: `/workspace/x64-run/lanes/B12/B12-O1.exact.log` and the fresh run is
+`harness/out/megabonk/run-PV5ZZ0fh`. Video:
 `/workspace/x64-run/videos/B12-O1.mp4`, 11.7 seconds, showing the routed run's
 terminal output and failure (no game window). Shell syntax check passed.
 No commit or remote operation was performed.
+
+B12 reviewer fix: removed the multicolour screenshot first-frame predicate and
+logo-based menu promotion. Captures are diagnostic only; automatic reporting
+now stops at gfx-init until actual game presentation can be established.
+This conservatively prevents blank clients, borders, error windows or
+unpresented surfaces from being reported as a rendered game frame. The exact
+45-second test was rerun with all three constraints on a fresh private Xvfb:
+`MEGABONK reached=unityplayer`, game exit=1, harness exit=0. The startup and
+RWX mapping failures persist. The fresh video is 11.7 seconds. Per-run reports
+and trace.tsv preserve the new counters; the tracked surface table was retained.
+`bash -n` and `git diff --check` passed. No first-frame or menu claim is made.
