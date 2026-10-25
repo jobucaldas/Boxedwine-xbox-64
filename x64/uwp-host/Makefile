@@ -15,7 +15,7 @@ CFLAGS_COMMON := -O2 -g -std=gnu11 -Wall -Wextra -Werror -Wno-unused-parameter -
 
 CC_LINUX ?= gcc
 CC_WIN   ?= x86_64-w64-mingw32-gcc
-WINE     ?= wine64
+WINE     ?= $(shell command -v wine64 >/dev/null 2>&1 && echo wine64 || echo wine)
 # WINAPI_FAMILY_APP = 2; Windows 10 2004 headers level
 WIN_DEFS := -DWINAPI_FAMILY=2 -D_WIN32_WINNT=0x0A00 -DNTDDI_VERSION=0x0A000008
 
@@ -65,7 +65,11 @@ check: $(OUT)/linux/libuwph.a $(OUT)/win/libuwph.a
 test: all
 	$(OUT)/linux/abi_check
 	$(OUT)/linux/smoke
-	WINEDEBUG=-all $(WINE) $(OUT)/win/smoke.exe
+	@# smoke.exe's default fixture root is relative to the repo root; make -C runs
+	@# from here, so pass the absolute tests dir (as harness/run-windows-smoke.sh does).
+	root=$$(WINEDEBUG=-all timeout 10s winepath -w "$(CURDIR)/tests") && \
+	    case "$$root" in [A-Za-z]:\\*) ;; *) echo "bad fixture root: $$root" >&2; exit 1;; esac && \
+	    WINEDEBUG=-all $(WINE) $(OUT)/win/smoke.exe "$$root"
 
 clean:
 	rm -rf $(OUT)

@@ -96,3 +96,8 @@ $(OUT)/protect_test: protect_test.c $(OUT)/libuwph.a
 protect-test: $(OUT)/protect_test
 	/workspace/xbox-readiness/bin/uwpjail --wx -- $<
 .PHONY: protect-test
+
+# Explicit packaging-time initialization only; never a runtime prerequisite.
+prebuilt-prefix:
+	./prepare-wine.sh --prebuilt-prefix
+.PHONY: prebuilt-prefix
