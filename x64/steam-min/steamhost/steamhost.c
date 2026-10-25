@@ -105,7 +105,7 @@ static int write_active_process(const char *dll) {
     return ok;
 }
 
-static int logon(HMODULE client, void *engine, const char *dll, int wait_s, int serve_s) {
+static int logon(HMODULE client, void *engine, const char *dll, int wait_s, int serve_s, int anon) {
     bgetcb_fn bget = (bgetcb_fn)(void *)GetProcAddress(client, "Steam_BGetCallback");
     freecb_fn bfree = (freecb_fn)(void *)GetProcAddress(client, "Steam_FreeLastCallback");
     char account[128];
@@ -114,14 +114,19 @@ static int logon(HMODULE client, void *engine, const char *dll, int wait_s, int 
     void *iuser;
     int result = -1, eresult = 0, wrote = 0;
     DWORD start = GetTickCount();
-    if (!read_loginusers(account, sizeof(account), &steamid)) { puts("loginusers=0"); return 7; }
-    puts("loginusers=1");
+    if (anon) {
+        steamid = ((uint64_t)1 << 56) | ((uint64_t)10 << 52); /* Public, AnonUser, account/instance 0 */
+        puts("anonymous=1");
+    } else if (!read_loginusers(account, sizeof(account), &steamid)) { puts("loginusers=0"); return 7; }
+    if (!anon) puts("loginusers=1");
     user = ((int32_t (*)(void *, int32_t *))SLOT(engine, ENGINE_CREATEGLOBALUSER))(engine, &pipe);
-    printf("global_user=%d\n", user != 0 && pipe != 0);
-    if (!user || !pipe) return 8;
+    printf("global_user=%d\n", user != 0 && pipe > 0);
+    printf("pipe=%d\n", pipe);
+    if (!user || pipe <= 0) return 8;
     iuser = ((void *(*)(void *, int32_t, int32_t))SLOT(engine, ENGINE_GETICLIENTUSER))(engine, user, pipe);
     if (!iuser) { puts("iclientuser=0"); return 8; }
-    printf("cached_login_set=%d\n", ((unsigned char (*)(void *, const char *, unsigned char))
+    puts("iclientuser=1");
+    if (!anon) printf("cached_login_set=%d\n", ((unsigned char (*)(void *, const char *, unsigned char))
            SLOT(iuser, USER_SETACCOUNTCACHED))(iuser, account, 0) != 0);
     SecureZeroMemory(account, sizeof(account));
     printf("logon_call_eresult=%d\n", ((int (*)(void *, uint64_t))SLOT(iuser, USER_LOGON))(iuser, steamid));
@@ -138,8 +143,10 @@ static int logon(HMODULE client, void *engine, const char *dll, int wait_s, int 
         }
         Sleep(100);
     }
+    printf("logon_seconds=%.3f\n", (GetTickCount() - start) / 1000.0);
     if (result == 1) printf("logon=1\n");
     else printf("logon=0 eresult=%d%s\n", eresult, result < 0 ? " timeout=1" : "");
+    if (anon) return result == 1 ? 0 : 9;
     if (!active_pid_is_self()) {
         wrote = write_active_process(dll);
         printf("activeprocess_written_by=steamhost ok=%d\n", wrote);
@@ -164,16 +171,16 @@ int main(int argc, char **argv) {
     HMODULE client;
     typedef void *(__cdecl *factory_fn)(const char *, int *);
     factory_fn factory;
-    int rc = 0, selftest = 0, check = 0, wait_s = 0, serve_s = 0;
+    int rc = 0, selftest = 0, check = 0, anon = 0, wait_s = 0, serve_s = 0;
     DWORD len;
     setvbuf(stdout, NULL, _IONBF, 0);
     if (argc == 2 && !strcmp(argv[1], "--selftest")) selftest = 1;
     else if (argc == 2 && !strcmp(argv[1], "--check-pin")) check = 1;
     else if (!((argc == 4 || (argc == 6 && !strcmp(argv[4], "--serve") &&
                 (serve_s = atoi(argv[5])) > 0 && serve_s <= 3600)) &&
-               !strcmp(argv[1], "--logon") && !strcmp(argv[2], "--wait") &&
+               (!strcmp(argv[1], "--logon") || (anon = !strcmp(argv[1], "--anon"))) && !strcmp(argv[2], "--wait") &&
                (wait_s = atoi(argv[3])) > 0 && wait_s <= 3600)) {
-        fprintf(stderr, "usage: steamhost64.exe --selftest | --check-pin | --logon --wait SECONDS [--serve SECONDS]\n");
+        fprintf(stderr, "usage: steamhost64.exe --selftest | --check-pin | --anon --wait SECONDS | --logon --wait SECONDS [--serve SECONDS]\n");
         return 2;
     }
     /* steamhost spawns no process; there is no webhelper (or any child) code path. */
@@ -210,5 +217,5 @@ int main(int argc, char **argv) {
     printf("engine=%d\n", engine != NULL);
     if (!engine) return 5;
     /* --selftest: no vtable calls, users, logon, or credentials. Process exit unloads DLL. */
-    return selftest ? 0 : logon(client, engine, dll, wait_s, serve_s);
+    return selftest ? 0 : logon(client, engine, dll, wait_s, serve_s, anon);
 }

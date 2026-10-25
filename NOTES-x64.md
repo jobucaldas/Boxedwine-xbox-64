@@ -3140,3 +3140,21 @@ The exact compound test exits 1 only because its final literal leak scan matches
 its own pattern in the driver-owned ORDERS.md, B78-O1.prompt and session JSONL.
 Those files were left intact. This is a test-input collision, not a credential
 finding; the separate scan of x64/steam-min is clean.
+
+## B78 O2
+
+Stock Wine, anonymous, build 1745623383. Added isolated `run.sh --anon --wait` dispatch and a credential-free helper mode (Public / AnonUser / account 0, instance 0). The anonymous path calls only CreateGlobalUser, GetIClientUser, LogOn, RunFrame and the callback exports; it never reads a login cache, sets cached account credentials, or writes ActiveProcess. Existing default pin and authenticated runner stay in place.
+
+Outcome: no successful logon in 420 seconds (360-second requested wait plus 60-second outer allowance). Neither `logon=1` nor a literal `logon=0` was emitted: Wine faulted inside the LogOn call before it returned and waited in WineDbg until timeout, runner exit 124. CreateGlobalUser was sane (`global_user=1`, `pipe=1`); GetIClientUser was non-null (`iclientuser=1`). LogOnResponse EResult verbatim: unavailable; no RecvMsgClientLogOnResponse exists. Transport: no established CM transport recorded. No “client too old” or update-required text observed. This does not establish server acceptance or rejection of this build. Stopped after this single attempt, with no workaround, patching, or version spoofing.
+
+Wine stderr verbatim: `wine: Unhandled page fault on read access to FFFFFFFFFFFFFFFF at address 00006FFFFA06D981 (thread 0120), starting debugger...`. Preceding assertions report GetAdaptersAddresses returned 13 and missing SDL3.dll; no inference of root cause is made.
+
+B70 fix applied to a fresh prefix: `crl_seed_total=23 ok=23`; TLS verification kept enabled. Prefix was about 1.4 GB before cleanup and deleted (`cleanup.log: prefix_deleted=1`). Disk before cached archive verification: 7.8 GB free; no Valve package download was needed. Package SHA2 and DLL pin verified. No loginusers.vdf before or after guest execution; webhelper_count=0. Credential-marker scan passed. Exact test failed (shell exit 1 at its first grep); output preserved in `/workspace/x64-run/lanes/B78/o2/exact-test-output.txt`. Separate checks confirmed absent logged-on/OK response, absent loginusers, zero webhelpers, prefix removal, and clean credential scan. Video: `/workspace/x64-run/videos/B78-O2.mp4`, 55 seconds, free Xvfb display. Route is stock Wine; no THROUGH-uwph or console proof.
+
+No connection_log entries occurred in the final 60 seconds of the run. The last available 60-second window (indeed the entire timestamped log), verbatim:
+
+```text
+[2026-10-25 22:38:56] Client version: 1745623383
+[2026-10-25 22:38:56] Connectivity test: Starting test, fetching 'http://test.steampowered.com/204'
+[2026-10-25 22:38:57] [Logged Off, 0, 0] [U:1:0] CCMInterface::SetSteamID( [U:1:0] )
+```

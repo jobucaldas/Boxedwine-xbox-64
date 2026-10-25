@@ -13,6 +13,10 @@ set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 MIN=$(cd "$HERE/.." && pwd)
 EVID= MODE= SELFTEST= GAME= WAIT=360 GAME_SECS=60
+# Anonymous dispatch is isolated from all credential seeding paths.
+for arg in "$@"; do
+    if [[ $arg == --anon ]]; then exec bash "$HERE/run-anon.sh" "$@"; fi
+done
 PIN="$HERE/PIN.txt"
 CHECK=
 APPID=3405340
