@@ -3096,3 +3096,21 @@ Metadata-only host-shell validation (build-only category); neither THROUGH-uwph
 nor stock Wine was executed. No runtime/console compatibility claim. Evidence:
 `/workspace/x64-run/lanes/B80/o1.txt`, `network-failure.txt`; seven-second Xvfb
 terminal recording `/workspace/x64-run/videos/B80-O1.mp4`. No prefix created.
+
+## B47 (B13 retry)
+
+O1 BLOCKED: preflight `df -BG /` reports only 14G available (128G total,
+114G used, 90% used), below the required 20 GB reserve. Per B47 orders,
+stopped before downloader info/full download; no token was read and no download
+was started. No files were deleted to make room.
+
+Exact test run:
+```
+$ ls /workspace/steam-owned/games/hades/x64/Hades.exe || find /workspace/steam-owned/games/hades -iname 'Hades*.exe' | head
+ls: cannot access '/workspace/steam-owned/games/hades/x64/Hades.exe': No such file or directory
+```
+The fallback find produced no output. Hades executable presence failed;
+manifest file-count/byte verification could not run without the download.
+Classification: host filesystem/download preflight only (build-only category);
+neither THROUGH-uwph nor stock Wine ran. No runtime proof or video was produced.
+O2 was not attempted (outside this assignment).
