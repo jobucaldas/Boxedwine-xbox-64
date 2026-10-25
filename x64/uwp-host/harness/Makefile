@@ -146,6 +146,6 @@ wine-test-inproc: wine-test-inproc-build
 FORCE:
 .PHONY: wine-test-inproc wine-test-inproc-build FORCE
 
-# B34 O1: explorer sources built as a separate, currently unused PE DLL.
-$(OUT)/wine-wx/.desk-stamp: prepare-wine-desk.sh wine-desktop-thread.patch $(OUT)/wine-wx/.stamp
+# B35 O1: desktop PE DLL and matching opt-in user32/win32u callback ABI.
+$(OUT)/wine-wx/.desk-stamp: prepare-wine-desk.sh wine-desktop-thread.patch wine-inproc-desktop.patch $(OUT)/wine-wx/.stamp
 	./prepare-wine-desk.sh

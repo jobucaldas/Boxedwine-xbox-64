@@ -14,7 +14,7 @@ if [[ $mode == stock-selfhost ]]; then
     make -s out/run_via_wine out/wine-wx/.desk-stamp
 fi
 if [[ $mode == nofork ]]; then
-    make -s out/libuwph_wine_shim.so out/run_via_wine out/wine-wx/.stamp
+    make -s out/libuwph_wine_shim.so out/run_via_wine out/wine-wx/.desk-stamp
 fi
 out=$here/out
 mkdir -p "$out/desk-probe"
@@ -24,7 +24,7 @@ run=$(mktemp -d "$out/desk-probe/run-XXXXXXXX")
 cp -a --reflink=auto "$here/prebuilt-prefix" "$run/prefix"
 chmod -R u+w "$run/prefix"
 export WINEPREFIX=$run/prefix
-unset WINEDLLOVERRIDES UWPH_INPROC_OWNER UWPH_INPROC_SERVER WINESERVER LD_PRELOAD
+unset WINEDLLOVERRIDES UWPH_INPROC_OWNER UWPH_INPROC_SERVER WINE_INPROC_DESKTOP WINESERVER LD_PRELOAD
 log=$run/wine.log
 rc=0
 echo "DESKTOP PROBE mode=$mode DISPLAY=$DISPLAY"
@@ -43,13 +43,15 @@ if [[ $mode == stock || $mode == stock-selfhost ]]; then
     server_pid=$!
     timeout --kill-after=5s "${K_TIMEOUT:-25}s" env WINEDEBUG=+process,err "$loader" "$probe" "${args[@]}" > "$log" 2>&1 || rc=$?
 else
-    export EXTRA_RW=$out UWPH_INPROC_SERVER=1 WINESERVER=/bin/false
+    cp "$out/wine-wx/lib/wine/x86_64-windows/uwpdesktop.dll" "$WINEPREFIX/drive_c/windows/system32/uwpdesktop.dll"
+    export EXTRA_RW=$out UWPH_INPROC_SERVER=1 WINE_INPROC_DESKTOP=1 WINESERVER=/bin/false
     wrapper=${UWPH_UWP_RUN:-/workspace/xbox-readiness/tests/uwp_run.sh}
     timeout --kill-after=5s "${K_TIMEOUT:-25}s" "$wrapper" nofork,wx,noproc "$(dirname "$probe")" -- env \
         LD_PRELOAD="$out/libuwph_wine_shim.so" UWPH_REPORT="$run/report" UWPH_REPORT_PID=1 \
         WINE_LOADER="$out/wine-wx/lib/wine/wine64" WINEDEBUG=+process,err \
         "$out/run_via_wine" "$probe" > "$log" 2>&1 || rc=$?
 fi
+grep -m1 '^uwpjail: seccomp ' "$log" || true
 # Wine emits CRLF for the PE console output; normalize the displayed oracle.
 sed 's/\r$//' "$log" | grep '^DESK ' || true
 echo "exit=$rc"

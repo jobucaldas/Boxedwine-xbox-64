@@ -2702,3 +2702,39 @@ thread. Linux only; Xbox untested.
 Full output and reason: `/workspace/x64-run/lanes/B34/B34-O2.result`.
 Video: `/workspace/x64-run/videos/B34-O2.mp4` (14.67 seconds, free Xvfb and
 ffmpeg, no Encom). No commit, push, or remote operation was performed.
+
+## B35 O1
+
+Added `wine-inproc-desktop.patch`: append `NtUserStartInprocDesktop` before
+`NtUserCallCount`, with user32 and wow64 callback table entries. win32u reads
+`WINE_INPROC_DESKTOP=1` exactly once with `pthread_once`; only that opt-in
+selects the callback instead of the existing explorer process block. The
+unset path retains the original process block unchanged. user32 loads
+`uwpdesktop.dll` using Wine's loader and calls `uwp_desktop_start(10000)`,
+returning errors without a fallback spawn. A per-thread guard prevents callback
+recursion, the desktop thread returns `STATUS_POSSIBLE_DEADLOCK` rather than
+waiting on itself or forcing a premature desktop, and concurrent initial
+callers share the helper's atomic owner and readiness event. The ordinary
+callback completion uses the existing force=1 desktop re-query semantics.
+
+`prepare-wine-desk.sh` reproducibly applies both desktop patches and rebuilds
+and stages user32.dll, win32u.dll and win32u.so together with uwpdesktop.dll.
+The nofork probe and Megabonk scripts build this set, copy the private DLL to
+the disposable prefix, and export the opt-in beside UWPH_INPROC_SERVER=1.
+The probe now displays the actual uwpjail seccomp enforcement line.
+
+Built the missing generated probe with `bash x64/pe/tests/build.sh`, then ran
+the exact O1 command on a free Xvfb display (:4): exit 0, all mandatory DESK
+checks PASS, `DESK result PASS`, `NtCreateUserProcess attempts: 0
+(wine-internal: 0, guest: 0)`, `nofork=1`, and no failed-to-start-explorer
+message. Evidence: `x64/uwp-host/harness/out/desk-probe/evidence-wd9KrMCF`.
+This is THROUGH uwp_run.sh(nofork,wx,noproc) -> launcher -> Wine's own W^X
+loader -> shim -> uwph, with in-process server and desktop, without
+`--self-host`. Stock Wine was used only to package the prebuilt prefix, not
+as the runtime proof. Linux proof only; Xbox untested. The passing run still
+logs `err:menu:copy_sys_popup Unable to load default system menu`; systray
+is informational and absent. O2 regression gates and Megabonk runtime were
+not run under this O1-only order. Video:
+`/workspace/x64-run/videos/B35-O1.mp4` (6.2 seconds, Xvfb + ffmpeg; no Encom).
+No security constraints, verifier defaults, surface gates, or remotes were
+changed; no commit or push was performed.
