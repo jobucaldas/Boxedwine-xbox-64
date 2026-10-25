@@ -31,3 +31,14 @@ GPU proof. dcomp.h exposes desktop interfaces: this compatibility object makes
 no platform compositor calls and does not authorize using desktop DComp APIs
 in UWP. Production UWP integration remains unimplemented. Lavapipe is not Xbox
 D3D12. No video: the unit test has textual output and no visual presentation.
+
+O3 offscreen clear: `make -C x64/graphics`, then
+`DISPLAY=:99 x64/graphics/tests/run-clear.sh`. Requires the initialized O2
+prefix and existing local dzn runtime at `/workspace/xbox-readiness/dzn/runtime`.
+The runner copies dependencies into ignored out/o3, opts into O2's native dcomp
+object, and directly loads dzn's ICD export. The 64x64 RGBA8 clear is copied to
+host memory and every pixel checked. Exact logs, binary hashes and shim reports
+are in evidence/R4G-O3. Both normal and loader-diagnostic runs exit 0, 4096 pixels
+and zero mismatches. This clears no window and creates no swapchain. The Linux
+backend is lavapipe, regardless of Wine's reported NVIDIA adapter identity;
+lavapipe ≠ Xbox D3D12. See NOTES-x64.md for proof limits and artifact paths.

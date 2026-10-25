@@ -687,3 +687,44 @@ Linux stand-in unit proof only: actual dzn enumeration, swapchain/presentation,
 UWP deployment/API authorization and Xbox GPU execution remain untested.
 No platform DComp API is invoked by the compatibility DLL. Lavapipe is not
 Xbox D3D12. No visual output/video for this textual unit test. O2 only.
+
+## R4G O3
+
+Off-device offscreen Vulkan clear/readback PASS (2026-10-24). Added
+`x64/graphics/vulkan_clear.c` and `tests/run-clear.sh`; `make -C x64/graphics`
+builds/links the x64 PE against the repository's Vulkan headers (exit 0,
+-Wall -Wextra -Werror). Direct ICD loading uses the existing local Mesa
+25.1.9 vulkan_dzn.dll and official DXIL dependency, plus VKD3D-Proton and the
+O2 enumeration-only dcomp.dll. No ICD registration or loader replacement.
+Exact runtime: `DISPLAY=:99 x64/graphics/tests/run-clear.sh` (exit 0);
+repeat `VK_LOADER_DEBUG=driver DISPLAY=:99 x64/graphics/tests/run-clear.sh`
+also exits 0. Logs/hashes/PID-specific reports: `x64/graphics/evidence/R4G-O3/`.
+
+Measured output: physicalDeviceCount=1; vkCreateDevice=0; vkQueueSubmit=0;
+vkQueueWaitIdle=0; `red clear readback: pixels=4096 mismatches=0`;
+`PASS offscreen clear/readback only; no presentation or Xbox proof`.
+A 64x64 RGBA8 optimal image is cleared to red, copied to a coherent staging
+buffer, synchronized to host access, and all 4096 pixels checked. No shader,
+triangle, window, surface, swapchain or presentation was exercised.
+
+Proof classification: THROUGH our run_via_wine launcher -> Wine's own PE
+loader, with selected ntdll Unix calls routed via the uwp-host preload shim
+(positive open/read/close/mmap/munmap counters). A separate stock Linux
+wineserver and initialized O2 desktop prefix remain dependencies. This is not
+full uwph acceptance or an in-process UWP deployment. The guest's adapter name
+`Microsoft Direct3D12 (NVIDIA GeForce GTX 470)` is Wine's reported identity,
+not hardware evidence: loader diagnostics identify lvp_icd.json,
+libvulkan_lvp.so and llvmpipe (LLVM 19.1.7, 256 bits). **lavapipe ≠ Xbox D3D12**.
+
+Proposed STATUS dzn row update text:
+`dzn | off-device clear/readback PASS through launcher + selected uwph routing;
+4096/4096 pixels correct on lavapipe; presentation/CoreWindow, UWP authorization
+and Xbox D3D12 UNPROVEN (lavapipe ≠ Xbox D3D12).`
+The earlier O1 E_NOTIMPL wall is passed only by opting into O2's compatibility
+object. Its compositor methods remain E_NOTIMPL; this does not resolve WSI.
+
+Artifacts: `/workspace/x64-run/videos/R4G-O3.mp4` (6 seconds) and
+`/workspace/x64-run/videos/R4G-O3.png`: Xvfb :177 terminal capture explicitly
+labeled SAVED RESULTS FROM LIVE LAUNCHER TEST, displaying real retained output,
+not a rendered clear or fake game screenshot. Original executions used :99.
+No console access, commits, pushes or remote operations. O3 only.

@@ -8,3 +8,8 @@ out/dcomp.dll: dcomp_stub.cpp | out
 out/test_dcomp.exe: tests/test_dcomp.cpp | out
 	$(CXX_WIN) $(FLAGS) $< -o $@ -luuid
 .PHONY: all
+
+# O3: Vulkan headers already vendored by this repository; direct ICD loading.
+all: out/vulkan_clear.exe
+out/vulkan_clear.exe: vulkan_clear.c | out
+	x86_64-w64-mingw32-gcc -O2 -std=c11 -Wall -Wextra -Werror -I../../source/vulkan/vk $< -o $@
