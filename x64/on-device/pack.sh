@@ -31,7 +31,10 @@ cmp out/test-cert.cer "$stage/pfx-cert.cer"
 test "$(openssl x509 -inform DER -in out/test-cert.cer -noout -subject -nameopt RFC2253)" = 'subject=CN=BoxedwineDev'
 
 mkdir -p "$stage/payload/Assets"
+test -s out/probe_d3d12.exe
 cp AppxManifest.xml out/smoke.exe out/rungs.exe "$stage/payload/"
+# Standalone D3D12 diagnostic built here from x64/graphics/probe_d3d12.c.
+cp out/probe_d3d12.exe "$stage/payload/"
 # Hosted combo assets: keep Linux runtime separate from the native UWP entry.
 combo="$stage/payload/combo"
 mkdir -p "$combo"
@@ -69,8 +72,9 @@ upload: MakeAppx pack /d payload /p BoxedwineDev.appx, then SignTool sign
 /fd SHA256 /f test-cert.pfx BoxedwineDev.appx (empty test password).
 Trust test-cert.cer only on your own development device as required.
 rungs.exe implements a CoreApplication view; console activation is unverified.
-smoke.exe remains a console build diagnostic. expandedResources is deprecated
-and Store-rejected, for development sideload only. This layout
+smoke.exe remains a console build diagnostic. probe_d3d12.exe is a standalone
+D3D12 diagnostic; the manifest does not activate it. expandedResources is
+deprecated and Store-rejected, for development sideload only. This layout
 does not establish installation, activation, capability approval, or Xbox proof.
 Do not ship test-cert.pfx or any private LocalState data with the app.
 EOF
@@ -133,6 +137,8 @@ try:
             return 'n0-n7 (native ladder; console unverified)'
         if name.endswith('smoke.exe'):
             return 'b (build diagnostic)'
+        if name == 'payload/probe_d3d12.exe':
+            return 'f/n2 (D3D12 diagnostic; standalone kit rung, console unverified)'
         if name.endswith('probe_native.exe'):
             return expected['probe_native.exe']
         if name == 'ladder':

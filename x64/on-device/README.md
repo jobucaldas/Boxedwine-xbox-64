@@ -13,7 +13,7 @@ separate build diagnostic. Tomorrow's checklist:
     make -C x64/on-device offline-smoke  # package, offline ladder, kit, Wine smoke
     bash x64/on-device/check-doc.sh      # this README vs the built kit
 
-- Loose payload: `x64/on-device/out/payload/` (`AppxManifest.xml`, `rungs.exe`, `smoke.exe`, optional `probe_native.exe`,
+- Loose payload: `x64/on-device/out/payload/` (`AppxManifest.xml`, `rungs.exe`, `smoke.exe`, `probe_d3d12.exe`, optional `probe_native.exe`,
   `Assets/*.png`, `PACKAGING-NOTES.txt`, and the hosted Linux `combo/` assets
   described under "B21 combo rung")
 - Test certificate: `x64/on-device/out/test-cert.cer` (CN=BoxedwineDev,
@@ -314,6 +314,22 @@ does not track changes. No Wine xinput integration is included. The probe uses
 the installed SDK-compatible MinGW Gamepad ABI declarations. Host mapping tests
 are native C tests, not THROUGH-uwph or stock Wine runtime evidence.
 
+## D3D12 probe rung (B46 O1)
+
+`make -C x64/on-device ladder package` also builds `out/probe_d3d12.exe` with
+MinGW from R4G's `x64/graphics/probe_d3d12.c` (same flags as
+`make -C x64/graphics`) and copies it to `payload/probe_d3d12.exe`;
+`kit-manifest.txt` lists it as `f/n2`. It is a standalone console PE: the
+manifest does not activate it and `rungs.exe` does not launch it, so it is a
+companion to n2, not a new ladder stage. d3d12.dll and dxgi.dll are loaded at
+runtime. Usage: `probe_d3d12.exe [--log PATH] [--no-window] [--frames N]`. The
+install directory is read-only, so pass `--log` with a LocalState path, or read
+`%LOCALAPPDATA%\probe_d3d12.log` / `%TEMP%\probe_d3d12.log`.
+
+| Rung | Probe | What it logs | Expected HRESULTs / exit |
+| --- | --- | --- | --- |
+| f/n2 | `probe_d3d12.exe` (D3D12 device, offscreen clear, optional HWND present) | `runtime: dxgi.dll=ok d3d12.dll=ok`; one `adapter[i]:` line per DXGI adapter (name, vendor/device id, VRAM, software flag); `device: created on adapter[i]` or `on default adapter`; `device: max feature level ...`; `offscreen: 64x64 RGBA8 ... mismatches=0`; `present: PASS`, or `present: SKIP` with no HWND (normal under UWP); last line `RESULT: PASS/FAIL adapter=... feature_level=... offscreen=... present=...`. | D3D12CreateDevice at FL 11_0 and every create/close/fence step S_OK (0x00000000); EnumAdapters1 ends with DXGI_ERROR_NOT_FOUND (0x887A0002), which is normal. A failure logs `step <name> failed hr=0x...` or `D3D12CreateDevice(default, 11_0) failed hr=0x...`; likely values: DXGI_ERROR_UNSUPPORTED 0x887A0004 (no FL 11_0), E_NOINTERFACE 0x80004002, E_OUTOFMEMORY 0x8007000E, DXGI_ERROR_DEVICE_REMOVED 0x887A0005, fence wait timeout 0x80070102. Exit 0 PASS; 1 FAIL after device creation; 2 FAIL with no runtime or device. **Off-device: SKIP.** The hosted ladder, `--offline` and `offline-smoke` never run it. The Linux run in `x64/graphics/tests/run-probe.sh` (run_via_wine, uwph, Wine's builtin vkd3d on lavapipe) is a SKIP/stand-in: not console PASS. Console PASS requires the run on the Xbox. |
+
 ## B21 combo rung
 
 `STAGE combo hello+hello_k32-nofork,noproc,wx` runs the existing B21 hellos
@@ -323,7 +339,7 @@ through the packaged launcher, bundled W^X Wine loader, shim and uwph on Linux.
 `package` and `kit` carry both PE guests plus the Linux runner, launcher, shim,
 W^X loader tree and verifiers in `payload/combo/`: `hello.exe`, `hello_k32.exe`,
 `run`, `run_via_wine`, `libuwph_wine_shim.so`, `wine-wx/`, `verify_noproc.py`,
-`verify_acceptance.py` and `surface-trace.tsv`. MakeAppx packs this directory
+`verify_acceptance.py`, `surface.tsv` and `surface-trace.tsv`. MakeAppx packs this directory
 too; the console app never runs it. The Linux loader tree retains
 B21's links to matching installed Debian Wine 10.0 DLLs/data: these are hosted
 diagnostics, not a Windows/UWP runtime. Build-time `prebuilt-prefix` preparation
