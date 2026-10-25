@@ -7,19 +7,16 @@ __attribute__((constructor)) static void stdio_init(void)
 uwph_FILE * uwph_fopen(const char *path, const char *mode)
 {
     uwph_trace_hit(UWPH_TRACE_FOPEN);
-    UWPH_NATIVE(uwph_FILE *, "fopen", (const char *path, const char *mode));
-    UWPH_NATIVE_RETURN(fn(path, mode));
+    return uwph_linux_fopen(path, mode);
 }
 uwph_FILE * uwph_fdopen(int fd, const char *mode)
 {
-    UWPH_NATIVE(uwph_FILE *, "fdopen", (int fd, const char *mode));
-    UWPH_NATIVE_RETURN(fn(fd, mode));
+    return uwph_linux_fdopen(fd, mode);
 }
 int uwph_fclose(uwph_FILE *f)
 {
     uwph_trace_hit(UWPH_TRACE_FCLOSE);
-    UWPH_NATIVE(int, "fclose", (uwph_FILE *f));
-    UWPH_NATIVE_RETURN(fn(f));
+    return uwph_linux_fclose(f);
 }
 int uwph_feof(uwph_FILE *f)
 {
@@ -59,8 +56,7 @@ int uwph_puts(const char *p)
 }
 int uwph_fileno(uwph_FILE *f)
 {
-    UWPH_NATIVE(int, "fileno", (uwph_FILE *f));
-    UWPH_NATIVE_RETURN(fn(f));
+    return uwph_linux_fileno(f);
 }
 int uwph_fflush(uwph_FILE *f)
 {

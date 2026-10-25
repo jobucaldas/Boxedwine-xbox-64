@@ -260,7 +260,7 @@ UWPH_API int uwph_vfscanf(uwph_FILE *f, const char *fmt, va_list ap)
                 /* memcpy avoids aliasing and signed/unsigned pointer punning. */
                 if (length == -2) { unsigned char v = (unsigned char)value; memcpy(out, &v, sizeof v); }
                 else if (length == -1) { unsigned short v = (unsigned short)value; memcpy(out, &v, sizeof v); }
-                else if (length == 1) { unsigned long v = (unsigned long)value; memcpy(out, &v, sizeof v); }
+                else if (length == 1) { uint64_t v = (uint64_t)value; memcpy(out, &v, sizeof v); }
                 else if (length == 2) memcpy(out, &value, sizeof value);
                 else { unsigned v = (unsigned)value; memcpy(out, &v, sizeof v); }
                 if (conv != 'n') assigned++;

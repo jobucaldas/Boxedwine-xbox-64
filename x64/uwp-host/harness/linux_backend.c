@@ -144,3 +144,77 @@ int uwph_linux_fcntl(int fd, int cmd, long arg)
 #endif
     return fdcall(SYS_fcntl,fd,cmd,arg,0);
 }
+
+/* Hold the namespace lock through bridge creation/destruction. fdopen borrows
+ * the existing descriptor; fclose consumes it, exactly as in POSIX. */
+#include <stdio.h>
+#include <errno.h>
+static int stream_slot(int n, int create)
+{
+#ifndef UWPH_HARNESS_NATIVE_FDS
+    int free_slot = -1;
+    for (int i = 0; i < SLOTS; i++) {
+        if (slots[i] == n + 1) return BASE + i;
+        if (!slots[i] && free_slot < 0) free_slot = i;
+    }
+    if (create && free_slot >= 0) {
+        slots[free_slot] = n + 1;
+        return BASE + free_slot;
+    }
+    uwph_errno = create ? UWPH_EMFILE : UWPH_EBADF;
+    return -1;
+#else
+    return n;
+#endif
+}
+uwph_FILE *uwph_linux_fdopen(int fd, const char *mode)
+{
+    FILE *(*fn)(int, const char *) = uwph_linux_symbol("fdopen");
+    WRLOCK();
+    int n = native(fd);
+    FILE *f = n < 0 ? NULL : fn(n, mode);
+    uwph_errno = n < 0 ? UWPH_EBADF : errno;
+    UNLOCK();
+    return (uwph_FILE *)f;
+}
+uwph_FILE *uwph_linux_fopen(const char *path, const char *mode)
+{
+    FILE *(*fn)(const char *, const char *) = uwph_linux_symbol("fopen");
+    int (*number)(FILE *) = uwph_linux_symbol("fileno");
+    int (*destroy)(FILE *) = uwph_linux_symbol("fclose");
+    WRLOCK();
+    FILE *f = fn(path, mode);
+    uwph_errno = errno;
+    if (f && stream_slot(number(f), 1) < 0) { destroy(f); f = NULL; }
+    UNLOCK();
+    return (uwph_FILE *)f;
+}
+int uwph_linux_fileno(uwph_FILE *f)
+{
+    int (*number)(FILE *) = uwph_linux_symbol("fileno");
+    WRLOCK();
+    int n = number((FILE *)f);
+    /* Standard streams remain borrowed; never adopt arbitrary native FILEs. */
+    int fd = n < 0 ? (uwph_errno = errno, -1) : stream_slot(n, 0);
+    UNLOCK();
+    return fd;
+}
+int uwph_linux_fclose(uwph_FILE *f)
+{
+    int (*number)(FILE *) = uwph_linux_symbol("fileno");
+    int (*destroy)(FILE *) = uwph_linux_symbol("fclose");
+    WRLOCK();
+#ifndef UWPH_HARNESS_NATIVE_FDS
+    int n = number((FILE *)f);
+    if (n >= 0) {
+        int fd = stream_slot(n, 0);
+        if (fd >= 0) slots[fd - BASE] = 0;
+    }
+#else
+    (void)number;
+#endif
+    int r = destroy((FILE *)f);
+    uwph_errno = errno;
+    UNLOCK();
+    return r;
+}

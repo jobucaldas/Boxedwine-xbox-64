@@ -24,3 +24,9 @@ long uwph_linux_futex(int *uaddr, int op, int val, const struct uwph_timespec *t
 void *uwph_linux_symbol(const char *name);
 int uwph_linux_fcntl(int fd, int cmd, long arg);
 uwph_ssize_t uwph_linux_writev(int fd, const struct uwph_iovec *iov, int cnt);
+
+/* Native FILE bridges share private descriptor ownership with fd operations. */
+uwph_FILE *uwph_linux_fopen(const char *path, const char *mode);
+uwph_FILE *uwph_linux_fdopen(int fd, const char *mode);
+int uwph_linux_fileno(uwph_FILE *f);
+int uwph_linux_fclose(uwph_FILE *f);

@@ -139,8 +139,11 @@ static void test_io(void)
     dup = uwph_fcntl(wfd, UWPH_F_DUPFD_CLOEXEC, 50);
 #ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
     CHECK(dup == -1 && uwph_errno == UWPH_EINVAL, "fcntl F_DUPFD_CLOEXEC refused (private slots)");
-    uwph_close(wfd);
-    f = uwph_fopen(path, "r");
+    CHECK(uwph_lseek(wfd, 0, UWPH_SEEK_SET) == 0, "rewind uwph descriptor");
+    CHECK(uwph_fdopen(wfd, "invalid") == NULL, "failed fdopen rejects invalid mode");
+    CHECK(uwph_fcntl(wfd, UWPH_F_GETFD) >= 0, "failed fdopen retains descriptor ownership");
+    f = uwph_fdopen(wfd, "r");
+    CHECK(f && uwph_fileno(f) == wfd, "fdopen/fileno preserves private descriptor");
 #else
     CHECK(dup >= 50 && uwph_fcntl(dup, UWPH_F_GETFD) == UWPH_FD_CLOEXEC, "fcntl F_DUPFD_CLOEXEC -> %d", dup);
     if (dup >= 0) uwph_close(dup);
@@ -157,7 +160,44 @@ static void test_io(void)
     CHECK(uwph_fscanf(f, "%7s", rest) == -1 && uwph_feof(f), "fscanf at end -> EOF, feof -> 1");
     CHECK(uwph_fclose(f) == 0, "fclose");
 #ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    CHECK(uwph_close(wfd) == -1 && uwph_errno == UWPH_EBADF, "fclose consumes fdopen descriptor");
+    f = uwph_fopen(path, "r");
+    CHECK(f != NULL, "fopen composition fixture");
+    if (f) {
+        int fd = uwph_fileno(f);
+        char bytes[3] = {0};
+        CHECK(fd >= 0 && fd == uwph_fileno(f) && uwph_read(fd, bytes, 2) == 2 && !strcmp(bytes, "42"),
+              "fopen/fileno/read shares descriptor namespace");
+        CHECK(uwph_fclose(f) == 0 && uwph_read(fd, bytes, 1) == -1 && uwph_errno == UWPH_EBADF,
+              "fclose invalidates fileno descriptor");
+        int next = uwph_open(path, UWPH_O_RDONLY, 0);
+        CHECK(next >= 0 && uwph_read(next, bytes, 2) == 2, "descriptor usable after slot reuse");
+        if (next >= 0) uwph_close(next);
+    }
     unlink(path); /* fixture cleanup only */
+#endif
+}
+
+/* Linux x64 long remains eight bytes even on the Win32 LLP64 host. */
+static void test_scan_long(void)
+{
+#ifndef UWPH_BACKEND_LINUX_PASSTHROUGH
+    int p[2];
+    const char text[] = "123456789abcdef0 -4294967297 4294967298";
+    CHECK(uwph_pipe(p) == 0, "long scanner pipe");
+    uwph_write(p[1], text, sizeof(text) - 1);
+    uwph_close(p[1]);
+    uwph_FILE *f = uwph_fdopen(p[0], "r");
+    CHECK(f != NULL, "long scanner fdopen");
+    if (f) {
+        uint64_t x = UINT64_C(0xaaaaaaaaaaaaaaaa), u = x;
+        int64_t d = (int64_t)x, n = (int64_t)x;
+        CHECK(uwph_fscanf(f, "%lx %ld %lu%ln", &x, &d, &u, &n) == 3 &&
+              x == UINT64_C(0x123456789abcdef0) && d == -INT64_C(4294967297) &&
+              u == UINT64_C(4294967298) && n == (int64_t)sizeof(text) - 1,
+              "Linux ABI %%lx/%%ld/%%lu/%%ln replaces all eight bytes");
+        uwph_fclose(f);
+    }
 #endif
 }
 
@@ -220,6 +260,7 @@ int main(int argc, char **argv)
     test_process();
     test_io();
     test_files();
+    test_scan_long();
 
     CHECK(uwph_trace_name(UWPH_TRACE_COUNT) == NULL && uwph_trace_count(UWPH_TRACE_COUNT) == 0,
           "trace API bounds");

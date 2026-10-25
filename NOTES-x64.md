@@ -721,3 +721,19 @@ hello: fopen 223, __isoc23_fscanf 222, pthread_mutex_lock 1855, write 295).
 Counts are process-wide uwph entries. The wine-test gate is still BLOCKED by
 the pre-existing wineboot attempt (same in stock control). Linux-host evidence
 only; no Xbox/UWP device acceptance. Video: /workspace/x64-run/videos/R4S-O2.mp4.
+
+### R4S O2 reviewer fixes
+
+Win32 integer scanning now stores Linux x64 `l` conversions with explicit
+64-bit width, including `%ln`. The regression initializes all destination high
+bits and scans hex, signed, and unsigned values above the 32-bit range.
+Linux diagnostic FILE bridges now translate private descriptors: fdopen retains
+the slot, fopen registers one, fileno returns it, and fclose releases it without
+a second native close. Failed fdopen leaves the descriptor owned by its caller.
+Borrowed native standard streams are not adopted into private descriptor slots.
+Composition regressions cover fdopen/fileno, fopen/fileno/read, fclose invalidation,
+and slot reuse. Exact test passes (stub traced 60, Win32 traced 63, passthrough
+traced 70; smoke 55/566). Backend/shim checks pass. Fresh launcher runs retain all
+20 counters, while the unchanged wineboot gate still blocks both controls and
+routed runs. These are Linux harness and Win32-under-Wine results, not Xbox
+acceptance; process-wide counters prove entry/routing, not per-ntdll completion.
