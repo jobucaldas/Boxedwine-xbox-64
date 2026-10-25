@@ -107,6 +107,7 @@ UWPH_API char *uwph_fgets(char *s, int n, uwph_FILE *f)
 
 UWPH_API uwph_ssize_t uwph___getdelim(char **line, size_t *n, int delim, uwph_FILE *f)
 {
+    uwph_trace_hit(UWPH_TRACE___GETDELIM);
     size_t i = 0;
     if (!*line || !*n) { *n = 128; if (!(*line = malloc(*n))) return UWPH_FAIL(UWPH_ENOMEM); }
     while (fill(f)) {

@@ -43,10 +43,30 @@ static void *lookup(const struct uwph_dl_library *lib, const char *name)
 
 UWPH_API void *uwph_dlsym(void *handle, const char *name)
 {
+    uwph_trace_hit(UWPH_TRACE_DLSYM);
     void *p = NULL;
     if (handle == (void *)libs) {
         for (int i = 0; i < nlibs && !p; i++) p = lookup(libs[i], name);
-    } else if (handle) p = lookup(handle, name);
+    } else {
+        int owned = 0;
+        for (int i = 0; i < nlibs; i++) {
+            if (handle == (void *)libs[i]) {
+                owned = 1;
+                p = lookup(libs[i], name);
+                break;
+            }
+        }
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+        /* Only foreign handles (including RTLD_DEFAULT) belong to libc.
+         * A missing registered symbol must never fall through to native dlsym. */
+        if (!owned) {
+            UWPH_NATIVE(void *, "dlsym", (void *, const char *));
+            UWPH_NATIVE_RETURN(fn(handle, name));
+        }
+#else
+        (void)owned;
+#endif
+    }
     if (!p) set_err("undefined symbol", name);
     return p;
 }
