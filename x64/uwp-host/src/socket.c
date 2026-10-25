@@ -271,6 +271,11 @@ int uwph_unix_poll_locked(struct uwph_object *o, int kind)
 /* ---- pipes ---- */
 UWPH_API int uwph_pipe2(int fds[2], int flags)
 {
+    uwph_trace_hit(UWPH_TRACE_PIPE2);
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    return uwph_linux_pipe2(fds, flags);
+#endif
+
     struct endpoint *r, *w;
     int fr, fw;
     if (make_pair(0, 0, &r, &w) < 0) return -1;
@@ -462,6 +467,12 @@ UWPH_API int uwph_shutdown(int fd, int how)
 
 UWPH_API uwph_ssize_t uwph_sendmsg(int fd, const struct uwph_msghdr *msg, int flags)
 {
+    uwph_trace_hit(UWPH_TRACE_SENDMSG);
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    UWPH_NATIVE(uwph_ssize_t, "sendmsg", (int, const struct uwph_msghdr *, int));
+    UWPH_NATIVE_RETURN(fn(fd, msg, flags));
+#endif
+
     struct passed_fd pf[MAX_PASS_FDS];
     int npf = 0, fl;
     uwph_ssize_t r;
@@ -494,6 +505,12 @@ UWPH_API uwph_ssize_t uwph_sendmsg(int fd, const struct uwph_msghdr *msg, int fl
 
 UWPH_API uwph_ssize_t uwph_recvmsg(int fd, struct uwph_msghdr *msg, int flags)
 {
+    uwph_trace_hit(UWPH_TRACE_RECVMSG);
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    UWPH_NATIVE(uwph_ssize_t, "recvmsg", (int, struct uwph_msghdr *, int));
+    UWPH_NATIVE_RETURN(fn(fd, msg, flags));
+#endif
+
     struct passed_fd pf[MAX_PASS_FDS];
     int npf = 0, fl;
     uwph_ssize_t r;
@@ -564,6 +581,12 @@ UWPH_API int uwph_getsockopt(int fd, int level, int name, void *val, uwph_sockle
 
 UWPH_API int uwph_setsockopt(int fd, int level, int name, const void *val, uwph_socklen_t len)
 {
+    uwph_trace_hit(UWPH_TRACE_SETSOCKOPT);
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    UWPH_NATIVE(int, "setsockopt", (int, int, int, const void *, uwph_socklen_t));
+    UWPH_NATIVE_RETURN(fn(fd, level, name, val, len));
+#endif
+
     struct endpoint *ep = get_unix(fd, NULL);
     (void)level; (void)name; (void)val; (void)len;
     if (!ep) return -1;

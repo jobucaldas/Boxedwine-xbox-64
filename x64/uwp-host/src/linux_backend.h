@@ -30,3 +30,6 @@ uwph_FILE *uwph_linux_fopen(const char *path, const char *mode);
 uwph_FILE *uwph_linux_fdopen(int fd, const char *mode);
 int uwph_linux_fileno(uwph_FILE *f);
 int uwph_linux_fclose(uwph_FILE *f);
+
+int uwph_linux_isatty(int fd);
+int uwph_linux_pipe2(int fds[2], int flags);

@@ -1373,3 +1373,51 @@ Video /workspace/x64-run/videos/B10-O1.mp4 (30 seconds) shows the routed
 installer blocker, not a running Steam client. No commits or remotes touched.
 
 Literal last installer log line: `44367.703:0030:0034:trace:module:MODULE_InitDLL (00006FFFFFC20000,PROCESS_DETACH,0000000000000001) - RETURN 1`.
+
+## B06
+
+O1 adds the next 15 unsupported traced imports after R4S's top 20, in trace
+priority order. All use existing public uwph signatures; each now has its own
+counter and shim export. Linux uses native libc passthrough, except descriptor
+operations use the existing raw-syscall/owned-slot adapter. UWP uses existing
+private objects and documented host APIs; no process creation or optional
+restricted API was added.
+
+| Symbol | Win32/UWP status |
+| --- | --- |
+| sendmsg | In-process Unix socket queue, iovecs and descriptor passing |
+| fstat | File metadata through GetFileInformationByHandleEx; private object metadata |
+| putenv | Private environment table, shares getenv |
+| recvmsg | In-process Unix socket queue and descriptor passing |
+| setsockopt | Existing in-process Unix endpoint subset; options have no kernel effect; Internet sockets remain unsupported |
+| chdir | Virtual cwd for mount paths and in-process socket directories |
+| dladdr | Static registered Unix-library ranges/symbols; no arbitrary module discovery |
+| execv | Counted ENOSYS: no documented UWP arbitrary process replacement equivalent |
+| getrlimit | Virtual NOFILE, STACK, AS, DATA queries; no host limit control |
+| isatty | Private descriptor kind; EBADF/ENOTTY for invalid/non-console descriptors |
+| pipe2 | In-process byte channels with descriptor flags; Linux raw pipe2 preserves private ownership |
+| setbuf | Existing unbuffered private FILE implementation; Linux native FILE passthrough |
+| setrlimit | Bounded virtual NOFILE; invalid soft/hard ordering rejected; other host resources counted ENOSYS |
+| sigemptyset | Clears private Linux-compatible signal set |
+| sysconf | Virtual limits plus GetSystemInfo/GlobalMemoryStatusEx for supported system queries |
+
+`tests/traced.c` covers every added entry and counter in stub, Linux passthrough
+and Win32/UWP builds, including socket payload exchange, pipe bytes/CLOEXEC,
+FILE use after setbuf, error handling and unsupported limit/process operations.
+Exact test `make -C x64/uwp-host test && make -C x64/uwp-host/harness windows-smoke-test`
+passes. The Windows full smoke reports 569 passed, 0 failed; its desktop-only
+exception test artifact remains separate from the UWP archive.
+
+Surface policy routed imports increase 26 -> 41. Actual launcher -> Wine's own
+private W^X loader -> ntdll -> shim -> uwph evidence increases traced THROUGH
+entries 20 -> 34 (+14) for each of hello_k32 and hello. execv is bound but unhit
+in these successful runs; its direct tests exercise missing-path Linux failure
+and UWP ENOSYS. `harness/verify_b06.py` checks real ntdll bindings, single-process
+counter evidence, successful PE output and the >=10 delta, writing per-PE
+surface reports. Evidence: `harness/out/wine-o4/run-oD5gMon0/`.
+The broader existing `wine-test` verifier still fails its all-routed-symbols-hit
+condition because execv has zero hits; it has not been weakened. Stock controls
+run through our launcher without uwph. A separate stock Linux wineserver is
+retained; none of this is Xbox device or complete UWP compatibility evidence.
+Video: `/workspace/x64-run/videos/B06-O1.mp4` (private free Xvfb display, 10.67s).
+Exact recorded output: `/workspace/x64-run/v2/B06/O1-record.log`.

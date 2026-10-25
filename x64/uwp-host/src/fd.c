@@ -177,6 +177,11 @@ UWPH_API int uwph_ioctl(int fd, unsigned long req, ...)
 
 UWPH_API int uwph_isatty(int fd)
 {
+    uwph_trace_hit(UWPH_TRACE_ISATTY);
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    return uwph_linux_isatty(fd);
+#endif
+
     enum uwph_fd_kind kind;
     uwph_obj_unref(uwph_fd_get(fd, &kind, NULL));
     if (kind == UWPH_FD_FREE) return uwph_errno = UWPH_EBADF, 0;

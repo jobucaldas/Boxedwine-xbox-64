@@ -105,9 +105,15 @@ UWPH_API char *uwph_getcwd(char *buf, size_t len)
 
 UWPH_API int uwph_chdir(const char *path)
 {
+    uwph_trace_hit(UWPH_TRACE_CHDIR);
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    UWPH_NATIVE(int, "chdir", (const char *));
+    UWPH_NATIVE_RETURN(fn(path));
+#endif
+
     char abs[512];
     if (uwph_fs_abspath(path, abs, sizeof(abs)) < 0) return -1;
-    /* existence check belongs to the backend; accepted as-is for now */
+    /* Virtual cwd also names in-process socket directories. */
     uwph_lock(&fs_lock);
     strcpy(cwd, abs);
     uwph_unlock(&fs_lock);
@@ -311,6 +317,8 @@ UWPH_API int uwph_creat(const char *path, uwph_mode_t mode)
 
 UWPH_API int uwph_fstat(int fd, struct uwph_stat *st)
 {
+    uwph_trace_hit(UWPH_TRACE_FSTAT);
+
 #ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
     return uwph_linux_fstat(fd, st);
 #else

@@ -138,3 +138,28 @@ _Static_assert(sizeof(sigset_t)==sizeof(uwph_sigset_t),"sigset ABI");
 
 ssize_t readlink(const char *p, char *b, size_t n)
 { ssize_t r = uwph_readlink(p,b,n); if (r < 0) errno=uwph_errno; return r; }
+
+#include <sys/socket.h>
+#include <sys/resource.h>
+#include <dlfcn.h>
+#define B06_INT(expr) do { int result_=(expr); if(result_<0) errno=uwph_errno; return result_; } while(0)
+ssize_t sendmsg(int fd, const struct msghdr *m, int f)
+{ ssize_t r=uwph_sendmsg(fd,(const struct uwph_msghdr *)m,f); if(r<0) errno=uwph_errno; return r; }
+ssize_t recvmsg(int fd, struct msghdr *m, int f)
+{ ssize_t r=uwph_recvmsg(fd,(struct uwph_msghdr *)m,f); if(r<0) errno=uwph_errno; return r; }
+int fstat(int fd, struct stat *s) { B06_INT(uwph_fstat(fd,(struct uwph_stat *)s)); }
+int putenv(char *s) { B06_INT(uwph_putenv(s)); }
+int setsockopt(int fd,int l,int n,const void *v,socklen_t z) { B06_INT(uwph_setsockopt(fd,l,n,v,z)); }
+int chdir(const char *p) { B06_INT(uwph_chdir(p)); }
+int dladdr(const void *a,Dl_info *i) { return uwph_dladdr(a,(uwph_Dl_info *)i); }
+int execv(const char *p,char *const a[]) { B06_INT(uwph_execv(p,a)); }
+int getrlimit(__rlimit_resource_t r,struct rlimit *l) { B06_INT(uwph_getrlimit(r,(struct uwph_rlimit *)l)); }
+int setrlimit(__rlimit_resource_t r,const struct rlimit *l) { B06_INT(uwph_setrlimit(r,(const struct uwph_rlimit *)l)); }
+int isatty(int fd) { int r=uwph_isatty(fd); if(!r) errno=uwph_errno; return r; }
+int pipe2(int p[2],int f) { B06_INT(uwph_pipe2(p,f)); }
+void setbuf(FILE *f,char *b) { uwph_setbuf((uwph_FILE *)f,b); }
+int sigemptyset(sigset_t *s) { B06_INT(uwph_sigemptyset((uwph_sigset_t *)s)); }
+long sysconf(int n) { long r=uwph_sysconf(n); if(r<0) errno=uwph_errno; return r; }
+_Static_assert(sizeof(struct msghdr)==sizeof(struct uwph_msghdr),"msghdr ABI");
+_Static_assert(sizeof(struct rlimit)==sizeof(struct uwph_rlimit),"rlimit ABI");
+_Static_assert(sizeof(Dl_info)==sizeof(uwph_Dl_info),"dladdr ABI");

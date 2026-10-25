@@ -265,3 +265,36 @@ int uwph_linux_fclose(uwph_FILE *f)
     UNLOCK();
     return r;
 }
+
+int uwph_linux_isatty(int fd)
+{
+    RDLOCK();
+    int n = native(fd);
+    unsigned char term[64];
+    long r = n < 0 ? -UWPH_EBADF : raw(SYS_ioctl,n,0x5401,PTR(term),0,0,0);
+    UNLOCK();
+    return result(r) == 0;
+}
+int uwph_linux_pipe2(int fds[2], int flags)
+{
+    int pair[2];
+    WRLOCK();
+    long r = raw(SYS_pipe2,PTR(pair),flags,0,0,0,0);
+#ifndef UWPH_HARNESS_NATIVE_FDS
+    if (r == 0) {
+        int a, b;
+        for (a=0; a<SLOTS && slots[a]; a++);
+        for (b=a+1; b<SLOTS && slots[b]; b++);
+        if (b>=SLOTS) {
+            raw(SYS_close,pair[0],0,0,0,0,0); raw(SYS_close,pair[1],0,0,0,0,0);
+            r=-UWPH_EMFILE;
+        } else {
+            slots[a]=pair[0]+1; slots[b]=pair[1]+1;
+            pair[0]=BASE+a; pair[1]=BASE+b;
+        }
+    }
+#endif
+    if (r==0) { fds[0]=pair[0]; fds[1]=pair[1]; }
+    UNLOCK();
+    return result(r);
+}
