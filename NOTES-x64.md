@@ -1328,6 +1328,45 @@ runtime proof and no stock Wine execution in O3. Recording
 `/workspace/x64-run/videos/R4W-O3.mp4` shows the blocked exact test only.
 No runtime code was changed, no commits created and no remotes accessed.
 
+## B15
+
+O1 reviewer fixes: SIGTERM/SIGHUP now run cleanup, including Wine helpers
+that start new sessions (identified by this lane's private prefix). Those
+helpers are also sampled. An exited private wineserver aborts before client
+launch instead of allowing an uncounted existing server. Runs retain separate
+timestamped evidence, including a copy of their summary. elapsed_s, max_gap_s
+and cadence expose delays rather than guaranteeing an exact 120-second bound.
+
+Exact test `bash x64/tools/memfoot.sh && column -t x64/tools/memfoot.tsv`
+exited 0. hello peak 17.79 MiB and hello_k32 peak 17.84 MiB fit both budgets.
+Megabonk aggregate peak RSS 1489.55 MiB, estimated commit 1949.60 MiB:
+exceeds 1024 MiB App, fits 5120 MiB Game. The actual game observation was
+120.254 seconds / 121 samples, maximum gap 1.123 seconds (cadence ok).
+Both hello stages exited 0 with two samples, one transient read error each;
+their sampled peaks are mostly wineserver because the clients are short-lived.
+Megabonk timed out as intended with no read errors. Steam skipped: B10 trace
+is absent. No credentials or tokens accessed.
+
+THROUGH our launcher -> Wine's own private W^X loader -> selected uwph shim
+calls/Linux backend; separate stock wineserver and private-prefix helpers
+included. Not stock-only, build-only or on-device UWP proof. Linux commit is
+an estimate from accountable smaps mapping Size, not Windows/UWP commit.
+RSS uses smaps_rollup. Shared RSS may double count; sampled peaks are lower
+bounds. No optimization or gameplay/authentication success claimed.
+
+Top three individual sampled RSS consumers (maxima are not summed):
+
+- Megabonk.exe (stage Megabonk, PID 685215): 1363.31 MiB.
+- explorer.exe (stage Megabonk, PID 685254): 84.63 MiB.
+- UnityCrashHandl (stage Megabonk, PID 685290): 26.26 MiB.
+
+Matching raw samples, logs, routing counters, top.tsv and summary.tsv:
+`/workspace/wt/B15/x64/uwp-host/harness/out/memfoot/20261025T063410.895220Z-685138`. Summary: `x64/tools/memfoot.tsv`.
+SIGTERM and SIGHUP interruption tests passed with no remaining private-prefix
+processes; an existing-server test failed before client launch as expected.
+The latter test has its own evidence directory and did not overwrite this run.
+Video `/workspace/x64-run/videos/B15-O1.mp4`: free Xvfb via -displayfd,
+55-second partial view of the measurement. No commits or remote operations.
 ## B18
 
 O1 (2026-10-25): remaining RWX inventory after R4X. Linux/off-device proof is
