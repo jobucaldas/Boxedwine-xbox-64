@@ -10,6 +10,9 @@ import hashlib
 import json
 from pathlib import Path
 import struct
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from denylist import denied_text
 
 PIN = 'caba4826aa3501039d095aee1843a6bfb270fb43a3ab4455b2d6733223579fee'
 REQUIRED = {
@@ -107,6 +110,9 @@ def validate(mapping, data):
             require(0 <= index < count and index not in indices, 'invalid_slot_index')
             require(isinstance(method, str), 'invalid_slot_name')
             indices.add(index)
+            # Evidence must never silently rename a destructive entry to a safe method.
+            require(not denied_text(slot.get('evidence', '')) or denied_text(method),
+                    'renamed_denied_slot')
             if method in required:
                 require(method not in names, 'duplicate_called_slot')
                 names.add(method)

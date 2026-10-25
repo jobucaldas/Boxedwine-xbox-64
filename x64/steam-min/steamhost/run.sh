@@ -13,10 +13,14 @@ set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 MIN=$(cd "$HERE/.." && pwd)
 EVID= MODE= SELFTEST= GAME= WAIT=360 GAME_SECS=60
+PIN="$HERE/PIN-1788652215.txt"
+CHECK_PIN=
 APPID=3405340
 GAME_SRC=/workspace/steam-owned/games/megabonk
 while (($#)); do
     case $1 in
+        --pin) PIN=$2; shift ;;
+        --check-pin) CHECK_PIN=1; MODE=${MODE:-uwph} ;;
         --stock) MODE=stock ;;
         --uwph) MODE=uwph ;;
         --selftest) SELFTEST=1 ;;
@@ -30,9 +34,19 @@ while (($#)); do
 done
 [[ ( $MODE == stock || $MODE == uwph ) && -n $EVID && $WAIT =~ ^[0-9]+$ && $GAME_SECS =~ ^[0-9]+$ ]] || exit 2
 [[ -z $GAME || -z $SELFTEST ]] || exit 2
+# Validate before building, prefix setup, or any guest LoadLibrary path.
+[[ $PIN = /* ]] || PIN="$PWD/$PIN"
+MAP_REL=$(sed -n 's/^map_file=//p' "$PIN")
+[[ -n $MAP_REL ]] || { echo 'map_valid=0 reason=missing_map_pin'; exit 1; }
+MAP="$(cd "$HERE/../../.." && pwd)/$MAP_REL"
+CLIENT="$HERE/out/client/steamclient64.dll"
+mkdir -p "$EVID"
+python3 "$MIN/ifacemap/validate-map.py" --map "$MAP" --dll "$CLIENT" >"$EVID/steamhost.log" || { cat "$EVID/steamhost.log"; exit 1; }
+export STEAMHOST_VALIDATED_MAP=$(sha256sum "$MAP" | cut -d ' ' -f1)
 VIDEO=/workspace/x64-run/videos/B72-O${SELFTEST:+1}${SELFTEST:-2}.mp4
 [[ -z $GAME ]] || VIDEO=/workspace/x64-run/videos/B73-O1.mp4
 [[ $MODE == stock ]] || VIDEO=/workspace/x64-run/videos/B74-O1.mp4
+[[ -z $CHECK_PIN ]] || VIDEO=/workspace/x64-run/videos/B83-O1.mp4
 HARNESS=$(cd "$HERE/../../uwp-host/harness" && pwd)
 # steamhost's Wine stderr; the uwph run keeps it apart from the other guests' logs.
 HWL=wine.log
@@ -42,13 +56,8 @@ mkdir -p "$EVID" "$HERE/out" "$MIN/out" /workspace/x64-run/videos
 EVID=$(cd "$EVID" && pwd)
 rm -f "$EVID"/{steamhost.log,wine.log,steamhost-wine.log,seed.log,webhelper_samples,webhelper_count,exit-code,probe.log,probe-wine.log,Player.log,game-wine.log,logon.txt}
 rm -rf "$EVID/steam-logs" "$EVID/uwph-reports"
-# Fetch through the existing manifest/SHA2 verifier only if not already staged.
-if [[ ! -f $HERE/out/client/steamclient64.dll ]]; then
-    FREE=$(df --output=avail -B1 / | tail -1)
-    ((FREE >= 10*1024*1024*1024)) || { echo 'need >=10GiB free before download' >&2; exit 1; }
-    python3 "$MIN/fetch-valve-client.py" --out "$HERE/out/client" >"$EVID/fetch.log"
-fi
-make -C "$HERE"
+# The pin and validated map require an explicitly staged, unmodified client.
+make -C "$HERE" PIN="$PIN" MAP="$MAP" CLIENT="$CLIENT"
 [[ $MODE == stock ]] || make -C "$HARNESS" out/libuwph_wine_shim.so out/run_via_wine out/wine-wx/.stamp
 REPORTS=$MIN/out/uwph-reports
 rm -rf "$REPORTS"
@@ -113,7 +122,16 @@ record() {
 [[ $GAME == 1 ]] || record 55
 sleep 1
 set +e
-if [[ $SELFTEST == 1 ]]; then
+if [[ $CHECK_PIN == 1 ]]; then
+    # Anonymous-only O1: a fresh prefix, no seeding or login cache access.
+    if find "$PFX" -iname loginusers.vdf -print -quit | grep -q .; then
+        echo 'unexpected_loginusers=1' >>"$EVID/steamhost.log"
+        exit 1
+    fi
+    guest steamhost-gate
+    timeout 45 "${G[@]}" "$STEAM/steamhost64.exe" --check-pin >"$EVID/steamhost.log" 2>"$EVID/$HWL"
+    RC=$?
+elif [[ $SELFTEST == 1 ]]; then
     guest selftest
     timeout 45 "${G[@]}" "$STEAM/steamhost64.exe" --selftest >"$EVID/steamhost.log" 2>"$EVID/$HWL"
     RC=$?
