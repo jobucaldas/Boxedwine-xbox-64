@@ -1605,3 +1605,49 @@ trace-stock-wx.log, trace-stock-nofork-noproc.log, trace-wxntdll-wx.log,
 strace-failed-mmap.txt, scripts). Video /workspace/x64-run/videos/B21-O1.mp4
 (20 s, private Xvfb). Linux box only, THROUGH our launcher -> Wine's own loader ->
 shim -> uwph inside uwp_run.sh/uwpjail; not Xbox proof.
+
+## B21 O2
+
+Fix for the B21 O1 failure: `run-acceptance.sh` (unchanged) now passes under
+its default `nofork,noproc,wx`. Both hellos exit 0. The constraint, the shim's
+W^X refusal and the acceptance script are untouched.
+
+- **Where the fix lives: the launcher's loader choice.** O1 showed the RWX
+  request came from the stock ntdll.so (`map_image_view` vprot with
+  VPROT_EXEC|VPROT_WRITECOPY). R4X's `wine-image-wx.patch` already gives Wine's
+  own loader the W^X mapping order (map RW, read/relocate sections, then
+  per-section R/RW/RX through mprotect -> uwph_protect, never RWX). The harness
+  build of `run_via_wine` now bundles that loader
+  (`-DRUN_VIA_WINE_WX_LOADER=<out>/wine-wx/lib/wine/wine64`, and the Makefile
+  rule depends on `out/wine-wx/.stamp`). When the uwph shim is loaded
+  (detected through its `uwph_shim_report` export; its mmap wrapper always
+  refuses WRITE|EXEC) and the requested loader is the stock
+  `/usr/lib/wine/wine64`, the launcher execs the bundled W^X loader and prints
+  `[launcher] W^X enforced by uwph shim: stock ... maps PE images RWX; using
+  bundled W^X loader ...`. The acceptance output shows this line. Any other
+  WINE_LOADER is used exactly as given. Runs without the shim (run-wine.sh
+  stock controls, inproc-server controls) are unchanged.
+  `RUN_VIA_WINE_EXACT_LOADER=1` turns the swap off for negative controls.
+  Plain `cc run_via_wine.c` builds (on-device scripts) are unchanged. In the
+  UWP app this is the same role: the launcher execs the W^X Wine bundled in
+  the app's storage.
+- **Stale verifier.** R4X added an `mprotect` counter, so every shim report has
+  six `total` rows. `verify_noproc.py` (R4S) still required exactly five ops
+  and failed every post-merge run. It now requires all six, each with backend
+  > 0, bypass 0 and ntdll attribution. That is stricter than before (as in
+  verify_wine.py) and proves the RW->RX flips went through uwph.
+- Also fixed: `out/wine_linux_backend.o` rule now does `mkdir -p` (O1 fresh
+  worktree rc=2).
+
+Results (Linux box, THROUGH uwp_run.sh/uwpjail nofork,noproc,wx -> run_via_wine
+-> Wine's own loader with W^X ntdll.so -> shim -> uwph; separate stock wineserver;
+Xbox untested): run-acceptance rc=0. hello_k32 `hello from a native x86-64 PE
+(kernel32 only)`, hello TEB/malloc/threads ok. hello_k32 had 84 uwph_protect calls
+and hello had 129. Refused RWX mmap/mprotect requests: 0. 20/20 traced bindings.
+`make -C x64/uwp-host test` rc=0 (70 passed). run-windows-smoke.sh rc=0 (500
+passed). run-noproc.sh rc=0. Negative control `RUN_VIA_WINE_EXACT_LOADER=1
+run-acceptance.sh` -> hello_k32 exit 13, `failed to load start.exe: c000000d`.
+Stability: 16/16 consecutive acceptance passes. One earlier run inside the
+recording xterm had hello_k32 exit=1 (it died early, 1 uwph_protect call). Its
+log was overwritten and it was not reproduced in 17 retries (including inside
+xterm), so the cause is unknown. Video /workspace/x64-run/videos/B21-O2.mp4.
