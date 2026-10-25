@@ -83,5 +83,6 @@ UWPH_API const char *uwph_backend_name(void);
 #include "server.h"
 #include "probe.h"
 #include "stdio.h"
+#include "trace.h"
 
 #endif
