@@ -2788,3 +2788,55 @@ defaults, security constraints, remotes, or third-party repositories changed.
 No commit or push. O2 not implemented. One overlapping initial build failed
 on an object being written by the other build; it ended before the sequential
 passing exact test and does not represent a source failure.
+
+## B36 O2
+
+Implemented opt-in MEGABONK_NO_CRASH_HANDLER=1 in run-megabonk.sh,
+documented in its header. Each per-run staging directory symlinks all six
+remaining top-level install entries (including directories), omitting only
+UnityCrashHandler64.exe. The original install remains mounted read-only so
+symlink targets resolve inside noproc; env -C enters the staging directory
+before our launcher. The owned crash handler remains present and no owned
+install files were changed. An initial run used staging as the jail's install
+mount and failed to resolve the symlink targets (c0000135); the final run fixes
+that without modifying the wrapper or any security constraint.
+
+BLOCKED: Unity still attempts its crash handler with the executable absent.
+Exact remaining attempt from x64/uwp-host/harness/out/megabonk/run-eGgeaqmJ/wine.log:56:
+
+```text
+0024:trace:process:CreateProcessInternalW app (null) cmdline L"\"Z:\\workspace\\wt\\B36\\x64\\uwp-host\\harness\\out\\megabonk\\run-eGgeaqmJ\\game\\UnityCrashHandler64.exe\" --attach 32 140737480364032"
+```
+
+The exact O2 shell test exits 0, but its NT-only metric does not capture this
+earlier CreateProcessInternalW call. Reported honestly: CreateProcess attempts: 1;
+NtCreateUserProcess attempts: 0 (wine-internal: 0, guest: 0). Runtime exit=0,
+MEGABONK reached=gfx-init, wineboot spawn failures: 0, no failed-to-start
+explorer/wineboot. Enforcement: seccomp wx=1 nofork=1 (34 insns), with
+constraints=nofork,wx,noproc. Required make -C x64/uwp-host test passed,
+including 172 passed / 0 failed in the traced host test and 7 passed / 0 failed
+in the in-process verifier tests. Full exact output:
+/workspace/x64-run/lanes/B36/B36-O2.exact-output.log.
+
+Main menu visually confirmed in x64/uwp-host/harness/out/megabonk/run-eGgeaqmJ/shot-003.png:
+grayscale mean 0.251721, standard deviation 0.112428 (>0.02 each).
+No menu input was needed; existing outside-jail xdotool Alt+F4 shut down the
+game. O1 window/menu proof remains intact in run-f2tIK3Gw and B36-O1.mp4.
+Staging links checked individually against the original install.
+
+Video: /workspace/x64-run/videos/B36-O2.mp4, 58 seconds, private free Xvfb :5,
+1280x720x24, ffmpeg x11grab at 15fps with libx264 ultrafast/yuv420p. Recording
+command: ffmpeg -y -loglevel error -f x11grab -video_size 1280x720 -framerate 15
+-i :5 -t 85 -c:v libx264 -preset ultrafast -pix_fmt yuv420p
+/tmp/b36-o2-full.mp4. Final video joins its first 25 seconds (menu), last 25
+seconds (shutdown, exact test and metrics), and an 8-second Xvfb capture of
+the explicit BLOCKED status and exact attempt; command line is on screen.
+No Encom. Generated surface-trace.tsv restored after collection.
+
+Linux proof through the Xbox-bound stack, Xbox untested. THROUGH-uwph:
+uwp_run.sh(nofork,wx,noproc) -> our launcher -> Wine's own W^X loader -> shim
+-> uwph, with in-process server and desktop. Stock Wine was used only for
+build-time prebuilt-prefix preparation, not runtime acceptance. No gates,
+verifier defaults, constraints, third-party repositories, or remotes changed.
+No commit or push. Despite the passing exact shell predicate and zero NT
+attempts, O2 remains BLOCKED under its explicit crash-handler-attempt rule.
