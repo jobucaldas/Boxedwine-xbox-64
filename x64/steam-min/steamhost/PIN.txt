@@ -1,0 +1,12 @@
+manifest_version=1792618285
+steamclient64_sha256=253e0a11a4415b38c78a42f7bdd6ecc426455f06c1ba6453a48090df3142dbbc
+manifest_url=https://client-update.steamstatic.com/steam_client_win64
+
+Vtable indices used: NONE (O1 only calls exported CreateInterface).
+Interface name: OpenSteamClient @ 8d4d18742555959b21453cde0efcd42f336735ee
+  src/client/ext/steamclient.h:7; factory call src/client/ext/steamclient.cpp:38-46.
+Export resolution: same revision src/client/ext/steamclient.cpp:13-22.
+Bootstrapper signatures: OpenSteamClient @ b6703299c982315a0efdf8d6bcea330ab931614b
+  OpenSteamClient/Entry.cs:34-125. Launcher type = 5: C++ revision above,
+  include/opensteamworks/ELauncherType.h:8.
+No logon, pipe creation, callback pump, or vtable invocation in O1.
