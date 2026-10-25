@@ -45,8 +45,11 @@ static int g_device;
 static int g_packaged;
 static int g_local_state;
 
+static void con_log(const char *line);
+
 static void out_line(const char *line)
 {
+    con_log(line);
     if (g_log) {
         fputs(line, g_log);
         fputc('\n', g_log);
@@ -950,16 +953,23 @@ static void rung_n11(void)
 }
 
 #include "input/probe.inc"
+#include "logview.inc"
 
 static void run_all(IUnknown *window)
 {
     if (!g_device) note("off-device: successful stand-in API calls are labelled SKIP; no console PASS");
     note("rungs.exe O5: native-API + Game-mode rungs; ctx=%s host=%s", g_ctx, g_host);
+    if (window) {
+        HRESULT chr = con_attach(window);
+        if (FAILED(chr)) note("on-screen log unavailable hr=0x%08lx (log file only)", hx(chr));
+    }
     readiness_rungs();
     rung_n0();
     rung_n1();
     rung_n2();
+    con_detach();          /* n3 creates its own swapchain on the CoreWindow, unchanged */
     rung_n3(window);
+    if (window) con_attach(window);   /* then the log view adopts n3's swapchain */
     rung_n4();
     rung_n6();
     rung_n7();
@@ -968,6 +978,8 @@ static void run_all(IUnknown *window)
     rung_n11();
     rung_n5(); /* last: the commit test may hit the app's memory limit */
     note("rungs done; run once as App and once as Game and keep both logs");
+    note("app stays open showing this log; press Home to leave");
+    con_draw(1);
 }
 
 static HRESULT open_log(void)

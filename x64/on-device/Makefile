@@ -53,7 +53,7 @@ $(OUT)/probe_d3d12.exe: ../graphics/probe_d3d12.c Makefile
 offline-smoke: ladder
 	./offline-smoke.sh
 
-$(OUT)/rungs.exe: rungs.c input/mapping.c input/mapping.h input/probe.inc Makefile
+$(OUT)/rungs.exe: rungs.c logview.inc logfont.h input/mapping.c input/mapping.h input/probe.inc Makefile
 	mkdir -p $(OUT)
 	$(CC_WIN) $(CFLAGS) -Wno-missing-field-initializers -m64 $(UWP_EXE_FLAGS) -static -o $@ $< input/mapping.c $(UWPH_OBJS) $(OUT)/readiness/unixside.o $(OUT)/readiness/smoke.o $(READINESS_OBJS) $(OUT)/readiness/vp_shim.o $(OUT)/readiness/libntdll_seh.a -lws2_32 -lbcrypt -lsynchronization -lwindowsapp -lole32 -lruntimeobject -luuid -ldxguid -lm
 	python3 linux/pe-appcontainer.py $@
