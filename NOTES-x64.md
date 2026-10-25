@@ -2666,3 +2666,39 @@ evidence: /workspace/wt/B33/x64/uwp-host/harness/out/desk-probe/evidence-XSKIdx6
 The requested exact test ran on a free Xvfb display and exited 0 (`/tmp/b33-exact.log`). `sh x64/pe/tests/build.sh` succeeded; the two expected FAIL greps and `wine-internal: 1` grep succeeded; `make -C x64/uwp-host test` passed (including 172 passed/0 failed shim checks and 7 passed/0 failed in-process verifier checks). Stock passed every required feature. Nofork returned 1 as expected, with explorer refused (`c0000017`), missing display GUID, and no driver window; clipboard/message/display-mode checks still passed. This is the B34–B36 acceptance oracle.
 
 Video: `/workspace/x64-run/videos/B33-O2.mp4` (13.2 seconds, private Xvfb + ffmpeg), showing both runs and the exact-test completion.
+
+
+## B34
+
+O2 implementation is **BLOCKED at runtime proof**, not DONE. The new
+`harness/wine-desktop-thread.patch` shares Wine's explorer initialization with
+`uwp_desktop_start`, using an atomic single owner and one ready event, and
+preserves the explorer process path. The desktop thread omits admin-token
+changes, launchers, cmdline execution, systray/appbar (B33 UNKNOWN), and Shell
+DDE. `desk_probe --self-host` loads and starts the DLL before user32 checks;
+`run-desk-probe.sh stock-selfhost` stages the DLL in its disposable prefix,
+sets the private loader/DLL path, and uses our launcher with stock wineserver.
+
+The exact O2 test exited **1** on a free Xvfb display. The DLL/PE builds passed,
+but self-host startup returned `c0000001` and `DESK result FAIL`, with
+`NtCreateUserProcess attempts: 9 (wine-internal: 9, guest: 0)` including
+wineboot and explorer. Wine 10.0 `dlls/ntdll/unix/env.c:build_initial_params`
+calls `run_wineboot` before PE entry; a fresh stock server has no boot event,
+so explorer starts before the probe can call the new export. DLL loading
+succeeded, but the existing explorer desktop prevents thread ownership.
+A bootstrap arrangement before PE entry remains necessary; no spawn metrics,
+security gates, verifier defaults, or nofork/wx/noproc constraints were changed.
+Successful initialization and repeated/concurrent caller behavior remain
+unverified at runtime.
+
+The remaining exact-chain checks were run separately: plain stock passed all
+DESK checks; `make -C x64/uwp-host test` passed (172/0 shim, 7/0 verifier);
+`run-acceptance.sh` passed. Build-only proof covers the DLL. The failed desktop
+proof used our launcher and Wine's own PE loader with a stock wineserver,
+without uwph. Existing hello acceptance passed THROUGH launcher -> Wine
+loader -> shim -> uwph under nofork,noproc,wx; that does not prove the desktop
+thread. Linux only; Xbox untested.
+
+Full output and reason: `/workspace/x64-run/lanes/B34/B34-O2.result`.
+Video: `/workspace/x64-run/videos/B34-O2.mp4` (14.67 seconds, free Xvfb and
+ffmpeg, no Encom). No commit, push, or remote operation was performed.
