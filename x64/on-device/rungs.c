@@ -920,6 +920,7 @@ static void rung_n12(void)
 
 #include "input/probe.inc"
 #include "lifecycle.inc"
+#include "pick-folder.inc"
 
 static void run_all(IUnknown *window)
 {
@@ -938,6 +939,7 @@ static void run_all(IUnknown *window)
     rung_n11();
     rung_n12();
     rung_n13();
+    rung_n14();
     rung_n5(); /* last: the commit test may hit the app's memory limit */
     note("rungs done; run once as App and once as Game and keep both logs");
 }
@@ -1019,11 +1021,12 @@ static HRESULT STDMETHODCALLTYPE view_load(void *This, HSTRING entry)
     (void)This;
     UINT32 n = 0;
     const WCHAR *name = WindowsGetStringRawBuffer(entry, &n);
-    static const WCHAR opt_in[] = L"Boxedwine.BigFile";
-    g_big_file = n == (sizeof(opt_in) / sizeof(*opt_in) - 1) &&
-                 !wmemcmp(name, opt_in, n);
-    note("activation EntryPoint=%.*ls --big-file=%s", (int)n, name,
-         g_big_file ? "enabled by Big file opt-in tile" : "disabled");
+    /* The raw buffer of an HSTRING is always NUL-terminated. */
+    g_pick_folder = !wcscmp(name, L"Boxedwine.PickFolder") || !wcscmp(name, L"Boxedwine.PickFolderBigFile");
+    g_big_file = g_big_file || !wcscmp(name, L"Boxedwine.BigFile") || !wcscmp(name, L"Boxedwine.PickFolderBigFile");
+    note("activation EntryPoint=%.*ls --big-file=%s%s", (int)n, name,
+         g_big_file ? "enabled by explicit opt-in tile" : "disabled",
+         g_pick_folder ? "; PickFolder tile: only n14 runs" : "");
     return S_OK;
 }
 static HRESULT STDMETHODCALLTYPE view_run(void *This)
@@ -1032,7 +1035,8 @@ static HRESULT STDMETHODCALLTYPE view_run(void *This)
     g_window->lpVtbl->Activate(g_window);
     g_window->lpVtbl->get_Dispatcher(g_window, (void **)&g_dispatcher);
     pump();
-    run_all((IUnknown *)g_window);
+    if (g_pick_folder) rung_n14(); /* separate tile: n14 only */
+    else run_all((IUnknown *)g_window);
     /* Keep the log open for lifecycle events after the observation window. */
     /* Keep the window (and the n3 colour) up until the user leaves the app. */
     if (g_dispatcher) g_dispatcher->lpVtbl->ProcessEvents(g_dispatcher, 2);

@@ -33,7 +33,7 @@ $(OUT)/ladder: ladder.py Makefile
 offline-smoke: ladder
 	./offline-smoke.sh
 
-$(OUT)/rungs.exe: rungs.c lifecycle.inc input/mapping.c input/mapping.h input/probe.inc Makefile
+$(OUT)/rungs.exe: rungs.c lifecycle.inc pick-folder.inc input/mapping.c input/mapping.h input/probe.inc Makefile
 	mkdir -p $(OUT)
 	$(CC_WIN) $(CFLAGS) -Wno-missing-field-initializers -m64 -mconsole -static -o $@ $< input/mapping.c $(UWPH_OBJS) $(OUT)/readiness/unixside.o $(OUT)/readiness/smoke.o $(READINESS_OBJS) -lws2_32 -lbcrypt -lsynchronization -lwindowsapp -lole32 -lruntimeobject -luuid -ldxguid -lm
 
