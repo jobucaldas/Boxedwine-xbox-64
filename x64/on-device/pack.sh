@@ -5,7 +5,9 @@ umask 077
 command -v openssl >/dev/null
 command -v python3 >/dev/null
 test -s out/smoke.exe
+# A failed rebuild must not leave an old sidecar that still verifies.
 mkdir -p out
+rm -f out/SHA256SUMS
 stage=$(mktemp -d out/.package.XXXXXX)
 trap 'rm -rf -- "$stage"' EXIT
 
@@ -165,13 +167,6 @@ try:
     shutil.rmtree(out / 'kit', ignore_errors=True)
     kit.rename(out / 'kit')
     archive.replace(out / 'kit.zip')
-    # Sidecar verifies the archive and every extracted member, including the
-    # kit's own checksum manifest, from the package output directory.
-    sidecar_files = [out / 'kit.zip'] + sorted(
-        p for p in (out / 'kit').rglob('*') if p.is_file())
-    (out / 'SHA256SUMS').write_text(''.join(
-        f'{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.relative_to(out).as_posix()}\n'
-        for p in sidecar_files))
     Path('kit-manifest.txt').write_text(manifest)
     print((out / 'kit.zip').resolve(), flush=True)
 finally:
@@ -179,3 +174,31 @@ finally:
         shutil.rmtree(kit)
 PY
 fi
+
+# Sidecar: every file this run packaged, followed through payload symlinks as
+# MakeAppx and the kit zip see them; verify with `sha256sum -c SHA256SUMS`.
+python3 - "${1:-}" <<'PY'
+import hashlib, os, sys
+from pathlib import Path
+
+out = Path('out')
+def tree(top):
+    return [Path(d, f) for d, _, names in os.walk(top, followlinks=True) for f in names]
+files = tree(out / 'payload') + [out / 'test-cert.cer', out / 'test-cert.pfx']
+if sys.argv[1] == '--kit':
+    files += [out / 'kit.zip'] + tree(out / 'kit')
+    # The kit must carry exactly the payload being summed here.
+    rel = lambda top: {p.relative_to(top) for p in tree(top)}
+    assert rel(out / 'payload') == rel(out / 'kit/payload'), 'kit payload differs from out/payload'
+def digest(path):
+    h = hashlib.sha256()
+    with open(path, 'rb') as f:
+        for block in iter(lambda: f.read(1 << 20), b''):
+            h.update(block)
+    return h.hexdigest()
+names = sorted(p.relative_to(out).as_posix() for p in files)
+tmp = out / '.SHA256SUMS.tmp'
+tmp.write_text(''.join(f'{digest(out / n)}  {n}\n' for n in names))
+tmp.replace(out / 'SHA256SUMS')
+print(f'Checksums: {(out / "SHA256SUMS").resolve()} ({len(names)} files)')
+PY

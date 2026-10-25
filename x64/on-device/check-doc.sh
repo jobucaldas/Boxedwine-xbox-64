@@ -214,8 +214,20 @@ check(listed == files, 'package', f'kit-manifest.txt vs kit files: {sorted(liste
 if (out / 'SHA256SUMS').is_file():
     rc = subprocess.run(['sha256sum', '--quiet', '-c', 'SHA256SUMS'], cwd=out, capture_output=True).returncode
     check(rc == 0, 'package', 'out/SHA256SUMS does not verify')
+    # Coverage: every packaged file, payload symlinks followed as MakeAppx reads them.
+    summed = {l.split('  ', 1)[1] for l in (out / 'SHA256SUMS').read_text().splitlines() if '  ' in l}
+    packaged = {'test-cert.cer', 'test-cert.pfx', 'kit.zip'}
+    for top in (out / 'payload', kit):
+        packaged |= {Path(d, f).relative_to(out).as_posix()
+                     for d, _, names in os.walk(top, followlinks=True) for f in names}
+    missing = sorted(packaged - summed)
+    check(not missing, 'package', f'out/SHA256SUMS omits {len(missing)} packaged files: {missing[:5]}')
 else:
     check(False, 'package', 'out/SHA256SUMS missing')
+# Install section names the exact package file MakeAppx produces.
+install = re.search(r'^## Install.*?(?=^## |\Z)', readme, re.M | re.S)
+check(install is not None and '`BoxedwineDev.appx`' in install.group(0), 'README.md',
+      'Install section does not name the package file `BoxedwineDev.appx`')
 
 for m in mismatches:
     print(m)

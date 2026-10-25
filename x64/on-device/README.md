@@ -20,9 +20,13 @@ separate build diagnostic. Tomorrow's checklist:
   matches manifest Publisher)
 - Private test key: `x64/on-device/out/test-cert.pfx` (empty password; this is
   a disposable dev identity. Never put it in the payload or share it.)
+- Checksums: `x64/on-device/out/SHA256SUMS`, rewritten by every `package`
+  or `kit` run. It covers every packaged file: each `out/payload/` file
+  (symlinks followed, as MakeAppx and the zip read them), `test-cert.cer`,
+  `test-cert.pfx`, and after `kit` also `kit.zip` and every extracted file.
+  Verify with `cd x64/on-device/out && sha256sum -c SHA256SUMS`.
 - Kit: `x64/on-device/out/kit.zip`, extracted as `x64/on-device/out/kit/`.
-  Verify it with `cd x64/on-device/out && sha256sum -c SHA256SUMS`; the
-  sidecar `out/SHA256SUMS` covers `kit.zip` and every extracted file. Top level:
+  Top level:
   - `README.md` (this file), `KIT-NOTES.txt` (build-only notes),
     `kit-manifest.txt` (every file and the rung it serves) and `SHA256SUMS`
     (in-kit checksums, excluding itself).
@@ -58,7 +62,11 @@ capabilities to get past it. We haven't run either tool here.
 2. Note the console IP shown in Dev Home. From a PC on the same LAN, browse to
    `https://<console-ip>:11443`. Accept the console's self-signed HTTPS
    warning, which is expected only for your own console on your LAN, and sign in.
-3. **Home > My games & apps > Add**. Choose `BoxedwineDev.appx` and continue.
+3. **Home > My games & apps > Add**. Choose the package file
+   `BoxedwineDev.appx`, the signed output of the MakeAppx/SignTool step above
+   built from `x64/on-device/out/payload/` (carried in
+   `x64/on-device/out/kit.zip`; run `sha256sum -c SHA256SUMS` in
+   `x64/on-device/out` first). Then continue.
    There are no dependency packages. If it asks for a certificate, give it
    `test-cert.cer` (never the `.pfx`). Start the install and wait for it to
    finish.
@@ -138,7 +146,8 @@ Nothing is downloaded, and there is no stock-Wine fallback.
 `make -C x64/on-device package` runs `pack.sh`. It generates the OpenSSL test
 certificate on first use and checks the CER/PFX pair, the publisher and the
 x64 identity. It also creates the PNG assets the manifest references and
-stages `out/payload/`. LocalState, tokens and private keys are never staged.
+stages `out/payload/`, then writes `out/SHA256SUMS` over everything it
+packaged. LocalState, tokens and private keys are never staged.
 No signature or AppxBlockMap is produced here, so pack and sign on Windows as
 shown above.
 
