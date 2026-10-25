@@ -4,6 +4,8 @@
  * Only public, flat Steamworks exports are used. Prints exactly:
  *   SteamAPI_Init=<0|1> msg=<errmsg>
  *   IsSteamRunning=<0|1>
+ *   GetHSteamUser=<handle>
+ *   GetHSteamPipe=<handle>
  *   BIsSubscribedApp(3405340)=<0|1>
  *   steamid_present=<0|1>
  * The SteamID and account name are never printed.
@@ -19,6 +21,7 @@
 
 typedef int (__cdecl *InitFlat_t)(char *errmsg /* SteamErrMsg = char[1024] */);
 typedef BOOL (__cdecl *InitSafe_t)(void);
+typedef int (__cdecl *GetHandle_t)(void);
 typedef BOOL (__cdecl *IsSteamRunning_t)(void);
 typedef void (__cdecl *Shutdown_t)(void);
 typedef void *(__cdecl *GetIface_t)(void);
@@ -81,6 +84,11 @@ int main(int argc, char **argv)
     if (is_running)
         running = is_running() ? 1 : 0;
     printf("IsSteamRunning=%d\n", running);
+
+    GetHandle_t get_huser = (GetHandle_t)GetProcAddress(api, "SteamAPI_GetHSteamUser");
+    GetHandle_t get_hpipe = (GetHandle_t)GetProcAddress(api, "SteamAPI_GetHSteamPipe");
+    printf("GetHSteamUser=%d\n", get_huser ? get_huser() : 0);
+    printf("GetHSteamPipe=%d\n", get_hpipe ? get_hpipe() : 0);
 
     if (ok && get_apps && is_sub) {
         void *apps = get_apps();

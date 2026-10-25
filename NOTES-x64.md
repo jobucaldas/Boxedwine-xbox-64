@@ -3158,3 +3158,9 @@ No connection_log entries occurred in the final 60 seconds of the run. The last 
 [2026-10-25 22:38:56] Connectivity test: Starting test, fetching 'http://test.steampowered.com/204'
 [2026-10-25 22:38:57] [Logged Off, 0, 0] [U:1:0] CCMInterface::SetSteamID( [U:1:0] )
 ```
+
+## B79 O1
+
+Added the anonymous two-process stock Wine baseline: `--serve 120 --probe two-process` keeps the real pinned client master serving after anonymous logon, publishes ActiveProcess as in the existing authenticated path, and launches our probe separately only after serving begins. The probe copies Megabonk's unmodified steam_api64.dll beside itself (byte comparison and SHA256 evidence), uses app ID 3405340 in steam_appid.txt, and reports GetHSteamUser/GetHSteamPipe alongside Init/error and subscription status. No O2 implementation.
+
+Exact test on build 1745623383: BLOCKED. Runner exit 124 (540-second outer timeout), assertions exit 1: Wine page fault reading FFFFFFFFFFFFFFFF at 00006FFFFA06D981 during anonymous LogOn. Pin/interface checks passed, global_user=1, pipe=1, iclientuser=1; no logon=1 or serving state. Probe skipped; SteamAPI_Init, Init error string, GetHSteamUser/GetHSteamPipe and BIsSubscribedApp are unmeasured, not zero or success claims. webhelper_count=0. Stock Wine only, no THROUGH-uwph or console proof. Evidence /workspace/x64-run/lanes/B79/o1; 55-second free-Xvfb/ffmpeg video /workspace/x64-run/videos/B79-O1.mp4. Prefix deleted (1.4 GB peak observed); independent credential-pattern scan passed. Reused and reverified B78's cached Valve archive because disk was below the download gate; gate unchanged. No credentials, commit, push or remote changes.

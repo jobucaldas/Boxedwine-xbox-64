@@ -146,7 +146,8 @@ static int logon(HMODULE client, void *engine, const char *dll, int wait_s, int 
     printf("logon_seconds=%.3f\n", (GetTickCount() - start) / 1000.0);
     if (result == 1) printf("logon=1\n");
     else printf("logon=0 eresult=%d%s\n", eresult, result < 0 ? " timeout=1" : "");
-    if (anon) return result == 1 ? 0 : 9;
+    /* Anonymous baseline may also serve real client IPC for our second process. */
+    if (anon && !serve_s) return result == 1 ? 0 : 9;
     if (!active_pid_is_self()) {
         wrote = write_active_process(dll);
         printf("activeprocess_written_by=steamhost ok=%d\n", wrote);
@@ -180,7 +181,7 @@ int main(int argc, char **argv) {
                 (serve_s = atoi(argv[5])) > 0 && serve_s <= 3600)) &&
                (!strcmp(argv[1], "--logon") || (anon = !strcmp(argv[1], "--anon"))) && !strcmp(argv[2], "--wait") &&
                (wait_s = atoi(argv[3])) > 0 && wait_s <= 3600)) {
-        fprintf(stderr, "usage: steamhost64.exe --selftest | --check-pin | --anon --wait SECONDS | --logon --wait SECONDS [--serve SECONDS]\n");
+        fprintf(stderr, "usage: steamhost64.exe --selftest | --check-pin | --anon --wait SECONDS [--serve SECONDS] | --logon --wait SECONDS [--serve SECONDS]\n");
         return 2;
     }
     /* steamhost spawns no process; there is no webhelper (or any child) code path. */
