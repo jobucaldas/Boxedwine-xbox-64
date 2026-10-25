@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Build a private W^X ntdll.so for the Linux harness (R4X O2).
+# Build private W^X Unix + PE ntdll for the Linux harness (R4X O2, B18 O1).
 #
 # Source: upstream Wine 10.0 at $WINE_SRC (default /tmp/wine-src) plus the
 # Debian 10.0~repack-6 patches that touch the Unix ntdll (so it matches the
-# installed wine64/wineserver/PE dlls), plus wine-image-wx.patch. Only
-# dlls/ntdll/ntdll.so is rebuilt; everything else in out/wine-wx is a symlink
+# installed wine64/wineserver/PE dlls), plus the image and stub W^X patches.
+# Unix ntdll.so and PE ntdll.dll are rebuilt; other DLLs in out/wine-wx link
 # to the installed Debian Wine. The installed Wine and $WINE_SRC are untouched.
 set -euo pipefail
 cd "$(dirname "$(realpath "$0")")"
@@ -16,7 +16,7 @@ grep -qx 'Wine version 10.0' "$src/VERSION" || { echo "prepare-wine-wx: $src is 
 if [[ ! -d $deb ]]; then
     mkdir -p /tmp/R4W-debian && tar -xJf /tmp/R4W-wine.debian.tar.xz -C /tmp/R4W-debian
 fi
-stamp=$( (cat "$src/VERSION" wine-image-wx.patch prepare-wine-wx.sh; cat "$deb"/fixes/{temporary-directory,ntdll-398da925,ntdll-5c45391e}.patch "$deb"/debianization/install-paths.patch) | sha256sum | cut -d' ' -f1)
+stamp=$( (cat "$src/VERSION" wine-image-wx.patch wine-loader-stub-wx.patch prepare-wine-wx.sh /usr/share/wine/nls/locale.nls; cat "$deb"/fixes/{temporary-directory,ntdll-398da925,ntdll-5c45391e,binutils2.44}.patch "$deb"/debianization/install-paths.patch) | sha256sum | cut -d' ' -f1)
 if [[ -f $tree/.stamp && $(cat "$tree/.stamp") == "$stamp" ]]; then exit 0; fi
 
 # Apply only the hunks of a patch that touch the listed files.
@@ -39,6 +39,8 @@ apply_files "$deb/fixes/ntdll-398da925.patch" dlls/ntdll/unix/virtual.c
 apply_files "$deb/fixes/ntdll-5c45391e.patch" dlls/ntdll/unix/virtual.c
 apply_files "$deb/debianization/install-paths.patch" dlls/ntdll/unix/loader.c
 patch -d "$out/wine-wx-source" -p1 --forward --no-backup-if-mismatch < wine-image-wx.patch
+apply_files "$deb/fixes/binutils2.44.patch" dlls/ntdll/loader.c tools/winebuild/import.c
+patch -d "$out/wine-wx-source" -p1 --forward --no-backup-if-mismatch < wine-loader-stub-wx.patch
 # Debian lists the new header via a makedep.c rule; register it with makedep instead.
 sed -i 's|^\twine/server.h \\$|&\n\twine/server_tmpdir.h \\|' "$out/wine-wx-source/include/Makefile.in"
 # The repack drops generated files and debian/rules reruns make_requests, which
@@ -59,8 +61,8 @@ python3 -I - <<'PYCONFIG'
 import pathlib, re
 path = pathlib.Path('config.status')
 text, count = re.subn(r'(?ms)^SUBDIRS = .*?(?=^DISABLED_SUBDIRS =)',
-    'SUBDIRS = include dlls/ntdll dlls/oleacc dlls/stdole2.tlb '
-    'dlls/stdole32.tlb tools/winebuild tools/widl\n', path.read_text())
+    'SUBDIRS = include libs/musl dlls/winecrt0 dlls/ntdll dlls/oleacc dlls/stdole2.tlb '
+    'dlls/stdole32.tlb tools/winebuild tools/widl tools/wrc tools/wmc tools/winegcc\n', path.read_text())
 assert count == 1, 'expected one Wine SUBDIRS assignment in config.status'
 path.write_text(text)
 PYCONFIG
@@ -68,15 +70,22 @@ if ! ./config.status >> configure.log 2>&1; then
     tail -40 configure.log >&2
     exit 1
 fi
+# Debian repack omits generated NLS data; wrc needs the matching installed file.
+mkdir -p nls
+cp /usr/share/wine/nls/locale.nls nls/locale.nls
 # Debian install dirs, so relative bin/lib/data paths match the mirrored tree.
 make -j"$(nproc)" bindir=/usr/lib/wine libdir=/usr/lib/x86_64-linux-gnu/wine datadir=/usr/share/wine \
-    dlls/ntdll/ntdll.so > build.log 2>&1 || { tail -20 build.log >&2; exit 1; }
+    dlls/ntdll/ntdll.so dlls/ntdll/x86_64-windows/ntdll.dll > build.log 2>&1 || { tail -20 build.log >&2; exit 1; }
 
 # Mirror /usr/lib/wine, /usr/lib/x86_64-linux-gnu/wine and /usr/share/wine.
 lib=$tree/lib/x86_64-linux-gnu/wine
 mkdir -p "$tree/lib/wine" "$lib/x86_64-unix" "$tree/share"
 cp /usr/lib/wine/wine64 "$tree/lib/wine/wine64"
-ln -s /usr/lib/x86_64-linux-gnu/wine/x86_64-windows "$lib/x86_64-windows"
+mkdir -p "$lib/x86_64-windows"
+for f in /usr/lib/x86_64-linux-gnu/wine/x86_64-windows/*; do
+    [[ $(basename "$f") == ntdll.dll ]] || ln -s "$f" "$lib/x86_64-windows/"
+done
+cp dlls/ntdll/x86_64-windows/ntdll.dll "$lib/x86_64-windows/ntdll.dll"
 for f in /usr/lib/x86_64-linux-gnu/wine/x86_64-unix/*; do
     [[ $(basename "$f") == ntdll.so ]] || ln -s "$f" "$lib/x86_64-unix/"
 done

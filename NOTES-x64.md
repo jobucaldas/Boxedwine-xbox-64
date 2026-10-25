@@ -1328,6 +1328,75 @@ runtime proof and no stock Wine execution in O3. Recording
 `/workspace/x64-run/videos/R4W-O3.mp4` shows the blocked exact test only.
 No runtime code was changed, no commits created and no remotes accessed.
 
+## B18
+
+O1 (2026-10-25): remaining RWX inventory after R4X. Linux/off-device proof is
+THROUGH our launcher -> Wine's own private loader/Unix + PE ntdll -> shim ->
+public uwph for the selected host calls. An explicit separate stock Linux
+wineserver remains; this is not in-process-server or on-console acceptance.
+No RWX exception was added to uwpjail, the shim, or uwph.
+
+The pre-fix inventory (`/workspace/x64-run/lanes/B18/O1-fast-{hello,d3d11,megabonk}.*`,
+hello is `O1-hello.*`) used `uwpjail --wx` with
+`strace -f -e trace=mmap,mprotect`. The initial all-success stack-unwinding runs
+(`O1-{d3d11,megabonk}.*`) timed out during initialization and are not graphics
+acceptance. Supplemental `O1-caller-d3d11.strace` uses
+`-k --status=failed` to identify the denied kernel request as
+`libc.__GI___mmap64 -> libvulkan_lvp.so+0x1f6287` (Mesa lavapipe).
+The shim now immediately logs refused calls with PID, operation, caller module
+and offset: those calls never enter the kernel and cannot appear in strace.
+Counts must include both sources; MAP_DENYWRITE on an RX file mapping is not
+PROT_WRITE and is excluded.
+
+The two Megabonk requests initially looked like Unity requests but are Wine
+missing-import stubs. `O1-gdb-megabonk.log` records the launched process under
+the same jail/launcher/private loader/shim with read-only stack inspection:
+Wine syscall frame saved guest SP -> PE ntdll+0x42e0c -> `allocate_stub`
+(`addr2line`, Wine loader.c:454), then Unix NtAllocateVirtualMemory -> map_view
+-> anon_mmap_alloc. The debug run also tries anon_mmap_fixed because GDB changes
+address layout; its four attempts are supplemental, not summed into the baseline
+counts. `O1-origin-megabonk.log` independently shows the two 64 KiB
+NtAllocateVirtualMemory calls with protection 0x40 (PAGE_EXECUTE_READWRITE).
+These are loader-generated unresolved-import stubs, not a Unity JIT.
+
+`wine-loader-stub-wx.patch` fixes that owner: each stub starts RW, is filled,
+protected RX, flushed with NtFlushInstructionCache, then published. No shared
+page containing earlier executable stubs is reopened writable. Allocation or
+protection failure keeps Wine's failure sentinel; the original maximum stub
+count stays intact. Cost: at least one page per unresolved import instead of
+packing stubs in one 64 KiB pool. `prepare-wine-wx.sh` now rebuilds and installs
+private PE ntdll.dll as well as Unix ntdll.so; installed Wine is untouched.
+Wine PE build dependencies and matching installed locale.nls are included in
+that private build. The focused `stub_probe.exe` imports two nonexistent
+version.dll functions, never invokes them, and verifies separate RX allocations.
+
+Inventory (counts are RWX requests per run: shim `UWPH_RWX` lines, which never
+reach the kernel, plus kernel-denied `PROT_WRITE|PROT_EXEC` lines in strace;
+the two sources do not overlap). Pre-fix = `O1-hello.*` and
+`O1-fast-{d3d11,megabonk}.*`; post-fix = `O1-v3-{hello,stub,d3d11,megabonk}.*`
+(fresh prefix copies, rebuilt ntdll from 01:07); callers from
+`O1-caller-d3d11.strace`, `O1-caller3-megabonk.strace` (`strace -k
+--status=failed`) and `O1-gdb-megabonk.log`.
+
+| caller | count | fixed | reachable-on-console |
+|---|---|---|---|
+| Wine PE ntdll `allocate_stub` (loader.c:454, missing-import stubs) -> NtAllocateVirtualMemory(PAGE_EXECUTE_READWRITE) -> Unix ntdll anon_mmap_alloc (`ntdll.so+0x5dc1a`) | Megabonk 2 before, 0 after; stub_probe 0 after (two stubs, both RX) | yes: `wine-loader-stub-wx.patch` (RW, fill, RX, flush, publish) | yes: any game with an unresolved import (Megabonk has them) |
+| Mesa lavapipe `util/u_execmem.c` init_heap, 10 MiB mmap prot 7 (`libvulkan_lvp.so+0x1f6287`), reached via DXVK -> winevulkan | d3d11_probe 1 before, 1 after | no (third-party, denied by the jail; u_execmem returns NULL and Mesa uses its non-rtasm path; readback still 0,128,255,255) | no: Linux-host Mesa software Vulkan; not in the console package |
+| Mesa libgallium `u_execmem` same 10 MiB heap (`libgallium-25.0.7...so+0x83ab47`), reached via wined3d GL/llvmpipe | Megabonk 1 before, 1 after | no (third-party, denied, non-fatal; Megabonk reaches Unity `LocalizationPrewarmer:Start`) | no: Linux-host Mesa software GL; not in the console package |
+| DXVK 3.1.1 d3d11.dll/dxgi.dll (PE, CPU side) | 0 | n/a | yes (no RWX seen) |
+| Unity: UnityPlayer.dll + GameAssembly.dll (Megabonk is IL2CPP/AOT, no JIT) | 0 in the 45 s window | n/a | yes (no RWX seen) |
+| hello.exe, launcher `run_via_wine`, shim, uwph, Wine image mapping (R4X patch) | 0 | n/a (R4X) | yes |
+
+Post-fix runs: hello exit 0; stub_probe exit 0 ("PASS: two missing-import
+stubs published on separate RX allocations"); d3d11_probe exit 0 with DXVK
+native d3d11 ("d3d11 probe done"); Megabonk killed by the 45 s timeout while
+running (no crash). Earlier `O1-fixed-*`/`O1-final-*` d3d11/Megabonk runs
+crashed explorer.exe in `RtlUnicodeToMultiByteN`. They used a PE ntdll.dll
+built before the locale.nls fix and are superseded. The current build passes
+d3d11 on both fresh and reused prefixes, with and without strace.
+Not covered: winevulkan with a real GPU ICD, and Unity paths after the menu.
+The console graphics path is unchanged here; any console Vulkan/D3D driver
+needs its own inventory.
 ## R4W O5 Wine 10.0 server as a static library (build-only)
 
 `x64/uwp-host/wineserver/` (`Makefile`, `build.sh`, `README.md`) builds Wine
