@@ -1651,6 +1651,46 @@ Video /workspace/x64-run/videos/B10-O1.mp4 (30 seconds) shows the routed
 installer blocker, not a running Steam client. No commits or remotes touched.
 
 Literal last installer log line: `44367.703:0030:0034:trace:module:MODULE_InitDLL (00006FFFFFC20000,PROCESS_DETACH,0000000000000001) - RETURN 1`.
+## B09 O1 — fake proc snapshots (2026-10-25)
+
+The provider now supplies self status/stat/auxv, meminfo, fd links and fd/task
+directory snapshots from uwph's descriptor, mapping and thread registries.
+Own numeric PID status/stat and task-stat paths are supported. Unknown proc
+paths fail closed. Memory budgets are 1024 MiB by default or 5120 MiB with
+UWPH_MEM_BUDGET_MB=5120; other values fail meminfo with EINVAL. Residency and
+CPU counters are unknown (zero), and this is not full Linux proc fidelity.
+Tests exercise Wine's process.c fill_vm_counters, system.c meminfo and
+thread.c get_thread_times parsing, binary auxv termination, descriptor links,
+thread lifecycle and mapping accounting with host procfs hidden.
+
+`make -C x64/uwp-host test` exits 0; complete output is
+/workspace/x64-run/lanes/B09/O1-make-test.log. Linux provider tests run THROUGH
+uwph; Windows backend unit tests run under stock Wine, not on Xbox.
+
+Exact acceptance reproduction (from /workspace/wt/B09):
+`DISPLAY=:2 WINEPREFIX=$PWD/x64/uwp-host/harness/out/wine-o4/prefix EXTRA_RW=$PWD /workspace/xbox-readiness/tests/uwp_run.sh noproc "$PWD/x64/uwp-host/harness" -- ./run-wine.sh`.
+Output: /workspace/x64-run/lanes/B09/O1-exact-noproc.log.
+Both routed hellos exit 0 THROUGH launcher -> Wine's own private W^X loader
+-> shim -> uwph. The command nevertheless exits 1: both stock controls exit
+1 with `wine: could not load ntdll.so: (null)` and the unchanged verifier
+reports `BLOCKED: control-hello_k32: nonzero exit`. This is not an exact-test PASS.
+
+Openat proof: harness/out/wine-o4/run-ZmdWtgjx/routed-hello.exec and
+routed-hello_k32.exec contain `strace -f -e trace=execve,openat` output;
+neither contains a /proc path. Fresh noproc probe traces are
+harness/out/b09-probes/fs_probe.strace and thread_probe.strace, collected
+with `strace -f -e openat`; neither contains a /proc path. Their logs report
+`SUMMARY fs_probe pass=7 fail=0` and `SUMMARY thread_probe pass=10 fail=0`,
+both exit 0 THROUGH the same launcher/loader/shim/uwph route. The thread
+probe's sysinfo memory value remains host-derived; the requested fake
+meminfo budget is tested separately and does not claim sysinfo coverage.
+
+All these routed processes see empty tmpfs /proc. The separately prestarted
+stock Linux wineserver remains outside the namespace and outside these
+traces. Therefore no global no-host-proc claim or concession removal is made;
+the shared readiness STATUS row is not upgraded. Xbox remains untested.
+Video: /workspace/x64-run/videos/B09-O1.mp4 (24.2 seconds, Xvfb).
+
 
 ## B06
 

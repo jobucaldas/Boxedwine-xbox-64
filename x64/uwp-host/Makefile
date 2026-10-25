@@ -83,6 +83,7 @@ test: all
 	    case "$$root" in [A-Za-z]:\\*) ;; *) echo "bad fixture root: $$root" >&2; exit 1;; esac && \
 	    WINEDEBUG=-all $(WINE) $(OUT)/win/traced.exe "$$root"
 	$(MAKE) -C harness traced-test
+	$(MAKE) -C harness proc-unit-test
 	$(MAKE) -C harness bigfile-test
 	python3 harness/test_verify_wine_inproc.py
 

@@ -16,6 +16,7 @@ UWPH_API uwph_pid_t uwph_getpid(void)
 #endif
 #ifdef UWPH_BACKEND_WIN32
     return (uwph_pid_t)GetCurrentProcessId();
+
 #else
     return 1;
 #endif

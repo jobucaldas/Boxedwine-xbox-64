@@ -133,6 +133,7 @@ int uwph_linux_openat(int dirfd, const char *path, int flags, unsigned mode)
     }
 #endif
     UNLOCK();
+    if (r >= 0) uwph_proc_fd_open((int)r, path);
     return result(r);
 }
 int uwph_linux_open(const char *path, int flags, unsigned mode)
@@ -143,6 +144,7 @@ int uwph_linux_open(const char *path, int flags, unsigned mode)
 int uwph_linux_close(int fd)
 {
     COUNT(C_CLOSE);
+    uwph_proc_fd_close(fd);
     WRLOCK();
     int n=native(fd);
     big_close(n);
@@ -196,9 +198,16 @@ void *uwph_linux_mmap(void *addr, size_t len, int prot, int flags, int fd, uwph_
         UNLOCK(); return (void *)result(r);
     }
     long r=(!(flags & UWPH_MAP_ANONYMOUS) && n<0) ? -UWPH_EBADF : raw(SYS_mmap,PTR(addr),len,prot,flags,n,off);
-    UNLOCK(); return (void *)result(r);
+    UNLOCK();
+    if ((unsigned long)r < (unsigned long)-4095) uwph_proc_mapping((void *)r, len, 1);
+    return (void *)result(r);
 }
-int uwph_linux_munmap(void *addr, size_t len) { COUNT(C_MUNMAP); return result(raw(SYS_munmap,PTR(addr),len,0,0,0,0)); }
+int uwph_linux_munmap(void *addr, size_t len) {
+    COUNT(C_MUNMAP);
+    int r = result(raw(SYS_munmap,PTR(addr),len,0,0,0,0));
+    if (!r) uwph_proc_mapping(addr, len, 0);
+    return r;
+}
 int uwph_linux_mprotect(void *addr, size_t len, int prot) { COUNT(C_PROTECT); return result(raw(SYS_mprotect,PTR(addr),len,prot,0,0,0)); }
 int uwph_linux_clock_gettime(uwph_clockid_t id, struct uwph_timespec *ts) { return result(raw(SYS_clock_gettime,id,PTR(ts),0,0,0,0)); }
 int uwph_linux_clock_getres(uwph_clockid_t id, struct uwph_timespec *ts) { return result(raw(SYS_clock_getres,id,PTR(ts),0,0,0,0)); }

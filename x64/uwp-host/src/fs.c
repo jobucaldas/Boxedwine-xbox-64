@@ -476,6 +476,7 @@ UWPH_API uwph_ssize_t uwph_readlink(const char *p, char *b, size_t l)
         if ((size_t)n > l) n = (int)l;
         memcpy(b, exe, n); return n;
     }
+    if (!strncmp(p, "/proc/", 6)) return uwph_fake_proc_link(p, b, l);
 #ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
     UWPH_NATIVE(uwph_ssize_t, "readlink", (const char *, char *, size_t));
     UWPH_NATIVE_RETURN(fn(p, b, l));
@@ -592,6 +593,8 @@ struct uwph_dir {
 UWPH_API uwph_DIR *uwph_opendir(const char *path)
 {
     uwph_trace_hit(UWPH_TRACE_OPENDIR);
+    if (path && (!strcmp(path, "/proc") || !strncmp(path, "/proc/", 6)))
+        return uwph_fake_opendir(path);
 #ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
     UWPH_NATIVE(uwph_DIR *, "opendir", (const char *));
     UWPH_NATIVE_RETURN(fn(path));
@@ -620,6 +623,7 @@ UWPH_API uwph_DIR *uwph_opendir(const char *path)
 }
 UWPH_API struct uwph_dirent *uwph_readdir(uwph_DIR *dir)
 {
+    if (uwph_fake_dir_owned(dir)) return uwph_fake_readdir(dir);
 #ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
     UWPH_NATIVE(struct uwph_dirent *, "readdir", (uwph_DIR *));
     UWPH_NATIVE_RETURN(fn(dir));
@@ -643,6 +647,7 @@ UWPH_API struct uwph_dirent *uwph_readdir(uwph_DIR *dir)
 }
 UWPH_API int uwph_closedir(uwph_DIR *dir)
 {
+    if (uwph_fake_dir_owned(dir)) return uwph_fake_closedir(dir);
 #ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
     UWPH_NATIVE(int, "closedir", (uwph_DIR *));
     UWPH_NATIVE_RETURN(fn(dir));

@@ -122,6 +122,11 @@ prebuilt-prefix:
 	./prepare-wine.sh --prebuilt-prefix
 .PHONY: prebuilt-prefix
 
+proc-unit-test: $(OUT)/fake_proc_test
+	$(OUT)/fake_proc_test --host-proc
+	bwrap --ro-bind / / --tmpfs /proc -- $(OUT)/fake_proc_test
+.PHONY: proc-unit-test
+
 # B18: two intentionally absent exports; never execute the generated stubs.
 $(OUT)/stub_probe.def:
 	@mkdir -p $(OUT)
