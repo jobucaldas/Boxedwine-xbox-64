@@ -1984,3 +1984,32 @@ c0000017 for wineboot/explorer, and MEGABONK reached=unityplayer.
 Full exact-test output: /workspace/x64-run/lanes/B24/evidence/exact-test.txt
 (command completed with status 0; harness reports guest exit=1).
 Video verified by ffprobe: 30.400000 seconds. bash -n and git diff --check pass.
+
+
+## B24 O2 — blocked: no remaining RWX caller reproduced
+
+Exact test on 2026-10-25: `make -C x64/uwp-host test && K_TIMEOUT=45 x64/uwp-host/harness/run-megabonk.sh 2>&1 | tee /tmp/b24.log; ! grep -q c0000017 /tmp/b24.log`.
+Host tests passed (including 70 passed, 0 failed / 20 traced symbols); final
+exact-test exit=1. Guest exit=1, MEGABONK reached=unityplayer; wineboot and
+explorer still return c0000017. Run: harness/out/megabonk/run-2eimxvqZ.
+Zero UWPH_RWX/unix_prot/Permission denied lines; mmap=8997, mprotect=1530.
+Evidence and full exact output: /workspace/x64-run/lanes/B24/evidence/O2/.
+Video: /workspace/x64-run/videos/B24-O2.mp4, 10.2 seconds, free Xvfb :0.
+THROUGH uwp_run.sh(nofork,wx,noproc) -> our launcher -> Wine own private
+W^X loader -> shim -> uwph Linux backend; separate stock Linux wineserver.
+This is routed Linux proof, not stock-Wine-only, build-only, or Xbox proof.
+
+Source inspection: Wine 10.0 dlls/ntdll/unix/process.c spawn_process calls
+fork at line 439 and returns STATUS_NO_MEMORY at line 479 when it fails;
+NtCreateUserProcess calls spawn_process at line 916. uwpjail.c lines 114–124
+reject fork/vfork/non-thread clone with EPERM. This is consistent with the
+observed child-start errors, independently of W^X. An attempted strace inside
+the unchanged jail failed before launcher startup (test_ptrace_seize: fork:
+Operation not permitted); it is not runtime attribution proof. Its separate
+diagnostic run reached=none and is not the exact test result.
+
+No runtime patch is justified by a reproduced RWX call. Existing image patch
+already maps the historical image-view/header sites RW, then applies section
+protections. No constraint was relaxed, no child-process emulation, graphics,
+or B19 in-process-server work was attempted. O2 remains blocked by missing
+caller reproduction and child-process startup under mandatory nofork.
