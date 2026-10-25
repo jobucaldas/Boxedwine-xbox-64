@@ -148,12 +148,23 @@ separately; these native probes do not prove the Wine compatibility runtime.
   n7 adapter). Writes and reads a 2304 MiB file in verified LocalState, checks
   per-block tags and endpoint bytes, logs bytes/errors, deletes on close.
   This is an opt-in size/I/O probe, not a full-byte integrity test. Normal Dev
-  Home activation supplies no CLI opt-in and therefore skips n7.
+  Home activation of the normal tile skips n7. For console opt-in, launch the
+  separately named **Boxedwine Big file opt-in** entry from Dev Home. Its manifest
+  EntryPoint `Boxedwine.BigFile` reaches `IFrameworkView.Load`, which enables
+  `--big-file` for this run only. No desktop argv, child process, or hosted adapter
+  is needed. Select App/Game on this entry too, and keep both logs. The log records
+  the received EntryPoint and opt-in before probes. This activation route is
+  implemented but still requires console validation.
+
+Packaged activation fails before any probe if ApplicationData LocalState lookup or
+`ladder-native.log` creation fails; there is no TEMP fallback. The original HRESULT
+and CRT errno are emitted to debugger diagnostics/stderr and the HRESULT is returned
+as the process exit code (inspect Device Portal diagnostics if no log exists).
 
 If `/workspace/wt/R4N/x64/native-gfx/out/probe_native.exe` exists, packaging copies
 it unchanged next to `rungs.exe`. n0 can run that copy in the desktop diagnostic;
 on UWP it reports SKIP because launching child executables with CreateProcess is
-unsupported. An in-process R4N adapter is still needed for console n0 execution.
+unsupported. **O5 INCOMPLETE for coordinator:** an in-process R4N adapter is still needed for console n0 execution.
 No child-process capability or bypass is requested.
 
 Off-device `out/ladder --offline` keeps all n0–n7 SKIP. `./x64/on-device/native-smoke.sh` runs the native executable through our `out/run_via_wine` launcher into Wine's own loader with
@@ -164,3 +175,5 @@ receives `--big-file`, and offline mode never executes these adapters.
 
 ABI references: [Microsoft SDK gaming IDs](https://github.com/microsoft/win32metadata/blob/main/generation/WinSDK/RecompiledIdlHeaders/um/gamingdeviceinformation.h)
 and [MemoryManager ABI](https://github.com/microsoft/win32metadata/blob/main/generation/WinSDK/RecompiledIdlHeaders/winrt/windows.system.h).
+
+Activation API reference: [IFrameworkView.Load](https://learn.microsoft.com/en-us/uwp/api/windows.applicationmodel.core.iframeworkview.load).

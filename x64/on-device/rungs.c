@@ -21,6 +21,8 @@
 #include <winstring.h>
 #include <windows.storage.h>
 #include <math.h>
+#include <errno.h>
+#include <wchar.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
@@ -172,7 +174,7 @@ static void pump(void)
 static void rung_n0(void)
 {
     if (g_packaged) {
-        stage("n0", "probe_native", "SKIP", "packaged probe_native.exe present if supplied; UWP cannot launch a child executable via CreateProcess; needs in-process probe adapter");
+        stage("n0", "probe_native", "SKIP", "packaged probe_native.exe present if supplied; UWP cannot launch a child executable via CreateProcess; INCOMPLETE O5 console n0: needs in-process probe adapter");
         return;
     }
     WCHAR exe[MAX_PATH], dir[MAX_PATH], cmd[3 * MAX_PATH], logw[MAX_PATH];
@@ -650,13 +652,18 @@ static void run_all(IUnknown *window)
     note("rungs done; run once as App and once as Game and keep both logs");
 }
 
-static int open_log(void)
+static HRESULT open_log(void)
 {
     WCHAR p[MAX_PATH];
-    CreateDirectoryW(g_state, NULL);
+    if (!CreateDirectoryW(g_state, NULL)) {
+        DWORD err = GetLastError();
+        if (err != ERROR_ALREADY_EXISTS) return HRESULT_FROM_WIN32(err);
+    }
     state_path(p, MAX_PATH, L"ladder-native.log");
     g_log = _wfopen(p, L"w");
-    return g_log != NULL;
+    if (g_log) return S_OK;
+    DWORD err = GetLastError();
+    return err ? HRESULT_FROM_WIN32(err) : E_FAIL;
 }
 
 /* ---- CoreApplication entry (packaged only) ---- */
@@ -715,7 +722,20 @@ static HRESULT STDMETHODCALLTYPE view_set_window(void *This, void *window)
     g_window->lpVtbl->base.AddRef(g_window);
     return S_OK;
 }
-static HRESULT STDMETHODCALLTYPE view_load(void *This, HSTRING entry) { (void)This; (void)entry; return S_OK; }
+/* Load receives the manifest EntryPoint, including for Dev Home activation.
+ * A separate explicitly named tile provides opt-in without desktop argv. */
+static HRESULT STDMETHODCALLTYPE view_load(void *This, HSTRING entry)
+{
+    (void)This;
+    UINT32 n = 0;
+    const WCHAR *name = WindowsGetStringRawBuffer(entry, &n);
+    static const WCHAR opt_in[] = L"Boxedwine.BigFile";
+    g_big_file = n == (sizeof(opt_in) / sizeof(*opt_in) - 1) &&
+                 !wmemcmp(name, opt_in, n);
+    note("activation EntryPoint=%.*ls --big-file=%s", (int)n, name,
+         g_big_file ? "enabled by Big file opt-in tile" : "disabled");
+    return S_OK;
+}
 static HRESULT STDMETHODCALLTYPE view_run(void *This)
 {
     (void)This;
@@ -755,8 +775,8 @@ static HRESULT STDMETHODCALLTYPE source_create(void *This, view_t **out)
     return S_OK;
 }
 
-/* LocalState = ApplicationData.Current.LocalFolder.Path (falls back to %TEMP%). */
-static void packaged_state_dir(void)
+/* Packaged evidence must stay in verified ApplicationData LocalState. */
+static HRESULT packaged_state_dir(void)
 {
     HSTRING cls = NULL, path = NULL;
     static const WCHAR name[] = L"Windows.Storage.ApplicationData";
@@ -774,12 +794,9 @@ static void packaged_state_dir(void)
         UINT32 n;
         const WCHAR *raw = WindowsGetStringRawBuffer(path, &n);
         g_local_state = n > 0 && n < MAX_PATH;
+        if (!g_local_state) hr = HRESULT_FROM_WIN32(ERROR_BAD_PATHNAME);
         _snwprintf(g_state, MAX_PATH, L"%.*ls", (int)n, raw);
         g_state[MAX_PATH - 1] = 0;
-    } else {
-        GetTempPathW(MAX_PATH, g_state);
-        size_t n = wcslen(g_state);
-        if (n && g_state[n - 1] == L'\\') g_state[n - 1] = 0;
     }
     if (path) WindowsDeleteString(path);
     if (item) __x_ABI_CWindows_CStorage_CIStorageItem_Release(item);
@@ -787,6 +804,7 @@ static void packaged_state_dir(void)
     if (data) __x_ABI_CWindows_CStorage_CIApplicationData_Release(data);
     if (stat) __x_ABI_CWindows_CStorage_CIApplicationDataStatics_Release(stat);
     if (cls) WindowsDeleteString(cls);
+    return hr;
 }
 
 int main(int argc, char **argv)
@@ -819,8 +837,17 @@ int main(int argc, char **argv)
                (info.deviceId == 0x1D27FABB || info.deviceId == 0x2F7A3DFF || info.deviceId == 0xDE8A5661);
     if (packaged && !console) {
         g_ctx = "uwp-corewindow";
-        packaged_state_dir();
-        open_log();
+        HRESULT evidence_hr = packaged_state_dir();
+        if (SUCCEEDED(evidence_hr)) evidence_hr = open_log();
+        if (FAILED(evidence_hr)) {
+            WCHAR message[256];
+            _snwprintf(message, 256, L"FATAL: verified LocalState/evidence log unavailable; hr=0x%08lx errno=%d. No probes ran.\n",
+                       hx(evidence_hr), errno);
+            OutputDebugStringW(message);
+            fwprintf(stderr, L"%ls", message);
+            /* Propagate the original failure to activation/Device Portal diagnostics. */
+            return (int)evidence_hr;
+        }
         static const WCHAR name[] = L"Windows.ApplicationModel.Core.CoreApplication";
         HSTRING cls = NULL;
         ICoreApplication_ *app = NULL;
@@ -836,7 +863,7 @@ int main(int argc, char **argv)
         if (cls) WindowsDeleteString(cls);
     } else {
         g_ctx = packaged ? "packaged-console" : "console";
-        if (!open_log()) {
+        if (FAILED(open_log())) {
             fprintf(stderr, "rungs.exe: cannot write ladder-native.log in --local-state\n");
             return 1;
         }
