@@ -57,7 +57,7 @@ def make_run(root, execv, banner=True, wineserver_exec=False):
                 report = [f'pid {PID}']
                 report += [f'total {op} 7 0' for op in SELECTED]
                 report += [f'module {str(ntdll).encode().hex()} {op} 7 7' for op in SELECTED]
-                report += [f'trace execv {execv}', 'trace write 3']
+                report += [f'trace execv {execv}', 'trace write 3', 'trace mprotect 7']
                 report += ['classification recursion=0 unattributed=0 module_overflow=0 instrumentation_raw_io=1']
                 (run / f'{name}.report.{PID}').write_text('\n'.join(report) + '\n')
             (run / f'{name}.log').write_text(log)

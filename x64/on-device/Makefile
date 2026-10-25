@@ -19,7 +19,7 @@ $(OUT)/smoke.exe: main.c Makefile
 	$(CC_WIN) $(CFLAGS) -m64 -mconsole -static -o $@ $<
 
 clean:
-	rm -f $(OUT)/smoke.exe $(OUT)/rungs.exe $(OUT)/ladder $(OUT)/run_via_wine $(OUT)/input_test
+	rm -rf $(OUT)
 
 # Hosted Linux diagnostic; device activation remains separate.
 ladder: $(OUT)/ladder $(OUT)/rungs.exe

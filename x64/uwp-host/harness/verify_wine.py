@@ -103,7 +103,7 @@ def verify(run, inproc=False):
             # O2 traced set: process-wide uwph entry counts (not ntdll-attributed).
             policy = [line.split('\t') for line in (run / 'surface.tsv').read_text().splitlines()[1:]]
             o2 = sorted(row[0] for row in policy if row[1] == 'routed')
-            o2 = [s for s in o2 if s not in selected]
+            o2 = [s for s in o2 if s not in selected or s == "mprotect"]
             assert set(traced) == set(o2), f'trace rows {sorted(traced)} != routed O2 set {o2}'
             print(f'{name}: O2 traced uwph entries ' + ','.join(f'{s}:{traced[s]}' for s in o2))
             if inproc:
