@@ -77,6 +77,47 @@ static void stage(const char *id, const char *name, const char *status, const ch
     out_line(line);
 }
 
+/* Readiness PE sources linked into this PE: no child process or custom loader. */
+static void state_path(WCHAR *dst, size_t n, const WCHAR *leaf);
+int readiness_thread_main(void);
+int readiness_uwph_main(int argc, char **argv);
+static void readiness_rungs(void)
+{
+    stage("p1", "seh_probe", "SKIP", "source requires AddVectoredExceptionHandler, absent from app API set; no desktop fallback");
+    if (!g_device || !g_packaged || !g_local_state) {
+        stage("p2", "thread_probe", "SKIP", "requires verified Xbox UWP activation and LocalState; no off-device execution");
+    } else {
+        int rc = readiness_thread_main();
+        stage("p2", "thread_probe", rc ? "FAIL" : "PASS", "in-process native PE probe exit=%d; native Windows APIs, no Wine", rc);
+    }
+    stage("p3", "fs_probe", "SKIP", "source uses SHGetFolderPathA/CreateFileA and desktop mappings; app-safe port required");
+    stage("p4", "net_probe", "SKIP", "original probe includes Steam directory/CM WebSocket tests; Steam probes excluded by O1");
+    stage("p5", "jit_probe", "SKIP", "original uses VirtualProtect/VirtualAlloc and RWX dual mappings; full app-safe VirtualProtectFromApp rebuild pending; original PE never executed");
+    if (!g_device || !g_packaged || !g_local_state) {
+        stage("p6", "uwph-self-test", "SKIP", "requires verified Xbox UWP activation and LocalState; THROUGH-uwph self-test linked, console unverified");
+    } else {
+        char root[MAX_PATH];
+        if (!WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, g_state, -1, root, sizeof(root), NULL, NULL)) {
+            stage("p6", "uwph-self-test", "FAIL", "LocalState UTF-8 conversion err=%lu", GetLastError());
+            return;
+        }
+        WCHAR fixture[MAX_PATH];
+        state_path(fixture, MAX_PATH, L"smoke-input.txt");
+        HANDLE file = CreateFile2(fixture, GENERIC_WRITE, 0, CREATE_ALWAYS, NULL);
+        const char input[] = "uwph smoke input\n";
+        DWORD written = 0;
+        BOOL ready = file != INVALID_HANDLE_VALUE && WriteFile(file, input, sizeof(input) - 1, &written, NULL);
+        if (file != INVALID_HANDLE_VALUE) CloseHandle(file);
+        if (!ready || written != sizeof(input) - 1) {
+            stage("p6", "uwph-self-test", "FAIL", "could not create LocalState smoke-input.txt fixture");
+            return;
+        }
+        char *argv[] = { "uwph-smoke", root, NULL };
+        int rc = readiness_uwph_main(2, argv);
+        stage("p6", "uwph-self-test", rc ? "FAIL" : "PASS", "THROUGH-uwph Windows smoke source in-process, exit=%d; no Wine", rc);
+    }
+}
+
 static unsigned long hx(HRESULT hr) { return (unsigned long)hr; }
 
 static FARPROC sym(const WCHAR *dll, const char *name)
@@ -641,6 +682,7 @@ static void run_all(IUnknown *window)
 {
     if (!g_device) note("off-device: successful stand-in API calls are labelled SKIP; no console PASS");
     note("rungs.exe O5: native-API + Game-mode rungs; ctx=%s host=%s", g_ctx, g_host);
+    readiness_rungs();
     rung_n0();
     rung_n1();
     rung_n2();

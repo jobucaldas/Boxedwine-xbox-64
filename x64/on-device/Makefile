@@ -35,4 +35,24 @@ offline-smoke: ladder
 
 $(OUT)/rungs.exe: rungs.c Makefile
 	mkdir -p $(OUT)
-	$(CC_WIN) $(CFLAGS) -Wno-missing-field-initializers -m64 -mconsole -static -o $@ $< -lole32 -lruntimeobject -luuid -ldxguid -lm
+	$(CC_WIN) $(CFLAGS) -Wno-missing-field-initializers -m64 -mconsole -static -o $@ $< $(UWPH_OBJS) $(OUT)/readiness/unixside.o $(OUT)/readiness/smoke.o $(OUT)/readiness/thread.o -lbcrypt -lsynchronization -lwindowsapp -lole32 -lruntimeobject -luuid -ldxguid -lm
+
+# In-process PE readiness module and the unchanged public uwph Windows self-test.
+APP_DEFS := -DWINAPI_FAMILY=2 -D_WIN32_WINNT=0x0A00 -DNTDDI_VERSION=0x0A000008
+UWPH_ROOT := ../uwp-host
+UWPH_SRCS := $(wildcard $(UWPH_ROOT)/src/*.c)
+UWPH_OBJS := $(patsubst $(UWPH_ROOT)/src/%.c,$(OUT)/readiness/uwph-%.o,$(UWPH_SRCS))
+READINESS_FLAGS := -O2 -std=gnu11 -Wall -Wextra -Wno-unused-parameter -Werror=implicit-function-declaration $(APP_DEFS)
+$(OUT)/readiness/uwph-%.o: $(UWPH_ROOT)/src/%.c
+	mkdir -p $(@D)
+	$(CC_WIN) $(READINESS_FLAGS) -I$(UWPH_ROOT)/include -c $< -o $@
+$(OUT)/readiness/unixside.o: $(UWPH_ROOT)/tests/unixside.c
+	mkdir -p $(@D)
+	$(CC_WIN) $(READINESS_FLAGS) -I$(UWPH_ROOT)/include -DWINE_UNIX_LIB -c $< -o $@
+$(OUT)/readiness/smoke.o: $(UWPH_ROOT)/tests/smoke.c
+	mkdir -p $(@D)
+	$(CC_WIN) $(READINESS_FLAGS) -I$(UWPH_ROOT)/include -I$(UWPH_ROOT)/src -Dmain=readiness_uwph_main -c $< -o $@
+$(OUT)/readiness/thread.o: readiness/thread_probe.c readiness/common.h
+	mkdir -p $(@D)
+	$(CC_WIN) $(READINESS_FLAGS) -Dmain=readiness_thread_main -c $< -o $@
+$(OUT)/rungs.exe: $(UWPH_OBJS) $(OUT)/readiness/unixside.o $(OUT)/readiness/smoke.o $(OUT)/readiness/thread.o

@@ -232,3 +232,28 @@ Activation API reference: [IFrameworkView.Load](https://learn.microsoft.com/en-u
 4. Review the files before sharing. Omit credentials, tokens, private keys
    (`.pfx`), `LocalState/private/`, and owned game payloads. Review diagnostic
    captures/dumps for private data; send only the relevant reviewed evidence.
+
+## Readiness ladder p1–p6 (B02 O1)
+
+These stages run before n0 in the packaged CoreApplication. No child process,
+Wine, or PE loader is needed: p2 and p6 are PE probe sources linked into
+`rungs.exe`. Execution requires verified Xbox UWP activation and LocalState.
+The hosted ladder emits six SKIPs, including when adapters exist. Build and
+offline output are not console evidence.
+
+| Rung | Probe | Native action / current limitation |
+| --- | --- | --- |
+| p1 | seh_probe | SKIP: AddVectoredExceptionHandler is outside the app API set. |
+| p2 | thread_probe | Runs the copied probe in-process; timeout assertion now checks the actual error with the SRW lock held. |
+| p3 | fs_probe | SKIP: SHGetFolderPathA, CreateFileA and desktop mappings require an app-safe port. |
+| p4 | net_probe | SKIP: original tests use Steam directory/CM WebSocket endpoints, excluded by O1. |
+| p5 | jit_probe | SKIP: original VirtualProtect/VirtualAlloc and RWX dual-map test is not rebuilt against app-safe APIs. No original JIT PE executes. A future full port must use VirtualProtectFromApp. |
+| p6 | uwph Windows smoke | Runs unchanged `x64/uwp-host/tests/smoke.c` plus unixside and Windows backend in-process, THROUGH-uwph. Creates `smoke-input.txt` in LocalState; full self-test assertions determine exit status. |
+
+Copied readiness sources are under `readiness/`, originally from
+`/workspace/xbox-readiness/src/pe`; only thread_probe is compiled. Originals
+remain unchanged. The uwph self-test and thread source compile with
+`WINAPI_FAMILY=2` and implicit API declarations rejected. This is a header
+check, not Windows SDK certification or console activation proof. Detailed
+probe assertions go to stdout; the final exit status goes to ladder-native.log.
+Unsupported tests remain explicit SKIPs rather than desktop API fallbacks.
