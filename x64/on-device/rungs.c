@@ -694,6 +694,78 @@ static void rung_n7(void)
           (unsigned long long)((UINT64)size.QuadPart / MB), (unsigned long long)(verified / MB), rerr, tr);
 }
 
+/* ---- n10: observe platform permissions; only the FromApp path executes. ---- */
+static FARPROC n10_kernel_proc(const char *name)
+{
+    HMODULE m = GetModuleHandleA("kernelbase.dll");
+    FARPROC p = m ? GetProcAddress(m, name) : NULL;
+    if (!p) {
+        m = GetModuleHandleA("kernel32.dll");
+        p = m ? GetProcAddress(m, name) : NULL;
+    }
+    return p;
+}
+
+static void rung_n10(void)
+{
+    typedef PVOID (WINAPI *alloc_fn)(PVOID, SIZE_T, DWORD, DWORD);
+    typedef BOOL (WINAPI *protect_fn)(PVOID, SIZE_T, DWORD, PDWORD);
+    const char *where = g_device ? "console" : "standin";
+    alloc_fn alloc = (alloc_fn)(void *)n10_kernel_proc("VirtualAlloc");
+    SetLastError(ERROR_PROC_NOT_FOUND);
+    void *rwx = alloc ? alloc(NULL, 64 * 1024, MEM_COMMIT | MEM_RESERVE,
+                             PAGE_EXECUTE_READWRITE) : NULL;
+    DWORD err = rwx ? ERROR_SUCCESS : GetLastError();
+    /* Free immediately: this allocation is never written or executed. */
+    BOOL freed = rwx ? VirtualFree(rwx, 0, MEM_RELEASE) : FALSE;
+    DWORD free_err = rwx && !freed ? GetLastError() : ERROR_SUCCESS;
+    note("n10 | %s VirtualAlloc RWX 64KiB %s ptr=%p err=%lu", where,
+         rwx ? "ALLOWED" : "REFUSED", rwx, err);
+    note("n10 | %s VirtualFree RWX %s err=%lu", where,
+         rwx ? (freed ? "OK" : "REFUSED") : "SKIP", free_err);
+
+    alloc_fn from_app = (alloc_fn)(void *)n10_kernel_proc("VirtualAllocFromApp");
+    protect_fn protect = (protect_fn)(void *)n10_kernel_proc("VirtualProtectFromApp");
+    SetLastError(ERROR_PROC_NOT_FOUND);
+    void *code = from_app ? from_app(NULL, 4096, MEM_COMMIT | MEM_RESERVE,
+                                    PAGE_READWRITE) : NULL;
+    err = code ? ERROR_SUCCESS : GetLastError();
+    note("n10 | %s VirtualAllocFromApp RW 4KiB %s ptr=%p err=%lu", where,
+         code ? "OK" : "REFUSED", code, err);
+    if (code) *(volatile unsigned char *)code = 0xc3;
+    note("n10 | %s write ret 0xC3 %s", where, code ? "OK" : "SKIP");
+    DWORD old = 0;
+    SetLastError(ERROR_PROC_NOT_FOUND);
+    BOOL rx = code && protect && protect(code, 4096, PAGE_EXECUTE_READ, &old);
+    err = rx ? ERROR_SUCCESS : GetLastError();
+    note("n10 | %s VirtualProtectFromApp RX %s err=%lu", where,
+         !code ? "SKIP" : rx ? "OK" : "REFUSED", err);
+    BOOL flushed = rx && FlushInstructionCache(GetCurrentProcess(), code, 1);
+    err = rx && !flushed ? GetLastError() : ERROR_SUCCESS;
+    note("n10 | %s FlushInstructionCache %s err=%lu", where,
+         !rx ? "SKIP" : flushed ? "OK" : "REFUSED", err);
+    if (flushed) ((void (*)(void))code)();
+    note("n10 | %s call ret %s", where, flushed ? "OK returned" : "SKIP");
+    if (code) {
+        BOOL released = VirtualFree(code, 0, MEM_RELEASE);
+        note("n10 | %s VirtualFree FromApp %s err=%lu", where,
+             released ? "OK" : "REFUSED", released ? 0ul : GetLastError());
+    }
+
+    HMODULE ntdll = GetModuleHandleA("ntdll.dll");
+    note("n10 | %s GetModuleHandleA ntdll.dll %s", where, ntdll ? "FOUND" : "MISSING");
+    static const char *names[] = {
+        "NtProtectVirtualMemory", "NtWaitForSingleObject", "NtSetEvent",
+        "NtDelayExecution", "NtQueryVirtualMemory"
+    };
+    for (unsigned i = 0; i < sizeof(names) / sizeof(names[0]); i++)
+        note("n10 | %s %s %s", where, names[i],
+             ntdll && GetProcAddress(ntdll, names[i]) ? "FOUND" : "MISSING");
+    stage("n10", "platform-allow", !g_device ? "SKIP" : flushed ? "PASS" : "FAIL",
+          "%s codeGeneration=%s; RWX and ntdll resolution informational; console verdict=%s",
+          where, flushed ? "OK" : "REFUSED", g_device ? (flushed ? "PASS" : "FAIL") : "SKIP");
+}
+
 #include "input/probe.inc"
 
 static void run_all(IUnknown *window)
@@ -709,6 +781,7 @@ static void run_all(IUnknown *window)
     rung_n6();
     rung_n7();
     rung_n8();
+    rung_n10();
     rung_n5(); /* last: the commit test may hit the app's memory limit */
     note("rungs done; run once as App and once as Game and keep both logs");
 }
