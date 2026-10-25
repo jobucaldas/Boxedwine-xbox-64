@@ -1,0 +1,202 @@
+--- a/programs/explorer/desktop.c
++++ b/programs/explorer/desktop.c
+@@ -23,8 +23,11 @@
+ 
+ #define COBJMACROS
+ #define OEMRESOURCE
++#define WIN32_NO_STATUS
+ #include <windows.h>
+ #include <winternl.h>
++#undef WIN32_NO_STATUS
++#include <ntstatus.h>
+ #include <rpc.h>
+ #include <shlobj.h>
+ #include <shellapi.h>
+@@ -1193,14 +1196,15 @@
+     SetShellWindow( hwnd );
+ }
+ 
+-/* main desktop management function */
+-void manage_desktop( WCHAR *arg )
++/* Shared initialization; a ready event selects the in-process thread path. */
++static NTSTATUS desktop_status;
++static NTSTATUS desktop_run( WCHAR *arg, HANDLE ready )
+ {
+     HDESK desktop = 0;
+     GUID guid;
+     MSG msg;
+     HWND hwnd;
+-    unsigned int width, height;
++    unsigned int width = 0, height = 0;
+     WCHAR *cmdline = NULL, *driver = NULL;
+     WCHAR *p = arg;
+     const WCHAR *name = NULL;
+@@ -1234,7 +1238,7 @@
+         if (!p || !parse_size( p, &width, &height ))
+             get_default_desktop_size( name, &width, &height );
+     }
+-    else if ((name = get_default_desktop_name()))
++    else if (!ready && (name = get_default_desktop_name()))
+     {
+         if (!get_default_desktop_size( name, &width, &height )) width = height = 0;
+     }
+@@ -1257,14 +1261,18 @@
+         if (!desktop)
+         {
+             ERR( "failed to create desktop %s error %ld\n", debugstr_w(name), GetLastError() );
++            if (ready) return STATUS_UNSUCCESSFUL;
+             ExitProcess( 1 );
+         }
+         SetThreadDesktop( desktop );
+     }
+ 
+     /* the desktop process should always have an admin token */
+-    status = NtSetInformationProcess( GetCurrentProcess(), ProcessWineGrantAdminToken, NULL, 0 );
+-    if (status) WARN( "couldn't set admin token for desktop, error %08lx\n", status );
++    if (!ready)
++    {
++        status = NtSetInformationProcess( GetCurrentProcess(), ProcessWineGrantAdminToken, NULL, 0 );
++        if (status) WARN( "couldn't set admin token for desktop, error %08lx\n", status );
++    }
+ 
+     /* create the desktop window */
+     hwnd = CreateWindowExW( 0, DESKTOP_CLASS_ATOM, NULL,
+@@ -1273,8 +1281,10 @@
+     if (hwnd)
+     {
+         /* create the HWND_MESSAGE parent */
+-        CreateWindowExW( 0, L"Message", NULL, WS_POPUP | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
++        HWND message = CreateWindowExW( 0, L"Message", NULL,
++                         WS_POPUP | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
+                          0, 0, 100, 100, 0, 0, 0, NULL );
++        if (ready && !message) return STATUS_UNSUCCESSFUL;
+ 
+         desktop_orig_wndproc = (WNDPROC)SetWindowLongPtrW( hwnd, GWLP_WNDPROC,
+             (LONG_PTR)desktop_wnd_proc );
+@@ -1285,23 +1295,27 @@
+                       SWP_SHOWWINDOW );
+         thread = CreateThread( NULL, 0, clipboard_thread, NULL, 0, &id );
+         if (thread) CloseHandle( thread );
++        else if (ready) return STATUS_UNSUCCESSFUL;
+         SystemParametersInfoW( SPI_SETDESKWALLPAPER, 0, NULL, FALSE );
+         ClipCursor( NULL );
+         initialize_display_settings( width, height );
+-        initialize_appbar();
+-
+-        initialize_systray( using_root, enable_shell, show_systray, no_tray_items );
+-        if (!using_root && enable_launchers) initialize_launchers( hwnd );
+-
+-        if ((shell32 = LoadLibraryW( L"shell32.dll" )) &&
+-            (pShellDDEInit = (void *)GetProcAddress( shell32, (LPCSTR)188)))
++        if (!ready)
+         {
+-            pShellDDEInit( TRUE );
++            initialize_appbar();
++
++            initialize_systray( using_root, enable_shell, show_systray, no_tray_items );
++            if (!using_root && enable_launchers) initialize_launchers( hwnd );
++
++            if ((shell32 = LoadLibraryW( L"shell32.dll" )) &&
++                (pShellDDEInit = (void *)GetProcAddress( shell32, (LPCSTR)188)))
++            {
++                pShellDDEInit( TRUE );
++            }
+         }
+     }
+ 
+     /* if we have a command line, execute it */
+-    if (cmdline)
++    if (!ready && cmdline)
+     {
+         STARTUPINFOW si;
+         PROCESS_INFORMATION pi;
+@@ -1316,12 +1330,21 @@
+         }
+     }
+ 
+-    desktopshellbrowserwindow_init();
+-    shellwindows_init();
+-
+-    /* Ideally we would set the window of an IShellView here, but we never
+-       actually create one, so the desktop window itself will have to do. */
+-    set_shell_window( hwnd );
++    if (!ready)
++    {
++        desktopshellbrowserwindow_init();
++        shellwindows_init();
++
++        /* Ideally we would set the window of an IShellView here, but we never
++           actually create one, so the desktop window itself will have to do. */
++        set_shell_window( hwnd );
++    }
++    if (ready)
++    {
++        if (!hwnd) return STATUS_UNSUCCESSFUL;
++        desktop_status = STATUS_SUCCESS;
++        SetEvent( ready );
++    }
+ 
+     /* run the desktop message loop */
+     if (hwnd)
+@@ -1333,7 +1356,61 @@
+ 
+     if (pShellDDEInit) pShellDDEInit( FALSE );
+ 
++    if (ready) return STATUS_SUCCESS;
+     ExitProcess( 0 );
++}
++
++void manage_desktop( WCHAR *arg )
++{
++    desktop_run( arg, NULL );
++}
++
++static LONG desktop_owner;
++static HANDLE desktop_ready;
++
++static DWORD WINAPI desktop_thread( void *arg )
++{
++    WCHAR options[] = L"";
++    NTSTATUS status = desktop_run( options, arg );
++    if (status)
++    {
++        desktop_status = status;
++        SetEvent( arg );
++    }
++    ExitThread( status );
++    return status;
++}
++
++NTSTATUS WINAPI uwp_desktop_start( DWORD timeout_ms )
++{
++    ULONGLONG start = GetTickCount64(), elapsed;
++    HANDLE thread;
++    DWORD wait;
++
++    if (!InterlockedCompareExchange( &desktop_owner, 1, 0 ))
++    {
++        desktop_status = STATUS_UNSUCCESSFUL;
++        desktop_ready = CreateEventW( NULL, TRUE, FALSE, NULL );
++        if (desktop_ready)
++        {
++            thread = CreateThread( NULL, 0, desktop_thread, desktop_ready, 0, NULL );
++            if (thread) CloseHandle( thread );
++            else SetEvent( desktop_ready );
++        }
++        InterlockedExchange( &desktop_owner, 2 );
++    }
++    /* Publish the one event only after creation, including failure. */
++    while (InterlockedCompareExchange( &desktop_owner, 2, 2 ) != 2)
++    {
++        if (GetTickCount64() - start >= timeout_ms) return STATUS_TIMEOUT;
++        Sleep( 1 );
++    }
++    if (!desktop_ready) return desktop_status;
++    elapsed = GetTickCount64() - start;
++    wait = WaitForSingleObject( desktop_ready, elapsed >= timeout_ms ? 0 : timeout_ms - elapsed );
++    if (wait == WAIT_TIMEOUT) return STATUS_TIMEOUT;
++    if (wait != WAIT_OBJECT_0) return STATUS_UNSUCCESSFUL;
++    return desktop_status;
+ }
+ 
+ /* IShellWindows implementation */
