@@ -4,6 +4,7 @@
 # refuses WRITE|EXEC and stock ntdll maps PE images RWX.
 set -euo pipefail
 cd "$(dirname "$0")"
+source ./prefix-hygiene.sh
 inproc=0
 for arg in "$@"; do
     case "$arg" in
@@ -30,6 +31,7 @@ wx=$PWD/out/wine-wx
 if (( inproc )); then
     source_prefix=$PWD/prebuilt-prefix
     [[ -d $source_prefix ]] || { echo 'Run make prebuilt-prefix at packaging time' >&2; exit 1; }
+    refuse_dereferenced_prefix "$source_prefix"
     run=$(mktemp -d "$work/run-XXXXXXXX")
     cp -a --reflink=auto "$source_prefix" "$run/prefix"
     chmod -R u+w "$run/prefix"
@@ -41,6 +43,7 @@ if [[ ! -d $work/prefix ]]; then
     for f in system.reg user.reg userdef.reg .update-timestamp; do
         [[ -f $source_prefix/$f ]] || { echo "Missing initialized fixture: $source_prefix/$f" >&2; exit 1; }
     done
+    refuse_dereferenced_prefix "$source_prefix"
     cp -a --reflink=auto "$source_prefix" "$work/prefix.tmp"
     {
         echo "SETUP ONLY: copied initialized stock-Wine fixture from $(realpath "$source_prefix")"
@@ -50,6 +53,7 @@ if [[ ! -d $work/prefix ]]; then
     } > "$work/fixture.txt"
     mv "$work/prefix.tmp" "$work/prefix"
 fi
+refuse_dereferenced_prefix "$work/prefix"
 export WINEPREFIX=$work/prefix
 run=$(mktemp -d "$work/run-XXXXXXXX")
 fi
@@ -80,11 +84,6 @@ server=/usr/lib/wine/wineserver64
 # is not uwph/UWP evidence; keep it alive only for this owned prefix/test.
 env -u LD_PRELOAD -u UWPH_REPORT "$server" -f -p > "$run/server.log" 2>&1 &
 server_pid=$!
-cleanup() {
-    env -u LD_PRELOAD -u UWPH_REPORT "$server" -k >/dev/null 2>&1 || true
-    wait "$server_pid" || true
-}
-trap cleanup EXIT
 sleep .2
 kill -0 "$server_pid"
 fi
@@ -115,5 +114,5 @@ for mode in control routed; do
     done
 done
 python3 verify_wine.py "$run" || status=$?
-echo "Raw evidence retained: $run"
+echo "Raw evidence retained: $([[ ${KEEP_RUN:-0} == 1 ]] && echo "$run" || echo "${run%/run-*}/evidence-${run##*/run-}")"
 exit "$status"

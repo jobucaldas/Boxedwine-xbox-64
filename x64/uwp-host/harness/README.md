@@ -448,3 +448,10 @@ selects the stock Debian ntdll as a control; under `--wx` that exits 13.
 | Windows uwph_protect | Build-only (mingw APP headers); no VirtualProtectFromApp run |
 | Separate wineserver | Stock Linux wineserver64 (unshimmed), as in R4H O4 |
 | wine-test (R4H O4 gate) | Routed = W^X ntdll.so + shim -> uwph, both PEs exit 0; controls = stock Wine; still BLOCKED only by wineboot attempts |
+
+Per-run prefix hygiene: `run-wine.sh` and the built `out/run_hello` install
+exit/signal cleanup before copying prefixes with `cp -a`. Real `dosdevices/z:`
+directories are refused. By default the prefix is removed and logs/reports/exits
+are retained in a sibling `evidence-*` directory; `KEEP_RUN=1` retains `run-*`
+including its prefix for debugging. `./check-hygiene.sh` runs one routed hello
+and checks that no new `run-*` or real `dosdevices/z:` directory remains in `out/`.
