@@ -64,7 +64,13 @@ cleanup() {
 }
 trap cleanup EXIT
 sleep .2
-kill -0 "$server_pid"
+# uwp_run noproc prestarts this prefix's server outside its namespace; a second
+# wineserver then exits 2 (lock held). Reuse it; any other exit still fails.
+if ! kill -0 "$server_pid" 2>/dev/null; then
+    server_rc=0; wait "$server_pid" || server_rc=$?
+    [[ $server_rc == 2 ]] || { echo "wineserver exited $server_rc" >&2; exit 1; }
+    echo 'Reusing prestarted stock wineserver for this prefix (retained concession, outside jail)'
+fi
 # Prevent automatic server startup from inheriting preload if our server dies.
 export WINESERVER=/bin/false
 export WINEDEBUG=+loaddll,+process
@@ -79,7 +85,7 @@ for mode in control routed; do
             extra=(WINE_LOADER="$wx/lib/wine/wine64" LD_PRELOAD="$PWD/out/libuwph_wine_shim.so" LD_DEBUG=bindings)
         fi
         rc=0
-        timeout --kill-after=2s 12s strace -f -e trace=execve -o "$run/$name.exec" \
+        timeout --kill-after=2s 12s strace -f -e trace=execve,openat -o "$run/$name.exec" \
             env -u LD_PRELOAD UWPH_REPORT_PID=1 UWPH_REPORT="$run/$name.report" "${extra[@]}" \
             "$PWD/out/run_via_wine" "$root/x64/pe/tests/$pe.exe" \
             > "$run/$name.log" 2>&1 || rc=$?

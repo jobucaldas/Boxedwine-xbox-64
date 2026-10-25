@@ -1,6 +1,12 @@
 #define _GNU_SOURCE
 #include "uwph/uwph.h"
 #include "counters.h"
+#include "../src/fake_proc.h"
+#include "../src/linux_backend.h"
+#include <dirent.h>
+#include <stddef.h>
+#include <pthread.h>
+#include <string.h>
 #include <sys/mman.h>
 #include <sys/syscall.h>
 #include <unistd.h>
@@ -138,3 +144,34 @@ _Static_assert(sizeof(sigset_t)==sizeof(uwph_sigset_t),"sigset ABI");
 
 ssize_t readlink(const char *p, char *b, size_t n)
 { ssize_t r = uwph_readlink(p,b,n); if (r < 0) errno=uwph_errno; return r; }
+
+_Static_assert(sizeof(struct dirent)==sizeof(struct uwph_dirent) &&
+               offsetof(struct dirent,d_type)==offsetof(struct uwph_dirent,d_type) &&
+               offsetof(struct dirent,d_name)==offsetof(struct uwph_dirent,d_name),"dirent ABI");
+DIR *opendir(const char *path)
+{
+    if (!strcmp(path, "/proc") || !strncmp(path, "/proc/", 6)) {
+        DIR *d = (DIR *)uwph_opendir(path);
+        if (!d) errno = uwph_errno;
+        return d;
+    }
+    DIR *(*native_fn)(const char *) = uwph_linux_symbol("opendir");
+    return native_fn(path);
+}
+struct dirent *readdir(DIR *dir)
+{
+    if (uwph_fake_dir_owned(dir)) return (struct dirent *)uwph_readdir((uwph_DIR *)dir);
+    struct dirent *(*native_fn)(DIR *) = uwph_linux_symbol("readdir");
+    return native_fn(dir);
+}
+int closedir(DIR *dir)
+{
+    if (uwph_fake_dir_owned(dir)) return uwph_closedir((uwph_DIR *)dir);
+    int (*native_fn)(DIR *) = uwph_linux_symbol("closedir");
+    return native_fn(dir);
+}
+
+int pthread_create(pthread_t *out, const pthread_attr_t *attr, void *(*start)(void *), void *arg)
+{
+    return uwph_proc_pthread_create(out, attr, start, arg);
+}

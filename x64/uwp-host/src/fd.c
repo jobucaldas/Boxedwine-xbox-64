@@ -78,6 +78,16 @@ struct uwph_object *uwph_fd_get(int fd, enum uwph_fd_kind *kind, int *flags)
     return o;
 }
 
+int uwph_fd_ids(int *ids, int capacity)
+{
+    int n = 0;
+    uwph_lock(&fd_lock);
+    for (int i = 0; i < UWPH_MAX_FDS && n < capacity; i++)
+        if (fds[i].kind != UWPH_FD_FREE) ids[n++] = i;
+    uwph_unlock(&fd_lock);
+    return n;
+}
+
 int uwph_fd_count(void)
 {
     int n = 0;

@@ -26,7 +26,7 @@ chdir	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks
 clock_getres	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 clock_gettime	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 close	routed	O2 selected wrapper; relocation diagnostic only; native-fd bypasses for read/close/file mmap; no full operation compatibility claim
-closedir	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
+closedir	explicit host fallback	fake proc directories THROUGH uwph; unrelated directories explicitly forwarded to native libc
 connect	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 creat	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 ctime	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
@@ -105,7 +105,7 @@ munlock	unsupported	no exported O2 shim wrapper; retained Linux dependency; bloc
 munmap	routed	O2 selected wrapper; relocation diagnostic only; native-fd bypasses for read/close/file mmap; no full operation compatibility claim
 nl_langinfo	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 open	routed	O2 selected wrapper; relocation diagnostic only; native-fd bypasses for read/close/file mmap; no full operation compatibility claim
-opendir	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
+opendir	explicit host fallback	fake proc directories THROUGH uwph; unrelated directories explicitly forwarded to native libc
 perror	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 pipe	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 pipe2	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
@@ -121,7 +121,7 @@ pthread_attr_setscope	unsupported	no exported O2 shim wrapper; retained Linux de
 pthread_attr_setstack	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 pthread_cond_broadcast	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 pthread_cond_wait	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
-pthread_create	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
+pthread_create	explicit host fallback	uwph thread registry lifecycle around native pthread creation; Linux harness only
 pthread_exit	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 pthread_getspecific	routed	R4S-O2 traced set: ntdll relocation -> shim -> counted uwph entry -> Linux passthrough; Win32 backend covered by tests/traced.c; Linux keeps native TLS keys
 pthread_join	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
@@ -140,7 +140,7 @@ puts	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks 
 pwrite	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
 qsort	libc internal	retained host libc/runtime dependency; may contain hidden host calls; not UWP support
 read	routed	O2 selected wrapper; relocation diagnostic only; native-fd bypasses for read/close/file mmap; no full operation compatibility claim
-readdir	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage
+readdir	explicit host fallback	fake proc directories THROUGH uwph; unrelated directories explicitly forwarded to native libc
 realloc	libc internal	retained host libc/runtime dependency; may contain hidden host calls; not UWP support
 realpath	routed	R4S-O2 traced set: ntdll relocation -> shim -> counted uwph entry -> Linux passthrough; Win32 backend covered by tests/traced.c
 recvmsg	unsupported	no exported O2 shim wrapper; retained Linux dependency; blocks full coverage

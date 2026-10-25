@@ -141,6 +141,8 @@ int uwph_mem_protect_is_fromapp(void);
 void *uwph_resolve(const char *fn);   /* GetProcAddress over kernelbase/kernel32/ntdll */
 
 /* module init hooks */
+int uwph_thread_ids(int *ids, int capacity);
+int uwph_fd_ids(int *ids, int capacity);
 void uwph_fd_init(void);
 int  uwph_signal_init(void);
 int  uwph_mem_page_size(void);

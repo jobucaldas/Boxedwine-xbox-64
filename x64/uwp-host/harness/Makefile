@@ -119,3 +119,8 @@ protect-test: $(OUT)/protect_test
 prebuilt-prefix:
 	./prepare-wine.sh --prebuilt-prefix
 .PHONY: prebuilt-prefix
+
+proc-unit-test: $(OUT)/fake_proc_test
+	$(OUT)/fake_proc_test --host-proc
+	bwrap --ro-bind / / --tmpfs /proc -- $(OUT)/fake_proc_test
+.PHONY: proc-unit-test

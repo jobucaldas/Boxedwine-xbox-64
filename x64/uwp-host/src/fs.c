@@ -398,6 +398,7 @@ UWPH_API uwph_ssize_t uwph_readlink(const char *p, char *b, size_t l)
         if ((size_t)n > l) n = (int)l;
         memcpy(b, exe, n); return n;
     }
+    if (!strncmp(p, "/proc/", 6)) return uwph_fake_proc_link(p, b, l);
 #ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
     UWPH_NATIVE(uwph_ssize_t, "readlink", (const char *, char *, size_t));
     UWPH_NATIVE_RETURN(fn(p, b, l));
@@ -413,10 +414,7 @@ FS_STUB(int, posix_fallocate, (int fd, uwph_off_t o, uwph_off_t l), (void)fd, (v
 FS_STUB(int, futimens, (int fd, const struct uwph_timespec t[2]), (void)fd, (void)t)
 FS_STUB(int, utimensat, (int d, const char *p, const struct uwph_timespec t[2], int f), (void)d, (void)p, (void)t, (void)f)
 FS_STUBP(char *, mkdtemp, (char *t), (void)t)
-FS_STUBP(uwph_DIR *, opendir, (const char *p), (void)p)
 FS_STUBP(uwph_DIR *, fdopendir, (int fd), (void)fd)
-FS_STUBP(struct uwph_dirent *, readdir, (uwph_DIR *d), (void)d)
-FS_STUB(int, closedir, (uwph_DIR *d), (void)d)
 FS_STUB(uwph_ssize_t, getxattr, (const char *p, const char *n, void *v, size_t l), (void)p, (void)n, (void)v, (void)l)
 FS_STUB(uwph_ssize_t, fgetxattr, (int fd, const char *n, void *v, size_t l), (void)fd, (void)n, (void)v, (void)l)
 FS_STUB(int, fsetxattr, (int fd, const char *n, const void *v, size_t l, int f), (void)fd, (void)n, (void)v, (void)l, (void)f)

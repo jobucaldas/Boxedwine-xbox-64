@@ -11,6 +11,9 @@ UWPH_API uwph_pid_t uwph_getpid(void)
 {
 #ifdef UWPH_BACKEND_WIN32
     return (uwph_pid_t)GetCurrentProcessId();
+#elif defined(UWPH_BACKEND_LINUX_PASSTHROUGH)
+    UWPH_NATIVE(uwph_pid_t, "getpid", (void));
+    return fn();
 #else
     return 1;
 #endif

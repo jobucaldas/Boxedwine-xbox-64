@@ -17,13 +17,16 @@ assert all(r['classification'] in allowed and r['reason'] for r in rows)
 log=(out/'bind.log').read_text(); ntdll=data['artifacts']['unix_ntdll']['path']
 exports=subprocess.check_output(['nm','-D','--defined-only','out/libuwph_shim.so'],text=True)
 export_names={line.split()[-1].split('@')[0] for line in exports.splitlines()}
-# O2 traced set + O3 readlink (provider assertions cover this entry): exactly the shim's version-script exports.
+# O2 traced set plus proc provider/registry wrappers: exact export inventory.
 script=pathlib.Path('shim.map').read_text()
 selected={x.strip() for x in script.split('global:')[1].split('local:')[0].split(';') if x.strip()}-{'uwph_shim_report'}
-assert {'open','read','close','mmap','mprotect','munmap','_exit'}<=selected and len(selected)==28, sorted(selected)
+assert {'open','read','close','mmap','mprotect','munmap','_exit'}<=selected and len(selected)==32, sorted(selected)
+proc_exports={'opendir','readdir','closedir','pthread_create'}
+assert proc_exports <= selected
+assert all(policy[s]['classification']=='explicit host fallback' for s in proc_exports)
 traced=set(re.findall(r'"([^"]+)"',pathlib.Path('../src/trace.c').read_text().split('names[]')[1].split(';')[0]))
-assert traced==selected-{'open','read','close','mmap','munmap','mprotect','_exit','readlink'}, 'uwph trace counters != shim traced exports'
-assert {s for s,r in policy.items() if r['classification']=='routed'}==selected-{'_exit','readlink'}
+assert traced==selected-proc_exports-{'open','read','close','mmap','munmap','mprotect','_exit','readlink'}, 'uwph trace counters != shim traced exports'
+assert {s for s,r in policy.items() if r['classification']=='routed'}==selected-proc_exports-{'_exit','readlink'}
 # readlink is a Wine loader export, absent from this ntdll import inventory.
 assert 'readlink' in export_names
 for symbol in sorted(selected-{'readlink'}):
