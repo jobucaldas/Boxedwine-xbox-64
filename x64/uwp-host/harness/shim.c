@@ -52,6 +52,8 @@ int close(int fd)
 void *mmap(void *addr,size_t len,int prot,int flags,int fd,off_t off)
 {
     BEGIN(C_MMAP,MAP_FAILED);
+    /* W^X: refuse WRITE|EXEC before any backend; shows as calls > backend. */
+    if((prot&PROT_WRITE) && (prot&PROT_EXEC)) { count_end(); errno=EACCES; return MAP_FAILED; }
     /* Borrowed native fds have no uwph ownership: explicit counted passthrough. */
     if(!(flags&MAP_ANONYMOUS) && !owned(fd)) {
         count_bypass(C_MMAP);
@@ -59,6 +61,11 @@ void *mmap(void *addr,size_t len,int prot,int flags,int fd,off_t off)
         count_end(); return (void *)native_result(r);
     }
     int saved=errno; void *r=uwph_mmap(addr,len,prot,flags,fd,off); END(r,r==MAP_FAILED);
+}
+int mprotect(void *addr,size_t len,int prot)
+{
+    BEGIN(C_PROTECT,-1);
+    int saved=errno, r=uwph_protect(addr,len,prot); END(r,r<0);
 }
 int munmap(void *addr,size_t len)
 {
