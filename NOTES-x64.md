@@ -743,3 +743,43 @@ prefix and matching stamp. Repeating it exited 0 and printed
 stock Wine packaging**, not THROUGH-uwph or launcher execution. The Xvfb :99
 recording `/workspace/x64-run/videos/R4W-O2.mp4` shows the repeat exact test,
 identity and stamp; it is not runtime proof.
+
+## R4W O3 in-process wineserver — BLOCKED
+
+No in-process server is implemented. Remaining runtime spawn:
+`harness/run-wine.sh` explicitly backgrounds `/usr/lib/wine/wineserver64 -f -p`
+and later invokes that binary with `-k`. Its stock server is outside uwph.
+The current launcher (`x64/pe/launcher/run_via_wine.c`) uses `execv()` to
+replace the process with Wine's loader; a pthread created before that handoff
+would be destroyed. A server must instead be initialized inside the loader
+process, with an explicit ready/error handshake before ntdll connects.
+
+Simply invoking Wine's server main on a pthread is insufficient: matching
+Wine 10.0 source `server/main.c:222–238` installs process-wide signal handlers
+and enters the server loop; `server/request.c:595–666` changes process cwd,
+`:829` registers process atexit cleanup, and `:914` exits the entire process
+on socket timeout. `server/signal.c:270–317` installs additional process-wide
+handlers. Foreground mode avoids the daemon fork at request.c:859, but does
+not isolate these effects from the Wine client in the same process. The
+server also uses cwd-relative operations during operation (fd.c:1904,2047).
+A source-linked server port needs thread-local lifecycle/error handling,
+path-independent socket/registry/file operations and signal ownership shared
+with ntdll; renaming main or wrapping the executable does not provide that.
+The installed server is an executable, not a thread-callable server library;
+no configured Wine source build or embedded server library is available here.
+The socket protocol must remain Wine's own during such a port.
+
+The exact requested O3 test was run. Default make succeeds but only builds
+`out/libuwph.a`; it neither builds nor runs the Wine test. The unchanged
+verifier takes its first argument as an evidence directory, so it reports:
+`Wine uwph verification: BLOCKED: [Errno 2] No such file or directory: '--expect-no-children/identity.json'`.
+The final grep exits 1 with no matches. No child_processes=0,
+wineboot_attempts=0 or PASS was observed. This is a verifier interface
+mismatch, not evidence about guest execution. Per the order, the verifier
+was not modified. Independently, Wine's fresh-session wineboot path remains
+`dlls/ntdll/unix/env.c:1594,1948` (see O1); O2's stamp does not suppress it.
+
+Evidence classification: **build-only and source inspection**, no THROUGH-uwph
+runtime proof and no stock Wine execution in O3. Recording
+`/workspace/x64-run/videos/R4W-O3.mp4` shows the blocked exact test only.
+No runtime code was changed, no commits created and no remotes accessed.
