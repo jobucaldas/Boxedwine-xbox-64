@@ -31,7 +31,7 @@ for chunk in re.split(r'(?m)^(?=--- )', text):
 PY
 }
 
-rm -rf "$out/wine-wx-source" "$tree"
+rm -rf "$out/wine-wx-source" "$out/wine-wx-build" "$tree"
 mkdir -p "$out/wine-wx-source" "$out/wine-wx-build"
 cp -a --reflink=auto "$src/." "$out/wine-wx-source/"
 apply_files "$deb/fixes/temporary-directory.patch" dlls/ntdll/unix/server.c include/wine/server_tmpdir.h
@@ -48,13 +48,26 @@ rm "$out/wine-wx-source/include/wine/server_protocol.h"
 grep -qx '#define SERVER_PROTOCOL_VERSION 1' "$out/wine-wx-source/include/wine/server_protocol.h"
 
 cd "$out/wine-wx-build"
-if [[ ! -f config.status ]]; then
-    ../wine-wx-source/configure --enable-win64 --disable-tests --without-x --without-freetype > configure.log 2>&1
+# Configure without generating Makefiles: Wine's initial makedep pass scans
+# unrelated test resources omitted from the Debian repack, even with tests off.
+# Restrict that first pass to ntdll and its build dependencies, not a later pass.
+if ! ../wine-wx-source/configure --enable-win64 --disable-tests --without-x --without-freetype --no-create > configure.log 2>&1; then
+    tail -40 configure.log >&2
+    exit 1
 fi
-# Generate makefiles for ntdll and its build tools only (tests/resources of
-# unrelated dlls need generated data absent from the repack tarball).
-sed -i 's|^SUBDIRS = .*|SUBDIRS = include dlls/ntdll dlls/oleacc dlls/stdole2.tlb dlls/stdole32.tlb tools/winebuild tools/widl|' Makefile
-./tools/makedep
+python3 -I - <<'PYCONFIG'
+import pathlib, re
+path = pathlib.Path('config.status')
+text, count = re.subn(r'(?ms)^SUBDIRS = .*?(?=^DISABLED_SUBDIRS =)',
+    'SUBDIRS = include dlls/ntdll dlls/oleacc dlls/stdole2.tlb '
+    'dlls/stdole32.tlb tools/winebuild tools/widl\n', path.read_text())
+assert count == 1, 'expected one Wine SUBDIRS assignment in config.status'
+path.write_text(text)
+PYCONFIG
+if ! ./config.status >> configure.log 2>&1; then
+    tail -40 configure.log >&2
+    exit 1
+fi
 # Debian install dirs, so relative bin/lib/data paths match the mirrored tree.
 make -j"$(nproc)" bindir=/usr/lib/wine libdir=/usr/lib/x86_64-linux-gnu/wine datadir=/usr/share/wine \
     dlls/ntdll/ntdll.so > build.log 2>&1 || { tail -20 build.log >&2; exit 1; }
