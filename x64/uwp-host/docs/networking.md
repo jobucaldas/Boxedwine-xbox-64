@@ -36,9 +36,21 @@ That is the code BoxedWine's Wine uses for its socketpairs on Xbox. Two
 differences from it:
 * There is no `SO_REUSEADDR`, because on Winsock it lets another socket take a bound port.
 * Neither end keeps a port in 57344-65535. Port 0 can return any port in the
-  Windows ephemeral range 49152-65535, so `loopback_bound` keeps a rejected
-  socket open (at most 16) and binds again until it gets a port below 57344.
-  It never binds into the documented drop range on purpose.
+  Windows ephemeral range 49152-65535. If that happens, `loopback_bound`
+  closes that socket and searches explicit ports 1025–49151, the range the
+  Xbox known-issues page specifies for explicit binds. Only `WSAEADDRINUSE`
+  advances the search; permission errors and other failures stop immediately.
+  Exhaustion returns `WSAEADDRINUSE`, with every attempted socket closed.
+  This avoids assuming that any bounded sequence of port-0 allocations will
+  include a usable port. Winsock documents explicit local binding and
+  `WSAEADDRINUSE` in [bind](https://learn.microsoft.com/en-us/windows/win32/api/winsock/nf-winsock-bind).
+  This is an allocation strategy, not evidence of target execution.
+
+Controlled test: `tests/inet_loopback.c` exercises the production helper with
+fake socket operations: 32 consecutive high port-0 assignments, occupied
+explicit ports before success, full allowed-range exhaustion, immediate
+permission-error termination, and getsockname failure. It checks cleanup and
+error preservation. These are native unit tests, not Xbox networking proof.
 
 Smoke test: `inet_socketpair` in `tests/smoke.c` `test_inet`. It checks echo in
 both directions, that both ports are below 57344, EOF after one end closes,

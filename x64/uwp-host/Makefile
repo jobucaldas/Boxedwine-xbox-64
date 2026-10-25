@@ -70,7 +70,12 @@ $(OUT)/win/traced.exe: tests/traced.c $(OUT)/win/libuwph.a
 check: $(OUT)/linux/libuwph.a $(OUT)/win/libuwph.a
 	$(MAKE) -C harness wine-surface-check
 
-test: all
+$(OUT)/linux/inet_loopback: tests/inet_loopback.c src/inet_loopback.h
+	@mkdir -p $(@D)
+	$(CC_LINUX) $(CFLAGS_COMMON) -Isrc -o $@ $<
+
+test: all $(OUT)/linux/inet_loopback
+	$(OUT)/linux/inet_loopback
 	$(OUT)/linux/abi_check
 	$(OUT)/linux/smoke "$(CURDIR)/tests"
 	@# smoke.exe's default fixture root is relative to the repo root; make -C runs

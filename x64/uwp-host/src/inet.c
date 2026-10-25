@@ -85,34 +85,7 @@ int uwph_inet_socket(int domain, int type, int proto)
     return own_socket(socket(domain == UWPH_AF_INET6 ? AF_INET6 : AF_INET, type & 15, proto),
                       type & (UWPH_SOCK_NONBLOCK | UWPH_SOCK_CLOEXEC));
 }
-/* Native TCP socket bound to 127.0.0.1 on a port below 57344 (Xbox known
- * issue: traffic on 57344-65535 can be silently dropped; port 0 may hand out
- * any ephemeral port in 49152-65535). Rejected sockets stay open until a
- * usable port is found so the next bind gets a different port. */
-static SOCKET loopback_bound(struct sockaddr_in *a)
-{
-    SOCKET rejected[16], s = INVALID_SOCKET;
-    int nrejected = 0, n, e = 0;
-    for (;;) {
-        memset(a, 0, sizeof(*a));
-        a->sin_family = AF_INET;
-        a->sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-        n = sizeof(*a);
-        s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-        if (s == INVALID_SOCKET) { e = WSAGetLastError(); break; }
-        if (bind(s, (struct sockaddr *)a, sizeof(*a)) || getsockname(s, (struct sockaddr *)a, &n)) {
-            e = WSAGetLastError(); closesocket(s); s = INVALID_SOCKET; break;
-        }
-        if (ntohs(a->sin_port) < 57344) break;
-        if (nrejected == (int)(sizeof(rejected) / sizeof(rejected[0]))) {
-            closesocket(s); s = INVALID_SOCKET; e = WSAEADDRNOTAVAIL; break;
-        }
-        rejected[nrejected++] = s;
-    }
-    while (nrejected) closesocket(rejected[--nrejected]);
-    if (s == INVALID_SOCKET) WSASetLastError(e);
-    return s;
-}
+#include "inet_loopback.h"
 static int same_addr(const struct sockaddr_in *a, const struct sockaddr_in *b)
 {
     return a->sin_port == b->sin_port && a->sin_addr.s_addr == b->sin_addr.s_addr;
