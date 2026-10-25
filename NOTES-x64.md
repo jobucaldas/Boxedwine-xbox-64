@@ -3072,3 +3072,19 @@ was deleted. Evidence: /workspace/x64-run/lanes/B73/o1. Video
 Unblock options (João's call; unchanged from B72): OSC tables for a pinnable build, an
 authorised table dump, or Valve's steam.exe route (B71 is currently BLOCKED: it stays
 Logged Off without the webhelper).
+
+## B80 O1
+
+Added `x64/steam-min/steamhost/osw-watch.sh` and its README. The anonymous,
+read-only watcher snapshots OSW HEAD, prefers its win64 manifest with win32
+fallback, reports the latest commit under Generated, HEAD-checks the exact bins
+archive, and compares the table build against Valve's current manifest. It reads
+only manifest_version from the local PIN.txt and never modifies the pin.
+At most five GitHub requests per run; no packages, credentials, or login.
+
+Exact test passed: tables 1745623383, bins HEAD 200, local/current Valve build
+1792618285, verdict=match-old-only. Simulated connection refusal exits 2.
+Metadata-only host-shell validation (build-only category); neither THROUGH-uwph
+nor stock Wine was executed. No runtime/console compatibility claim. Evidence:
+`/workspace/x64-run/lanes/B80/o1.txt`, `network-failure.txt`; seven-second Xvfb
+terminal recording `/workspace/x64-run/videos/B80-O1.mp4`. No prefix created.
