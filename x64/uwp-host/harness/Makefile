@@ -89,7 +89,7 @@ acceptance-test:
 # R4X O2: private W^X ntdll.so (RW map/relocate, then per-section RX/R/RW).
 $(OUT)/wine-wx/.stamp: prepare-wine-wx.sh wine-image-wx.patch wine-loader-stub-wx.patch
 	./prepare-wine-wx.sh
-$(OUT)/run_hello: run-hello.sh $(OUT)/libuwph_wine_shim.so $(OUT)/run_via_wine $(OUT)/wine-wx/.stamp
+$(OUT)/run_hello: run-hello.sh prefix-hygiene.sh $(OUT)/libuwph_wine_shim.so $(OUT)/run_via_wine $(OUT)/wine-wx/.stamp
 	cp $< $@
 	chmod +x $@
 
@@ -139,7 +139,8 @@ stub-test: $(OUT)/run_hello $(OUT)/stub_probe.exe
 	$(MAKE) -C ../wineserver lib
 $(OUT)/libuwph_inproc_server.so: inproc_server.c ../wineserver/server_thread.c ../wineserver/out/libwineserver.a
 	$(CC) $(CFLAGS) -shared $^ -Wl,-z,defs -o $@
-wine-test-inproc-build: $(OUT)/libuwph_wine_shim.so $(OUT)/libuwph_inproc_server.so $(OUT)/run_via_wine
+wine-test-inproc-build: $(OUT)/libuwph_wine_shim.so $(OUT)/libuwph_inproc_server.so $(OUT)/run_via_wine prebuilt-prefix
+	./run-wine.sh --stage-inproc
 wine-test-inproc: wine-test-inproc-build
 	./run-wine.sh --inproc-server
 FORCE:

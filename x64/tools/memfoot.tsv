@@ -1,0 +1,4 @@
+stage	peak_rss_mb	peak_commit_estimate_mb	peak_mb	fits_app	fits_game	status	samples	read_errors	routing	elapsed_s	max_gap_s	cadence	evidence_dir
+hello	17.79	17.27	17.79	yes	yes	exit_0	2	1	observed	1.207	1.000	ok	/workspace/wt/B15/x64/uwp-host/harness/out/memfoot/20261025T063410.895220Z-685138
+hello_k32	17.84	17.27	17.84	yes	yes	exit_0	2	1	observed	1.209	1.000	ok	/workspace/wt/B15/x64/uwp-host/harness/out/memfoot/20261025T063410.895220Z-685138
+Megabonk	1489.55	1949.60	1949.60	no	yes	timeout	121	0	observed	120.254	1.123	ok	/workspace/wt/B15/x64/uwp-host/harness/out/memfoot/20261025T063410.895220Z-685138

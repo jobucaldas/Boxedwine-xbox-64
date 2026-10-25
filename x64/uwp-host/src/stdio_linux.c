@@ -85,7 +85,8 @@ int uwph_vfscanf(uwph_FILE *f, const char *fmt, va_list ap)
     UWPH_NATIVE_RETURN(fn(f, fmt, ap));
 }
 void uwph_setbuf(uwph_FILE *f, char *p)
-{ UWPH_NATIVE(void, "setbuf", (uwph_FILE *, char *)); fn(f, p); }
+{
+    uwph_trace_hit(UWPH_TRACE_SETBUF); UWPH_NATIVE(void, "setbuf", (uwph_FILE *, char *)); fn(f, p); }
 int uwph_fprintf(uwph_FILE *f, const char *fmt, ...)
 { va_list ap; int n; va_start(ap, fmt); n = uwph_vfprintf(f, fmt, ap); va_end(ap); return n; }
 int uwph_fscanf(uwph_FILE *f, const char *fmt, ...)
