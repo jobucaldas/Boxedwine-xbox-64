@@ -1,0 +1,1 @@
+wine: Call from 00006FFFFF3FCF77 to unimplemented function KERNEL32.dll.ReadConsoleInputExW, aborting

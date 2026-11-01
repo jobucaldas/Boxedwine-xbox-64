@@ -1,0 +1,23 @@
+create(&ci,NULL,&inst): 0
+MESA: error: Failed to create DXCore adapter factory
+WARNING: dzn is not a conformant Vulkan implementation, testing use only.
+35965.308:0120:0124:info:vkd3d-proton:vkd3d_instance_apply_application_workarounds: Program name: "dzn_probe.exe" (hash: 712ed4f1f21a0536)
+35965.308:0120:0124:info:vkd3d-proton:vkd3d_instance_deduce_config_flags_from_environment: shader_cache is used, global_pipeline_cache is enforced.
+35965.308:0120:0124:info:vkd3d-proton:vkd3d_config_flags_init_once: VKD3D_CONFIG=''.
+35965.312:0120:0124:info:vkd3d-proton:vkd3d_get_vk_version: vkd3d-proton - applicationVersion: 3.0.1.
+35965.312:0120:0124:info:vkd3d-proton:vkd3d_instance_init: vkd3d-proton - build: 3b10bd7a7ec6a73.
+35965.313:0120:0124:info:vkd3d-proton:d3d12_device_create: Forcing singleton device due to RenderDoc being enabled.
+35965.370:0120:0124:info:vkd3d-proton:vkd3d_memory_info_decide_hvv_usage: Topology: UMA-like topology.
+35965.370:0120:0124:info:vkd3d-proton:vkd3d_memory_info_upload_hvv_memory_properties: Topology: HVV usage is allowed, using DEVICE_LOCAL | HOST_COHERENT for UPLOAD.
+35965.370:0120:0124:info:vkd3d-proton:vkd3d_bindless_state_get_bindless_flags: Enabling fast paths for advanced ExecuteIndirect() graphics and compute (EXT_dgc).
+35965.370:0120:0124:info:vkd3d-proton:vkd3d_bindless_state_get_bindless_flags: Device supports VK_EXT_mutable_descriptor_type.
+35965.490:0120:0124:info:vkd3d-proton:d3d12_device_determine_ray_tracing_tier: DXR support enabled.
+35965.490:0120:0124:info:vkd3d-proton:d3d12_device_determine_ray_tracing_tier: DXR 1.1 support enabled.
+35965.490:0120:0124:info:vkd3d-proton:vkd3d_pipeline_library_init_disk_cache: Remapping VKD3D_SHADER_CACHE to: vkd3d-proton.cache.
+35965.490:0120:0124:info:vkd3d-proton:vkd3d_pipeline_library_init_disk_cache: Attempting to load disk cache from: vkd3d-proton.cache.
+35965.491:0120:012c:info:vkd3d-proton:vkd3d_pipeline_library_disk_thread_main: Performing async setup of stream archive ...
+35965.491:0120:012c:info:vkd3d-proton:vkd3d_pipeline_library_disk_cache_merge: No write cache exists. No need to merge any disk caches.
+35965.491:0120:012c:info:vkd3d-proton:vkd3d_pipeline_library_disk_cache_initial_setup: Merging pipeline libraries took 0.110 ms.
+35965.491:0120:012c:info:vkd3d-proton:vkd3d_pipeline_library_disk_cache_initial_setup: Failed to map read-only cache: vkd3d-proton.cache.
+35965.491:0120:012c:info:vkd3d-proton:vkd3d_pipeline_library_disk_thread_main: Done performing async setup of stream archive.
+vkEnumeratePhysicalDevices(inst,&count,NULL): -3

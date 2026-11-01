@@ -1,0 +1,298 @@
+The Meson build system
+Version: 1.12.1
+Source dir: /workspace/xbox-readiness/dzn/src/mesa-25.1.9
+Build dir: /workspace/xbox-readiness/dzn/build
+Build type: cross build
+Project name: mesa
+Project version: 25.1.9
+C compiler for the host machine: x86_64-w64-mingw32-gcc (gcc 14.0.0 "x86_64-w64-mingw32-gcc (GCC) 14-win32")
+C linker for the host machine: x86_64-w64-mingw32-gcc ld.bfd 2.44
+C++ compiler for the host machine: x86_64-w64-mingw32-g++ (gcc 14.0.0 "x86_64-w64-mingw32-g++ (GCC) 14-win32")
+C++ linker for the host machine: x86_64-w64-mingw32-g++ ld.bfd 2.44
+C compiler for the build machine: cc (gcc 14.2.0 "cc (Debian 14.2.0-19) 14.2.0")
+C linker for the build machine: cc ld.bfd 2.44
+C++ compiler for the build machine: c++ (gcc 14.2.0 "c++ (Debian 14.2.0-19) 14.2.0")
+C++ linker for the build machine: c++ ld.bfd 2.44
+Build machine cpu family: x86_64
+Build machine cpu: x86_64
+Host machine cpu family: x86_64
+Host machine cpu: x86_64
+Target machine cpu family: x86_64
+Target machine cpu: x86_64
+Checking for size of "void*" : 8 
+src/mesa-25.1.9/meson.build:268: WARNING: Conditional on version '< 1.3' always evaluates to false
+src/mesa-25.1.9/meson.build:524: WARNING: cannot auto-detect -mtls-dialect when cross-compiling, using compiler default
+Dependency libglvnd for host machine skipped: feature glvnd disabled
+Found pkg-config: YES (/usr/bin/pkg-config) 1.8.1
+Found CMake: NO
+Run-time dependency directx-headers found: NO  (tried pkg-config and cmake)
+Run-time dependency directx-headers found: NO  (tried pkg-config and cmake)
+Looking for a fallback subproject for the dependency DirectX-Headers
+
+Executing subproject DirectX-Headers for machine: host 
+
+DirectX-Headers| Project name: DirectX-Headers
+DirectX-Headers| Project version: 1.619.5
+DirectX-Headers| C++ compiler for the host machine: x86_64-w64-mingw32-g++ (gcc 14.0.0 "x86_64-w64-mingw32-g++ (GCC) 14-win32")
+DirectX-Headers| C++ linker for the host machine: x86_64-w64-mingw32-g++ ld.bfd 2.44
+DirectX-Headers| C++ compiler for the build machine: c++ (gcc 14.2.0 "c++ (Debian 14.2.0-19) 14.2.0")
+DirectX-Headers| C++ linker for the build machine: c++ ld.bfd 2.44
+DirectX-Headers| Library d3d12 found: YES
+DirectX-Headers| Library dxcore found: YES
+DirectX-Headers| Found pkg-config: YES (/usr/bin/pkg-config) 1.8.1
+DirectX-Headers| Build targets in project: 2
+DirectX-Headers| Subproject DirectX-Headers finished.
+
+Dependency DirectX-Headers for host machine found: YES 1.619.5 (overridden)
+Dependency vdpau for host machine skipped: feature gallium-vdpau disabled
+Program glslangValidator found: YES (/usr/bin/glslangValidator)
+Dependency libva-win32 for host machine skipped: feature gallium-va disabled
+Program python3 found: YES 3.13.5 3.13.5 (/workspace/xbox-readiness/dzn/venv/bin/python3)
+Fetching value of define "ETIME" : 137 
+Compiler for C supports arguments -gsplit-dwarf: YES 
+Compiler for C supports link arguments -Wl,--gdb-index: NO 
+Checking for function "bswap32" : YES 
+Checking for function "bswap64" : YES 
+Checking for function "clz" : YES 
+Checking for function "clzll" : YES 
+Checking for function "ctz" : YES 
+Checking for function "expect" : YES 
+Checking for function "ffs" : YES 
+Checking for function "ffsll" : YES 
+Checking for function "popcount" : YES 
+Checking for function "popcountll" : YES 
+Checking for function "unreachable" : YES 
+Checking for function "types_compatible_p" : YES 
+Compiler for C supports function attribute const: YES 
+Compiler for C supports function attribute flatten: YES 
+Compiler for C supports function attribute malloc: YES 
+Compiler for C supports function attribute pure: YES 
+Compiler for C supports function attribute unused: YES 
+Compiler for C supports function attribute warn_unused_result: YES 
+Compiler for C supports function attribute weak: YES 
+Compiler for C supports function attribute format: YES 
+Compiler for C supports function attribute packed: YES 
+Compiler for C supports function attribute returns_nonnull: YES 
+Compiler for C supports function attribute alias: YES 
+Compiler for C supports function attribute noreturn: YES 
+Compiler for C supports function attribute optimize: YES 
+Compiler for C supports function attribute visibility:hidden: NO 
+Checking if "__uint128_t" compiles: YES 
+Checking for function "reallocarray" : NO 
+Checking for function "fmemopen" : NO 
+Checking if "gc-sections" links: YES 
+Compiler for C supports arguments -Werror=implicit-function-declaration: YES 
+Compiler for C supports arguments -Werror=missing-prototypes: YES 
+Compiler for C supports arguments -Werror=return-type: YES 
+Compiler for C supports arguments -Werror=empty-body: YES 
+Compiler for C supports arguments -Werror=incompatible-pointer-types: YES 
+Compiler for C supports arguments -Werror=int-conversion: YES 
+Compiler for C supports arguments -Wimplicit-fallthrough: YES 
+Compiler for C supports arguments -Wmisleading-indentation: YES 
+Compiler for C supports arguments -Wno-missing-field-initializers: YES 
+Compiler for C supports arguments -Wno-format-truncation: YES 
+Compiler for C supports arguments -Wno-nonnull-compare: YES 
+Compiler for C supports arguments -fno-math-errno: YES 
+Compiler for C supports arguments -fno-trapping-math: YES 
+Compiler for C supports arguments -Qunused-arguments: NO 
+Compiler for C supports arguments -fno-common: YES 
+Compiler for C supports arguments -Wno-unknown-pragmas: YES 
+Compiler for C supports arguments -Wno-microsoft-enum-value: NO 
+Compiler for C supports arguments -Wno-unused-function: YES 
+Compiler for C supports arguments -Werror=thread-safety: NO 
+Compiler for C supports arguments -ffunction-sections: YES 
+Compiler for C supports arguments -fdata-sections: YES 
+Compiler for C supports arguments -Wno-unused-variable: YES 
+Compiler for C supports arguments -Wno-unused-but-set-variable: YES 
+Compiler for C supports arguments /wd4189: NO 
+Compiler for C++ supports arguments -Werror=return-type: YES 
+Compiler for C++ supports arguments -Werror=empty-body: YES 
+Compiler for C++ supports arguments -Wmisleading-indentation: YES 
+Compiler for C++ supports arguments -Wno-non-virtual-dtor: YES 
+Compiler for C++ supports arguments -Wno-missing-field-initializers: YES 
+Compiler for C++ supports arguments -Wno-format-truncation: YES 
+Compiler for C++ supports arguments -fno-math-errno: YES 
+Compiler for C++ supports arguments -fno-trapping-math: YES 
+Compiler for C++ supports arguments -Qunused-arguments: NO 
+Compiler for C++ supports arguments -flifetime-dse=1: YES 
+Compiler for C++ supports arguments -Wno-unknown-pragmas: YES 
+Compiler for C++ supports arguments -Wno-microsoft-enum-value: NO 
+Compiler for C++ supports arguments -ffunction-sections: YES 
+Compiler for C++ supports arguments -fdata-sections: YES 
+Compiler for C++ supports arguments -Wno-unused-variable: YES 
+Compiler for C++ supports arguments -Wno-unused-but-set-variable: YES 
+Compiler for C++ supports arguments /wd4189: NO 
+Compiler for C supports arguments -Wno-override-init: YES 
+Compiler for C supports arguments -Wno-initializer-overrides: NO 
+Compiler for C supports arguments -Werror=pointer-arith: YES 
+Compiler for C supports arguments -Werror=vla: YES 
+Compiler for C supports arguments -Werror=gnu-empty-initializer: NO 
+Compiler for C++ supports arguments -Werror=pointer-arith: YES 
+Compiler for C++ supports arguments -Werror=vla: YES 
+Compiler for C++ supports arguments -Werror=gnu-empty-initializer: NO 
+Compiler for C supports link arguments -Wl,--nxcompat: YES 
+Compiler for C supports link arguments -Wl,--dynamicbase: YES 
+Compiler for C supports link arguments -static-libgcc: YES 
+Compiler for C supports link arguments -static-libstdc++: YES 
+Compiler for C++ supports link arguments -Wl,--nxcompat: YES 
+Compiler for C++ supports link arguments -Wl,--dynamicbase: YES 
+Compiler for C++ supports link arguments -static-libgcc: YES 
+Compiler for C++ supports link arguments -static-libstdc++: YES 
+Checking for function "__builtin_ia32_clflushopt" : YES 
+Checking if "GCC atomic builtins" compiles: YES 
+Checking if "GCC atomic builtins required -latomic" links: YES 
+Checking if "GCC 64bit atomics" with dependency  links: YES 
+Library ws2_32 found: YES
+Header "sys/sysmacros.h" has symbol "major" : NO 
+Header "sys/mkdev.h" has symbol "major" : NO 
+Check usable header "sched.h" : YES 
+Checking for function "sched_getaffinity" : NO 
+Check usable header "sys/sysctl.h" : NO 
+Check usable header "xlocale.h" : NO 
+Check usable header "linux/futex.h" : NO 
+Check usable header "endian.h" : NO 
+Check usable header "dlfcn.h" : NO 
+Check usable header "sys/shm.h" : NO 
+Check usable header "cet.h" : YES 
+Check usable header "pthread_np.h" : NO 
+Check usable header "sys/inotify.h" : NO 
+Check usable header "linux/udmabuf.h" : NO 
+Checking for function "strtof" : YES 
+Checking for function "mkostemp" : NO 
+Checking for function "memfd_create" : NO 
+Checking for function "random_r" : NO 
+Checking for function "flock" : NO 
+Checking for function "strtok_r" : YES 
+Checking for function "getrandom" : NO 
+Checking for function "qsort_s" : YES 
+Checking for function "posix_fallocate" : NO 
+Checking for function "secure_getenv" : NO 
+Checking if "GNU qsort_r" links: NO 
+Checking if "BSD qsort_r" links: NO 
+Header "time.h" has symbol "struct timespec" : YES 
+Checking for function "thrd_create" : NO 
+Header "errno.h" has symbol "program_invocation_name" : NO 
+Header "math.h" has symbol "issignaling" : NO 
+Checking whether type "struct dirent" has member "d_type" : NO 
+Checking if "strtod has locale support" links: NO 
+Checking if "Bsymbolic" links: YES 
+Checking if "version-script" links: YES 
+Checking if "dynamic-list" links: YES 
+Compiler for C supports link arguments -Wl,--build-id=sha1: YES 
+Checking for function "dl_iterate_phdr" : NO 
+Dependency zlib for host machine skipped: feature zlib disabled
+Dependency libzstd for host machine skipped: feature zstd disabled
+Dependency expat for host machine skipped: feature expat disabled
+Library m found: YES
+Library regex found: NO
+Library synchronization found: YES
+Run-time dependency libudev found: NO  (tried pkg-config and cmake)
+Run-time dependency spirv-tools found: NO  (tried pkg-config and cmake)
+Run-time dependency lua54 found: NO  (tried pkg-config and cmake)
+Run-time dependency lua5.4 found: NO  (tried pkg-config and cmake)
+Run-time dependency lua-5.4 found: NO  (tried pkg-config and cmake)
+Run-time dependency lua53 found: NO  (tried pkg-config and cmake)
+Run-time dependency lua5.3 found: NO  (tried pkg-config and cmake)
+Run-time dependency lua-5.3 found: NO  (tried pkg-config and cmake)
+Run-time dependency lua found: NO  (tried pkg-config and cmake)
+Library version found: YES
+Run-time dependency libelf found: NO  (tried pkg-config and cmake)
+Run-time dependency valgrind found: NO  (tried pkg-config)
+Program bison found: YES (/usr/bin/bison)
+Program bison found: YES 3.8.2 3.8.2 (/usr/bin/bison)
+Program flex found: YES (/usr/bin/flex)
+Run-time dependency libunwind found: NO  (tried pkg-config and cmake)
+Run-time dependency OpenMP found: YES 4.5
+Library sensors found: NO
+Program dumpbin found: NO
+Program symbols-check.py found: YES (/workspace/xbox-readiness/dzn/venv/bin/python3 /workspace/xbox-readiness/dzn/src/mesa-25.1.9/bin/symbols-check.py)
+Program install_megadrivers.py found: YES (/workspace/xbox-readiness/dzn/venv/bin/python3 /workspace/xbox-readiness/dzn/src/mesa-25.1.9/bin/install_megadrivers.py)
+Compiler for C supports arguments -Wno-misleading-indentation: YES 
+Program decode.py found: YES (/workspace/xbox-readiness/dzn/src/mesa-25.1.9/src/compiler/isaspec/decode.py)
+Program encode.py found: YES (/workspace/xbox-readiness/dzn/src/mesa-25.1.9/src/compiler/isaspec/encode.py)
+Compiler for C supports arguments -Werror=unused-variable: YES 
+Compiler for C supports arguments -Werror=unused-but-set-variable: YES 
+Compiler for C supports arguments -Werror=unused-value: YES 
+Compiler for C supports arguments -Werror=format: YES 
+Compiler for C supports arguments -Werror=switch: YES 
+Compiler for C++ supports arguments -Wno-error=unused-value: YES 
+Program sphinx-build skipped: feature html-docs disabled
+Build targets in project: 80
+
+mesa 25.1.9
+
+  Directories
+    prefix                    : /workspace/xbox-readiness/dzn/install
+    libdir                    : lib
+    includedir                : include
+
+  Common C and C++ arguments
+    c_cpp_args                :
+
+  OpenGL
+    OpenGL                    : NO
+    ES1                       : NO
+    ES2                       : NO
+    GLVND                     : NO
+
+  DRI
+    Platform                  : windows
+    Driver dir                : /workspace/xbox-readiness/dzn/install/lib/dri
+
+  GLX
+    Enabled                   : NO
+    Provider                  : None
+
+  EGL
+    Enabled                   : NO
+
+  GBM
+    Enabled                   : NO
+
+  Vulkan
+    Drivers                   : microsoft-experimental
+    Platforms                 : windows
+    ICD dir                   : share/vulkan/icd.d
+    Intel Ray tracing         : NO
+
+  Video
+    Codecs                    : NO
+    APIs                      : vulkan
+
+  LLVM
+    Enabled                   : NO
+
+  Gallium
+    Enabled                   : NO
+
+  Perfetto
+    Enabled                   : NO
+
+  Teflon (TensorFlow Lite delegate)
+    Enabled                   : NO
+
+  Subprojects (for host machine)
+    DirectX-Headers           : YES
+
+  User defined options
+    Cross files               : cross-win64.ini
+    DirectX-Headers:build-test: false
+    build-tests               : false
+    buildtype                 : release
+    egl                       : disabled
+    gallium-drivers           : 
+    gbm                       : disabled
+    gles1                     : disabled
+    gles2                     : disabled
+    glx                       : disabled
+    llvm                      : disabled
+    opengl                    : false
+    platforms                 : windows
+    prefix                    : /workspace/xbox-readiness/dzn/install
+    spirv-to-dxil             : true
+    video-codecs              : 
+    vulkan-drivers            : microsoft-experimental
+    zlib                      : disabled
+    zstd                      : disabled
+
+Found ninja-1.13.2.git.kitware.jobserver-pipe-1 at /workspace/xbox-readiness/dzn/venv/bin/ninja

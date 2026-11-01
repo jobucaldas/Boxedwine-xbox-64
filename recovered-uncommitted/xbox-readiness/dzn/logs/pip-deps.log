@@ -1,0 +1,21 @@
+Collecting meson
+  Downloading meson-1.12.1-py3-none-any.whl.metadata (1.7 kB)
+Collecting ninja
+  Downloading ninja-1.13.2-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (5.4 kB)
+Collecting mako
+  Downloading mako-1.4.3-py3-none-any.whl.metadata (2.9 kB)
+Collecting packaging
+  Downloading packaging-26.3-py3-none-any.whl.metadata (3.5 kB)
+Collecting MarkupSafe>=2.0 (from mako)
+  Downloading markupsafe-3.0.4-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (2.7 kB)
+Downloading meson-1.12.1-py3-none-any.whl (1.1 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.1/1.1 MB 64.9 MB/s eta 0:00:00
+
+Downloading ninja-1.13.2-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (183 kB)
+Downloading mako-1.4.3-py3-none-any.whl (80 kB)
+Downloading packaging-26.3-py3-none-any.whl (129 kB)
+Downloading markupsafe-3.0.4-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (23 kB)
+Installing collected packages: packaging, ninja, meson, MarkupSafe, mako
+
+
+Successfully installed MarkupSafe-3.0.4 mako-1.4.3 meson-1.12.1 ninja-1.13.2 packaging-26.3

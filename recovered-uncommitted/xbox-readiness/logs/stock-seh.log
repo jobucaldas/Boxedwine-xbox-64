@@ -1,0 +1,10 @@
+PASS access violation -> VEH                    hits=1 code=c0000005
+PASS int divide by zero -> VEH                  hits=1 code=c0000094
+PASS ud2 -> illegal instruction                 hits=1 code=c000001d
+PASS int3 -> breakpoint                         hits=1 code=80000003
+PASS RaiseException software                    hits=1
+PASS guard page -> STATUS_GUARD_PAGE once       hits=1 code=80000001
+PASS 10000 AV round trips                       1.94 us/fault
+PASS faults on 4 threads concurrently           hits=400
+PASS 512KB stack probe (guard-page growth)      ok
+SUMMARY seh_probe pass=9 fail=0

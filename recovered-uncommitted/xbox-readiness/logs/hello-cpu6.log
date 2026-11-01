@@ -1,0 +1,4 @@
+hello.exe: native x86-64 Windows PE, argc=1 argv[0]=Z:\workspace\xbox-readiness\bin\hello.exe
+TEB self-check: ok, sizeof(void*)=8
+malloc: heap, 64-bit math 123456789000, double 6.283
+threads: shared=200000 exit codes=6,7 main tls=5

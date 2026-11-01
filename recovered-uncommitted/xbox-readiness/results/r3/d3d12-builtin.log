@@ -1,0 +1,5 @@
+adapter: NVIDIA GeForce GTX 470 (vendor 0x10de)
+d3d12.dll: C:\windows\system32\d3d12.dll
+d3d12.dll kind: Wine builtin (vkd3d)
+presented 30 frames, fence=30
+d3d12 probe done

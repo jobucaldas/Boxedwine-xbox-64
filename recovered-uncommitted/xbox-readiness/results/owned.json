@@ -1,0 +1,17 @@
+{
+  "owned_count": 771,
+  "targets": {
+    "3405340": {
+      "name": "Megabonk",
+      "owned": true
+    },
+    "1145360": {
+      "name": "Hades",
+      "owned": true
+    },
+    "892970": {
+      "name": "Valheim",
+      "owned": false
+    }
+  }
+}

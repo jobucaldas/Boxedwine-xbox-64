@@ -1,0 +1,4 @@
+loaded Z:\workspace\xbox-readiness\steamapi\steam_api64.dll
+SteamAPI_GetSteamInstallPath = Z:\workspace\xbox-readiness\steamapi\
+SteamAPI_IsSteamRunning      = 1
+SteamAPI_Init                = 1 (connected to a running Steam client)

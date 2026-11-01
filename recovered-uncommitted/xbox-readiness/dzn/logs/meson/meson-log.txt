@@ -1,0 +1,3779 @@
+Build started at 2026-10-24T20:12:03.760554
+Main binary: /workspace/xbox-readiness/dzn/venv/bin/python3
+Build Options: -Dbuildtype=release -Dprefix=/workspace/xbox-readiness/dzn/install -Dvulkan-drivers=microsoft-experimental -Dgallium-drivers= -Dplatforms=windows -Dbuild-tests=false -Dspirv-to-dxil=true -Dllvm=disabled -Dopengl=false -Dgles1=disabled -Dgles2=disabled -Degl=disabled -Dglx=disabled -Dgbm=disabled -Dvideo-codecs= -Dzstd=disabled -Dzlib=disabled -DDirectX-Headers:build-test=false --cross-file=cross-win64.ini
+Python system: Linux
+The Meson build system
+Version: 1.12.1
+Source dir: /workspace/xbox-readiness/dzn/src/mesa-25.1.9
+Build dir: /workspace/xbox-readiness/dzn/build
+Build type: cross build
+Project name: mesa
+Project version: 25.1.9
+-----------
+Detecting compiler via: `x86_64-w64-mingw32-gcc --version` -> 0
+stdout:
+x86_64-w64-mingw32-gcc (GCC) 14-win32
+Copyright (C) 2024 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+-----------
+Running command: -cpp -x c -E -dM -
+-----
+-----------
+Detecting linker via: `x86_64-w64-mingw32-gcc -Wl,--version` -> 0
+stdout:
+GNU ld (GNU Binutils) 2.44
+Copyright (C) 2025 Free Software Foundation, Inc.
+This program is free software; you may redistribute it under the terms of
+the GNU General Public License version 3 or (at your option) a later version.
+This program has absolutely no warranty.
+-----------
+stderr:
+collect2 version 14-win32
+/usr/bin/x86_64-w64-mingw32-ld -plugin /usr/lib/gcc/x86_64-w64-mingw32/14-win32/liblto_plugin.so -plugin-opt=/usr/lib/gcc/x86_64-w64-mingw32/14-win32/lto-wrapper -plugin-opt=-fresolution=/tmp/ccISCeLv.res -plugin-opt=-pass-through=-lmingw32 -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_eh -plugin-opt=-pass-through=-lmingwex -plugin-opt=-pass-through=-lmsvcrt -plugin-opt=-pass-through=-lkernel32 -plugin-opt=-pass-through=-ladvapi32 -plugin-opt=-pass-through=-lshell32 -plugin-opt=-pass-through=-luser32 -plugin-opt=-pass-through=-lkernel32 -plugin-opt=-pass-through=-lmingw32 -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_eh -plugin-opt=-pass-through=-lmingwex -plugin-opt=-pass-through=-lmsvcrt -plugin-opt=-pass-through=-lkernel32 -m i386pep -Bdynamic /usr/lib/gcc/x86_64-w64-mingw32/14-win32/../../../../x86_64-w64-mingw32/lib/crt2.o /usr/lib/gcc/x86_64-w64-mingw32/14-win32/crtbegin.o -L/usr/lib/gcc/x86_64-w64-mingw32/14-win32 -L/usr/lib/gcc/x86_64-w64-mingw32/14-win32/../../../../x86_64-w64-mingw32/lib --version -lmingw32 -lgcc -lgcc_eh -lmingwex -lmsvcrt -lkernel32 -ladvapi32 -lshell32 -luser32 -lkernel32 -lmingw32 -lgcc -lgcc_eh -lmingwex -lmsvcrt -lkernel32 /usr/lib/gcc/x86_64-w64-mingw32/14-win32/crtend.o
+-----------
+Sanity check compiler command line: x86_64-w64-mingw32-gcc -o sanity_check_for_c_cross.exe sanity_check_for_c.c -D_FILE_OFFSET_BITS=64 -c
+Sanity check compile stdout:
+
+-----
+Sanity check compile stderr:
+
+-----
+Cannot run cross check
+C compiler for the host machine: x86_64-w64-mingw32-gcc (gcc 14.0.0 "x86_64-w64-mingw32-gcc (GCC) 14-win32")
+C linker for the host machine: x86_64-w64-mingw32-gcc ld.bfd 2.44
+-----------
+Detecting archiver via: `x86_64-w64-mingw32-ar --version` -> 0
+stdout:
+GNU ar (GNU Binutils) 2.44
+Copyright (C) 2025 Free Software Foundation, Inc.
+This program is free software; you may redistribute it under the terms of
+the GNU General Public License version 3 or (at your option) any later version.
+This program has absolutely no warranty.
+-----------
+-----------
+Detecting compiler via: `x86_64-w64-mingw32-g++ --version` -> 0
+stdout:
+x86_64-w64-mingw32-g++ (GCC) 14-win32
+Copyright (C) 2024 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+-----------
+Running command: -cpp -x c++ -E -dM -
+-----
+-----------
+Detecting linker via: `x86_64-w64-mingw32-g++ -Wl,--version` -> 0
+stdout:
+GNU ld (GNU Binutils) 2.44
+Copyright (C) 2025 Free Software Foundation, Inc.
+This program is free software; you may redistribute it under the terms of
+the GNU General Public License version 3 or (at your option) a later version.
+This program has absolutely no warranty.
+-----------
+stderr:
+collect2 version 14-win32
+/usr/bin/x86_64-w64-mingw32-ld -plugin /usr/lib/gcc/x86_64-w64-mingw32/14-win32/liblto_plugin.so -plugin-opt=/usr/lib/gcc/x86_64-w64-mingw32/14-win32/lto-wrapper -plugin-opt=-fresolution=/tmp/ccYTFRpA.res -plugin-opt=-pass-through=-lmingw32 -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lmingwex -plugin-opt=-pass-through=-lmsvcrt -plugin-opt=-pass-through=-lkernel32 -plugin-opt=-pass-through=-ladvapi32 -plugin-opt=-pass-through=-lshell32 -plugin-opt=-pass-through=-luser32 -plugin-opt=-pass-through=-lkernel32 -plugin-opt=-pass-through=-lmingw32 -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lmingwex -plugin-opt=-pass-through=-lmsvcrt -plugin-opt=-pass-through=-lkernel32 -m i386pep -Bdynamic /usr/lib/gcc/x86_64-w64-mingw32/14-win32/../../../../x86_64-w64-mingw32/lib/crt2.o /usr/lib/gcc/x86_64-w64-mingw32/14-win32/crtbegin.o -L/usr/lib/gcc/x86_64-w64-mingw32/14-win32 -L/usr/lib/gcc/x86_64-w64-mingw32/14-win32/../../../../x86_64-w64-mingw32/lib --version -lstdc++ -lmingw32 -lgcc_s -lgcc -lmingwex -lmsvcrt -lkernel32 -ladvapi32 -lshell32 -luser32 -lkernel32 -lmingw32 -lgcc_s -lgcc -lmingwex -lmsvcrt -lkernel32 /usr/lib/gcc/x86_64-w64-mingw32/14-win32/crtend.o
+-----------
+Sanity check compiler command line: x86_64-w64-mingw32-g++ -o sanity_check_for_cpp_cross.exe sanity_check_for_cpp.cpp -D_FILE_OFFSET_BITS=64 -c
+Sanity check compile stdout:
+
+-----
+Sanity check compile stderr:
+
+-----
+Cannot run cross check
+C++ compiler for the host machine: x86_64-w64-mingw32-g++ (gcc 14.0.0 "x86_64-w64-mingw32-g++ (GCC) 14-win32")
+C++ linker for the host machine: x86_64-w64-mingw32-g++ ld.bfd 2.44
+-----------
+Detecting compiler via: `cc --version` -> 0
+stdout:
+cc (Debian 14.2.0-19) 14.2.0
+Copyright (C) 2024 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+-----------
+Running command: -cpp -x c -E -dM -
+-----
+-----------
+Detecting linker via: `cc -Wl,--version` -> 0
+stdout:
+GNU ld (GNU Binutils for Debian) 2.44
+Copyright (C) 2025 Free Software Foundation, Inc.
+This program is free software; you may redistribute it under the terms of
+the GNU General Public License version 3 or (at your option) a later version.
+This program has absolutely no warranty.
+-----------
+stderr:
+collect2 version 14.2.0
+/usr/bin/ld -plugin /usr/libexec/gcc/x86_64-linux-gnu/14/liblto_plugin.so -plugin-opt=/usr/libexec/gcc/x86_64-linux-gnu/14/lto-wrapper -plugin-opt=-fresolution=/tmp/ccffBSXi.res -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s --build-id --eh-frame-hdr -m elf_x86_64 --hash-style=gnu --as-needed -dynamic-linker /lib64/ld-linux-x86-64.so.2 -pie /usr/lib/gcc/x86_64-linux-gnu/14/../../../x86_64-linux-gnu/Scrt1.o /usr/lib/gcc/x86_64-linux-gnu/14/../../../x86_64-linux-gnu/crti.o /usr/lib/gcc/x86_64-linux-gnu/14/crtbeginS.o -L/usr/lib/gcc/x86_64-linux-gnu/14 -L/usr/lib/gcc/x86_64-linux-gnu/14/../../../x86_64-linux-gnu -L/usr/lib/gcc/x86_64-linux-gnu/14/../../../../lib -L/lib/x86_64-linux-gnu -L/lib/../lib -L/usr/lib/x86_64-linux-gnu -L/usr/lib/../lib -L/usr/lib/gcc/x86_64-linux-gnu/14/../../.. --version -lgcc --push-state --as-needed -lgcc_s --pop-state -lc -lgcc --push-state --as-needed -lgcc_s --pop-state /usr/lib/gcc/x86_64-linux-gnu/14/crtendS.o /usr/lib/gcc/x86_64-linux-gnu/14/../../../x86_64-linux-gnu/crtn.o
+-----------
+Sanity check compiler command line: cc -o sanity_check_for_c.exe sanity_check_for_c.c -D_FILE_OFFSET_BITS=64
+Sanity check compile stdout:
+
+-----
+Sanity check compile stderr:
+
+-----
+Sanity check built target output for build machine c compiler
+ -- Running test binary command:  /workspace/xbox-readiness/dzn/build/meson-private/sanity_check_for_c.exe
+-----------
+Sanity check: `/workspace/xbox-readiness/dzn/build/meson-private/sanity_check_for_c.exe` -> 0
+ -- stdout:
+ 
+ -- stderr:
+ 
+ -- returncode: 0
+C compiler for the build machine: cc (gcc 14.2.0 "cc (Debian 14.2.0-19) 14.2.0")
+C linker for the build machine: cc ld.bfd 2.44
+-----------
+Detecting archiver via: `gcc-ar --version` -> 0
+stdout:
+GNU ar (GNU Binutils for Debian) 2.44
+Copyright (C) 2025 Free Software Foundation, Inc.
+This program is free software; you may redistribute it under the terms of
+the GNU General Public License version 3 or (at your option) any later version.
+This program has absolutely no warranty.
+-----------
+-----------
+Detecting compiler via: `c++ --version` -> 0
+stdout:
+c++ (Debian 14.2.0-19) 14.2.0
+Copyright (C) 2024 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+-----------
+Running command: -cpp -x c++ -E -dM -
+-----
+-----------
+Detecting linker via: `c++ -Wl,--version` -> 0
+stdout:
+GNU ld (GNU Binutils for Debian) 2.44
+Copyright (C) 2025 Free Software Foundation, Inc.
+This program is free software; you may redistribute it under the terms of
+the GNU General Public License version 3 or (at your option) a later version.
+This program has absolutely no warranty.
+-----------
+stderr:
+collect2 version 14.2.0
+/usr/bin/ld -plugin /usr/libexec/gcc/x86_64-linux-gnu/14/liblto_plugin.so -plugin-opt=/usr/libexec/gcc/x86_64-linux-gnu/14/lto-wrapper -plugin-opt=-fresolution=/tmp/cc6JUucF.res -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc --build-id --eh-frame-hdr -m elf_x86_64 --hash-style=gnu --as-needed -dynamic-linker /lib64/ld-linux-x86-64.so.2 -pie /usr/lib/gcc/x86_64-linux-gnu/14/../../../x86_64-linux-gnu/Scrt1.o /usr/lib/gcc/x86_64-linux-gnu/14/../../../x86_64-linux-gnu/crti.o /usr/lib/gcc/x86_64-linux-gnu/14/crtbeginS.o -L/usr/lib/gcc/x86_64-linux-gnu/14 -L/usr/lib/gcc/x86_64-linux-gnu/14/../../../x86_64-linux-gnu -L/usr/lib/gcc/x86_64-linux-gnu/14/../../../../lib -L/lib/x86_64-linux-gnu -L/lib/../lib -L/usr/lib/x86_64-linux-gnu -L/usr/lib/../lib -L/usr/lib/gcc/x86_64-linux-gnu/14/../../.. --version -lstdc++ -lm -lgcc_s -lgcc -lc -lgcc_s -lgcc /usr/lib/gcc/x86_64-linux-gnu/14/crtendS.o /usr/lib/gcc/x86_64-linux-gnu/14/../../../x86_64-linux-gnu/crtn.o
+-----------
+Sanity check compiler command line: c++ -o sanity_check_for_cpp.exe sanity_check_for_cpp.cpp -D_FILE_OFFSET_BITS=64
+Sanity check compile stdout:
+
+-----
+Sanity check compile stderr:
+
+-----
+Sanity check built target output for build machine cpp compiler
+ -- Running test binary command:  /workspace/xbox-readiness/dzn/build/meson-private/sanity_check_for_cpp.exe
+-----------
+Sanity check: `/workspace/xbox-readiness/dzn/build/meson-private/sanity_check_for_cpp.exe` -> 0
+ -- stdout:
+ 
+ -- stderr:
+ 
+ -- returncode: 0
+C++ compiler for the build machine: c++ (gcc 14.2.0 "c++ (Debian 14.2.0-19) 14.2.0")
+C++ linker for the build machine: c++ ld.bfd 2.44
+Build machine cpu family: x86_64
+Build machine cpu: x86_64
+Host machine cpu family: x86_64
+Host machine cpu: x86_64
+Target machine cpu family: x86_64
+Target machine cpu: x86_64
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpx_78spyc
+Code:
+
+        #include <stddef.h>
+        int main(void) {
+            void* something;
+            return 0;
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpx_78spyc/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpx_78spyc/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11` -> 0
+Running compile:
+Working directory:  /tmp/tmpp47pf40y
+Code:
+
+        
+        #ifndef sizeof(void*)
+        # define sizeof(void*) "MESON_GET_DEFINE_UNDEFINED_SENTINEL"
+        #endif
+        "MESON_GET_DEFINE_DELIMITER_START"
+sizeof(void*)
+"MESON_GET_DEFINE_DELIMITER_END"
+-----------
+Command line: `x86_64-w64-mingw32-gcc /tmp/tmpp47pf40y/testfile.c -E -P -D_FILE_OFFSET_BITS=64 -P -O0 -U_FORTIFY_SOURCE -std=c11` -> 1
+stdout:
+"MESON_GET_DEFINE_DELIMITER_START"
+sizeof(void*)
+"MESON_GET_DEFINE_DELIMITER_END"
+-----------
+stderr:
+/tmp/tmpp47pf40y/testfile.c:3:23: warning: extra tokens at end of #ifndef directive
+    3 |         #ifndef sizeof(void*)
+      |                       ^
+/tmp/tmpp47pf40y/testfile.c:4:29: error: expected ',' or ')', found "*"
+    4 |         # define sizeof(void*) "MESON_GET_DEFINE_UNDEFINED_SENTINEL"
+      |                             ^
+-----------
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmprqdki6du
+Code:
+
+        #include <stddef.h>
+        int main(void) { static int a[1-2*!(sizeof(void*) >= 0)]; a[0]=0; return 0; }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmprqdki6du/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmprqdki6du/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11` -> 0
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmp6nvp47bb
+Code:
+
+        #include <stddef.h>
+        int main(void) { static int a[1-2*!(sizeof(void*) > 0)]; a[0]=0; return 0; }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmp6nvp47bb/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmp6nvp47bb/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11` -> 0
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpbgn952l2
+Code:
+
+        #include <stddef.h>
+        int main(void) { static int a[1-2*!(sizeof(void*) > 1)]; a[0]=0; return 0; }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpbgn952l2/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpbgn952l2/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11` -> 0
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmp677pw1l6
+Code:
+
+        #include <stddef.h>
+        int main(void) { static int a[1-2*!(sizeof(void*) > 3)]; a[0]=0; return 0; }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmp677pw1l6/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmp677pw1l6/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11` -> 0
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmp9a0jd0b4
+Code:
+
+        #include <stddef.h>
+        int main(void) { static int a[1-2*!(sizeof(void*) > 7)]; a[0]=0; return 0; }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmp9a0jd0b4/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmp9a0jd0b4/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11` -> 0
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmphr3p7m5b
+Code:
+
+        #include <stddef.h>
+        int main(void) { static int a[1-2*!(sizeof(void*) > 15)]; a[0]=0; return 0; }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmphr3p7m5b/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmphr3p7m5b/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11` -> 1
+stderr:
+/workspace/xbox-readiness/dzn/build/meson-private/tmphr3p7m5b/testfile.c: In function 'main':
+/workspace/xbox-readiness/dzn/build/meson-private/tmphr3p7m5b/testfile.c:3:37: error: size of array 'a' is negative
+    3 |         int main(void) { static int a[1-2*!(sizeof(void*) > 15)]; a[0]=0; return 0; }
+      |                                     ^
+-----------
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpgztik5kq
+Code:
+
+        #include <stddef.h>
+        int main(void) { static int a[1-2*!(sizeof(void*) <= 11)]; a[0]=0; return 0; }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpgztik5kq/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpgztik5kq/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11` -> 0
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpxycqkwu6
+Code:
+
+        #include <stddef.h>
+        int main(void) { static int a[1-2*!(sizeof(void*) <= 9)]; a[0]=0; return 0; }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpxycqkwu6/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpxycqkwu6/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11` -> 0
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmps85vi9eq
+Code:
+
+        #include <stddef.h>
+        int main(void) { static int a[1-2*!(sizeof(void*) <= 8)]; a[0]=0; return 0; }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmps85vi9eq/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmps85vi9eq/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11` -> 0
+Checking for size of "void*" : 8 
+src/mesa-25.1.9/meson.build:268: WARNING: Conditional on version '< 1.3' always evaluates to false
+src/mesa-25.1.9/meson.build:524: WARNING: cannot auto-detect -mtls-dialect when cross-compiling, using compiler default
+Dependency libglvnd for host machine skipped: feature glvnd disabled
+Pkg-config binary for host machine specified from cross file, native file, or env var as ['pkg-config']
+Found pkg-config: YES (/usr/bin/pkg-config) 1.8.1
+Determining dependency 'directx-headers' with pkg-config executable '/usr/bin/pkg-config'
+env[PKG_CONFIG_PATH]: 
+env[PKG_CONFIG_LIBDIR]: /workspace/xbox-readiness/dzn/install/lib/pkgconfig
+env[PKG_CONFIG]: /usr/bin/pkg-config
+-----------
+Called: `/usr/bin/pkg-config --modversion directx-headers` -> 1
+stderr:
+Package directx-headers was not found in the pkg-config search path.
+Perhaps you should add the directory containing `directx-headers.pc'
+to the PKG_CONFIG_PATH environment variable
+Package 'directx-headers', required by 'virtual:world', not found
+-----------
+CMake binary for host machine is not cached
+CMake binary missing from cross or native file, or env var undefined.
+Default target is not allowed for cross use
+Found CMake: NO
+CMake binary for machine host machine not found. Giving up.
+Run-time dependency directx-headers found: NO  (tried pkg-config and cmake)
+Determining dependency 'DirectX-Headers' with pkg-config executable '/usr/bin/pkg-config'
+env[PKG_CONFIG_PATH]: 
+env[PKG_CONFIG_LIBDIR]: /workspace/xbox-readiness/dzn/install/lib/pkgconfig
+env[PKG_CONFIG]: /usr/bin/pkg-config
+-----------
+Called: `/usr/bin/pkg-config --modversion DirectX-Headers` -> 1
+stderr:
+Package DirectX-Headers was not found in the pkg-config search path.
+Perhaps you should add the directory containing `DirectX-Headers.pc'
+to the PKG_CONFIG_PATH environment variable
+Package 'DirectX-Headers', required by 'virtual:world', not found
+-----------
+CMake binary for host machine is cached as not found
+CMake binary for machine host machine not found. Giving up.
+Run-time dependency directx-headers found: NO  (tried pkg-config and cmake)
+Looking for a fallback subproject for the dependency DirectX-Headers
+
+Executing subproject DirectX-Headers for machine: host 
+
+Project name: DirectX-Headers
+Project version: 1.619.5
+C++ compiler for the host machine: x86_64-w64-mingw32-g++ (gcc 14.0.0 "x86_64-w64-mingw32-g++ (GCC) 14-win32")
+C++ linker for the host machine: x86_64-w64-mingw32-g++ ld.bfd 2.44
+C++ compiler for the build machine: c++ (gcc 14.2.0 "c++ (Debian 14.2.0-19) 14.2.0")
+C++ linker for the build machine: c++ ld.bfd 2.44
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpoubdyubf
+Code:
+int main(void) { return 0; }
+
+-----------
+Command line: `x86_64-w64-mingw32-g++ /workspace/xbox-readiness/dzn/build/meson-private/tmpoubdyubf/testfile.cpp -o /workspace/xbox-readiness/dzn/build/meson-private/tmpoubdyubf/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -fpermissive -ld3d12 -Wl,--allow-shlib-undefined` -> 0
+Library d3d12 found: YES
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmp3hkamyn4
+Code:
+int main(void) { return 0; }
+
+-----------
+Command line: `x86_64-w64-mingw32-g++ /workspace/xbox-readiness/dzn/build/meson-private/tmp3hkamyn4/testfile.cpp -o /workspace/xbox-readiness/dzn/build/meson-private/tmp3hkamyn4/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -fpermissive -ldxcore -Wl,--allow-shlib-undefined` -> 0
+Library dxcore found: YES
+Pkg-config binary for host machine specified from cross file, native file, or env var as ['pkg-config']
+Found pkg-config: YES (/usr/bin/pkg-config) 1.8.1
+Build targets in project: 2
+Subproject DirectX-Headers finished.
+
+Dependency DirectX-Headers for host machine found: YES 1.619.5 (overridden)
+Dependency vdpau for host machine skipped: feature gallium-vdpau disabled
+Program glslangValidator found: YES (/usr/bin/glslangValidator)
+Running command: /usr/bin/glslangValidator --version
+--- stdout ---
+Glslang Version: 11:15.2.0
+ESSL Version: OpenGL ES GLSL 3.20 glslang Khronos. 15.2.0
+GLSL Version: 4.60 glslang Khronos. 15.2.0
+SPIR-V Version 0x00010600, Revision 1
+GLSL.std.450 Version 100, Revision 1
+Khronos Tool ID 8
+SPIR-V Generator Version 11
+GL_KHR_vulkan_glsl version 100
+ARB_GL_gl_spirv version 100
+
+--- stderr ---
+
+
+Running command: /usr/bin/glslangValidator --quiet --version
+--- stdout ---
+Glslang Version: 11:15.2.0
+ESSL Version: OpenGL ES GLSL 3.20 glslang Khronos. 15.2.0
+GLSL Version: 4.60 glslang Khronos. 15.2.0
+SPIR-V Version 0x00010600, Revision 1
+GLSL.std.450 Version 100, Revision 1
+Khronos Tool ID 8
+SPIR-V Generator Version 11
+GL_KHR_vulkan_glsl version 100
+ARB_GL_gl_spirv version 100
+
+--- stderr ---
+
+
+Dependency libva-win32 for host machine skipped: feature gallium-va disabled
+Running command: /workspace/xbox-readiness/dzn/venv/bin/python3 --version
+--- stdout ---
+Python 3.13.5
+
+--- stderr ---
+
+
+Program python3 found: YES 3.13.5 3.13.5 (/workspace/xbox-readiness/dzn/venv/bin/python3)
+Running command: /workspace/xbox-readiness/dzn/venv/bin/python3 -c '
+try:
+  from packaging.version import Version
+except:
+  from distutils.version import StrictVersion as Version
+import mako
+assert Version(mako.__version__) >= Version("0.8.0")
+  '
+--- stdout ---
+
+--- stderr ---
+
+
+Running command: /workspace/xbox-readiness/dzn/venv/bin/python3 -c '
+import yaml
+  '
+--- stdout ---
+
+--- stderr ---
+
+
+Running compile:
+Working directory:  /tmp/tmp0sre5tw_
+Code:
+
+        #include <errno.h>
+        #ifndef ETIME
+        # define ETIME "MESON_GET_DEFINE_UNDEFINED_SENTINEL"
+        #endif
+        "MESON_GET_DEFINE_DELIMITER_START"
+ETIME
+"MESON_GET_DEFINE_DELIMITER_END"
+-----------
+Command line: `x86_64-w64-mingw32-gcc /tmp/tmp0sre5tw_/testfile.c -E -P -D_FILE_OFFSET_BITS=64 -P -O0 -U_FORTIFY_SOURCE -std=c11` -> 0
+stdout:
+#pragma pack(push,_CRT_PACKING)
+  typedef __builtin_va_list __gnuc_va_list;
+  typedef __gnuc_va_list va_list;
+#pragma pack(pop)
+void __attribute__((__cdecl__)) __debugbreak(void);
+extern __inline__ __attribute__((__always_inline__,__gnu_inline__)) void __attribute__((__cdecl__)) __debugbreak(void)
+{
+  __asm__ __volatile__("int {$}3":);
+}
+void __attribute__((__cdecl__)) __attribute__ ((__noreturn__)) __fastfail(unsigned int code);
+extern __inline__ __attribute__((__always_inline__,__gnu_inline__)) void __attribute__((__cdecl__)) __attribute__ ((__noreturn__)) __fastfail(unsigned int code)
+{
+  __asm__ __volatile__("int {$}0x29"::"c"(code));
+  __builtin_unreachable();
+}
+const char *__mingw_get_crt_info (void);
+#pragma pack(push,_CRT_PACKING)
+__extension__ typedef unsigned long long size_t;
+__extension__ typedef long long ssize_t;
+typedef size_t rsize_t;
+__extension__ typedef long long intptr_t;
+__extension__ typedef unsigned long long uintptr_t;
+__extension__ typedef long long ptrdiff_t;
+typedef unsigned short wchar_t;
+typedef unsigned short wint_t;
+typedef unsigned short wctype_t;
+typedef int errno_t;
+typedef long __time32_t;
+__extension__ typedef long long __time64_t;
+typedef __time64_t time_t;
+struct threadlocaleinfostruct;
+struct threadmbcinfostruct;
+typedef struct threadlocaleinfostruct *pthreadlocinfo;
+typedef struct threadmbcinfostruct *pthreadmbcinfo;
+struct __lc_time_data;
+typedef struct localeinfo_struct {
+  pthreadlocinfo locinfo;
+  pthreadmbcinfo mbcinfo;
+} _locale_tstruct,*_locale_t;
+typedef struct tagLC_ID {
+  unsigned short wLanguage;
+  unsigned short wCountry;
+  unsigned short wCodePage;
+} LC_ID,*LPLC_ID;
+typedef struct threadlocaleinfostruct {
+  int refcount;
+  unsigned int lc_codepage;
+  unsigned int lc_collate_cp;
+  unsigned long lc_handle[6];
+  LC_ID lc_id[6];
+  struct {
+    char *locale;
+    wchar_t *wlocale;
+    int *refcount;
+    int *wrefcount;
+  } lc_category[6];
+  int lc_clike;
+  int mb_cur_max;
+  int *lconv_intl_refcount;
+  int *lconv_num_refcount;
+  int *lconv_mon_refcount;
+  struct lconv *lconv;
+  int *ctype1_refcount;
+  unsigned short *ctype1;
+  const unsigned short *pctype;
+  const unsigned char *pclmap;
+  const unsigned char *pcumap;
+  struct __lc_time_data *lc_time_curr;
+} threadlocinfo;
+#pragma pack(pop)
+__attribute__ ((__dllimport__)) extern int *__attribute__((__cdecl__)) _errno(void);
+errno_t __attribute__((__cdecl__)) _set_errno(int _Value);
+errno_t __attribute__((__cdecl__)) _get_errno(int *_Value);
+        "MESON_GET_DEFINE_DELIMITER_START"
+137
+"MESON_GET_DEFINE_DELIMITER_END"
+-----------
+Fetching value of define "ETIME" : 137 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmp4bu5tpxw
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmp4bu5tpxw/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmp4bu5tpxw/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -gsplit-dwarf` -> 0
+Compiler for C supports arguments -gsplit-dwarf: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmp_t5jc71y
+Code:
+int main(void) { return 0; }
+
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmp_t5jc71y/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmp_t5jc71y/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -Wl,--fatal-warnings -Wl,--gdb-index` -> 1
+stderr:
+/usr/bin/x86_64-w64-mingw32-ld: unrecognized option '--gdb-index'
+/usr/bin/x86_64-w64-mingw32-ld: use the --help option for usage information
+collect2: error: ld returned 1 exit status
+-----------
+Compiler for C supports link arguments -Wl,--gdb-index: NO 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpkv4kga8w
+Code:
+
+        #define bswap32 meson_disable_define_of_bswap32
+        
+        #include <limits.h>
+        #undef bswap32
+        
+        #ifdef __cplusplus
+        extern "C"
+        #endif
+        char bswap32 (void);
+        
+        #if defined __stub_bswap32 || defined __stub___bswap32
+        fail fail fail this function is not going to work
+        #endif
+        
+        int main(void) {
+          return bswap32 ();
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpkv4kga8w/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpkv4kga8w/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group` -> 1
+stderr:
+/usr/bin/x86_64-w64-mingw32-ld: /tmp/ccKSKYBz.o:testfile.c:(.text+0xe): undefined reference to `bswap32'
+collect2: error: ld returned 1 exit status
+-----------
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmp15sg6wgx
+Code:
+
+        int main(void) {
+
+        /* With some toolchains (MSYS2/mingw for example) the compiler
+         * provides various builtins which are not really implemented and
+         * fall back to the stdlib where they aren't provided and fail at
+         * build/link time. In case the user provides a header, including
+         * the header didn't lead to the function being defined, and the
+         * function we are checking isn't a builtin itself we assume the
+         * builtin is not functional and we just error out. */
+        #if !1 && !defined(bswap32) && !0
+            #error "No definition for __builtin_bswap32 found in the prefix"
+        #endif
+
+        #ifdef __has_builtin
+            #if !__has_builtin(__builtin_bswap32)
+                #error "__builtin_bswap32 not found"
+            #endif
+        #elif ! defined(bswap32)
+            __builtin_bswap32;
+        #endif
+        return 0;
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmp15sg6wgx/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmp15sg6wgx/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group` -> 0
+Checking for function "bswap32" : YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmp9rpadgxd
+Code:
+
+        #define bswap64 meson_disable_define_of_bswap64
+        
+        #include <limits.h>
+        #undef bswap64
+        
+        #ifdef __cplusplus
+        extern "C"
+        #endif
+        char bswap64 (void);
+        
+        #if defined __stub_bswap64 || defined __stub___bswap64
+        fail fail fail this function is not going to work
+        #endif
+        
+        int main(void) {
+          return bswap64 ();
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmp9rpadgxd/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmp9rpadgxd/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group` -> 1
+stderr:
+/usr/bin/x86_64-w64-mingw32-ld: /tmp/ccOXM0PC.o:testfile.c:(.text+0xe): undefined reference to `bswap64'
+collect2: error: ld returned 1 exit status
+-----------
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmph3jzyjig
+Code:
+
+        int main(void) {
+
+        /* With some toolchains (MSYS2/mingw for example) the compiler
+         * provides various builtins which are not really implemented and
+         * fall back to the stdlib where they aren't provided and fail at
+         * build/link time. In case the user provides a header, including
+         * the header didn't lead to the function being defined, and the
+         * function we are checking isn't a builtin itself we assume the
+         * builtin is not functional and we just error out. */
+        #if !1 && !defined(bswap64) && !0
+            #error "No definition for __builtin_bswap64 found in the prefix"
+        #endif
+
+        #ifdef __has_builtin
+            #if !__has_builtin(__builtin_bswap64)
+                #error "__builtin_bswap64 not found"
+            #endif
+        #elif ! defined(bswap64)
+            __builtin_bswap64;
+        #endif
+        return 0;
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmph3jzyjig/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmph3jzyjig/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group` -> 0
+Checking for function "bswap64" : YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpqmdomg8p
+Code:
+
+        #define clz meson_disable_define_of_clz
+        
+        #include <limits.h>
+        #undef clz
+        
+        #ifdef __cplusplus
+        extern "C"
+        #endif
+        char clz (void);
+        
+        #if defined __stub_clz || defined __stub___clz
+        fail fail fail this function is not going to work
+        #endif
+        
+        int main(void) {
+          return clz ();
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpqmdomg8p/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpqmdomg8p/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group` -> 1
+stderr:
+/usr/bin/x86_64-w64-mingw32-ld: /tmp/ccsUsKtP.o:testfile.c:(.text+0xe): undefined reference to `clz'
+collect2: error: ld returned 1 exit status
+-----------
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmp0q3mz8p7
+Code:
+
+        int main(void) {
+
+        /* With some toolchains (MSYS2/mingw for example) the compiler
+         * provides various builtins which are not really implemented and
+         * fall back to the stdlib where they aren't provided and fail at
+         * build/link time. In case the user provides a header, including
+         * the header didn't lead to the function being defined, and the
+         * function we are checking isn't a builtin itself we assume the
+         * builtin is not functional and we just error out. */
+        #if !1 && !defined(clz) && !0
+            #error "No definition for __builtin_clz found in the prefix"
+        #endif
+
+        #ifdef __has_builtin
+            #if !__has_builtin(__builtin_clz)
+                #error "__builtin_clz not found"
+            #endif
+        #elif ! defined(clz)
+            __builtin_clz;
+        #endif
+        return 0;
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmp0q3mz8p7/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmp0q3mz8p7/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group` -> 0
+Checking for function "clz" : YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmprhw0i_bb
+Code:
+
+        #define clzll meson_disable_define_of_clzll
+        
+        #include <limits.h>
+        #undef clzll
+        
+        #ifdef __cplusplus
+        extern "C"
+        #endif
+        char clzll (void);
+        
+        #if defined __stub_clzll || defined __stub___clzll
+        fail fail fail this function is not going to work
+        #endif
+        
+        int main(void) {
+          return clzll ();
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmprhw0i_bb/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmprhw0i_bb/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group` -> 1
+stderr:
+/usr/bin/x86_64-w64-mingw32-ld: /tmp/ccMNaYzF.o:testfile.c:(.text+0xe): undefined reference to `clzll'
+collect2: error: ld returned 1 exit status
+-----------
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpemvsjjc2
+Code:
+
+        int main(void) {
+
+        /* With some toolchains (MSYS2/mingw for example) the compiler
+         * provides various builtins which are not really implemented and
+         * fall back to the stdlib where they aren't provided and fail at
+         * build/link time. In case the user provides a header, including
+         * the header didn't lead to the function being defined, and the
+         * function we are checking isn't a builtin itself we assume the
+         * builtin is not functional and we just error out. */
+        #if !1 && !defined(clzll) && !0
+            #error "No definition for __builtin_clzll found in the prefix"
+        #endif
+
+        #ifdef __has_builtin
+            #if !__has_builtin(__builtin_clzll)
+                #error "__builtin_clzll not found"
+            #endif
+        #elif ! defined(clzll)
+            __builtin_clzll;
+        #endif
+        return 0;
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpemvsjjc2/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpemvsjjc2/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group` -> 0
+Checking for function "clzll" : YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpmdo4a1gw
+Code:
+
+        #define ctz meson_disable_define_of_ctz
+        
+        #include <limits.h>
+        #undef ctz
+        
+        #ifdef __cplusplus
+        extern "C"
+        #endif
+        char ctz (void);
+        
+        #if defined __stub_ctz || defined __stub___ctz
+        fail fail fail this function is not going to work
+        #endif
+        
+        int main(void) {
+          return ctz ();
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpmdo4a1gw/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpmdo4a1gw/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group` -> 1
+stderr:
+/usr/bin/x86_64-w64-mingw32-ld: /tmp/ccy3qJ2E.o:testfile.c:(.text+0xe): undefined reference to `ctz'
+collect2: error: ld returned 1 exit status
+-----------
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpz0ly84sb
+Code:
+
+        int main(void) {
+
+        /* With some toolchains (MSYS2/mingw for example) the compiler
+         * provides various builtins which are not really implemented and
+         * fall back to the stdlib where they aren't provided and fail at
+         * build/link time. In case the user provides a header, including
+         * the header didn't lead to the function being defined, and the
+         * function we are checking isn't a builtin itself we assume the
+         * builtin is not functional and we just error out. */
+        #if !1 && !defined(ctz) && !0
+            #error "No definition for __builtin_ctz found in the prefix"
+        #endif
+
+        #ifdef __has_builtin
+            #if !__has_builtin(__builtin_ctz)
+                #error "__builtin_ctz not found"
+            #endif
+        #elif ! defined(ctz)
+            __builtin_ctz;
+        #endif
+        return 0;
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpz0ly84sb/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpz0ly84sb/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group` -> 0
+Checking for function "ctz" : YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmputx0tlih
+Code:
+
+        #define expect meson_disable_define_of_expect
+        
+        #include <limits.h>
+        #undef expect
+        
+        #ifdef __cplusplus
+        extern "C"
+        #endif
+        char expect (void);
+        
+        #if defined __stub_expect || defined __stub___expect
+        fail fail fail this function is not going to work
+        #endif
+        
+        int main(void) {
+          return expect ();
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmputx0tlih/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmputx0tlih/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group` -> 1
+stderr:
+/usr/bin/x86_64-w64-mingw32-ld: /tmp/ccIXTHvM.o:testfile.c:(.text+0xe): undefined reference to `expect'
+collect2: error: ld returned 1 exit status
+-----------
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpw4oqk5kg
+Code:
+
+        int main(void) {
+
+        /* With some toolchains (MSYS2/mingw for example) the compiler
+         * provides various builtins which are not really implemented and
+         * fall back to the stdlib where they aren't provided and fail at
+         * build/link time. In case the user provides a header, including
+         * the header didn't lead to the function being defined, and the
+         * function we are checking isn't a builtin itself we assume the
+         * builtin is not functional and we just error out. */
+        #if !1 && !defined(expect) && !0
+            #error "No definition for __builtin_expect found in the prefix"
+        #endif
+
+        #ifdef __has_builtin
+            #if !__has_builtin(__builtin_expect)
+                #error "__builtin_expect not found"
+            #endif
+        #elif ! defined(expect)
+            __builtin_expect;
+        #endif
+        return 0;
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpw4oqk5kg/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpw4oqk5kg/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group` -> 0
+Checking for function "expect" : YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpa5k692cr
+Code:
+
+        #define ffs meson_disable_define_of_ffs
+        
+        #include <limits.h>
+        #undef ffs
+        
+        #ifdef __cplusplus
+        extern "C"
+        #endif
+        char ffs (void);
+        
+        #if defined __stub_ffs || defined __stub___ffs
+        fail fail fail this function is not going to work
+        #endif
+        
+        int main(void) {
+          return ffs ();
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpa5k692cr/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpa5k692cr/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group` -> 1
+stderr:
+/usr/bin/x86_64-w64-mingw32-ld: /tmp/ccDNGSOv.o:testfile.c:(.text+0xe): undefined reference to `ffs'
+collect2: error: ld returned 1 exit status
+-----------
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpvzjn278k
+Code:
+
+        int main(void) {
+
+        /* With some toolchains (MSYS2/mingw for example) the compiler
+         * provides various builtins which are not really implemented and
+         * fall back to the stdlib where they aren't provided and fail at
+         * build/link time. In case the user provides a header, including
+         * the header didn't lead to the function being defined, and the
+         * function we are checking isn't a builtin itself we assume the
+         * builtin is not functional and we just error out. */
+        #if !1 && !defined(ffs) && !0
+            #error "No definition for __builtin_ffs found in the prefix"
+        #endif
+
+        #ifdef __has_builtin
+            #if !__has_builtin(__builtin_ffs)
+                #error "__builtin_ffs not found"
+            #endif
+        #elif ! defined(ffs)
+            __builtin_ffs;
+        #endif
+        return 0;
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpvzjn278k/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpvzjn278k/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group` -> 0
+Checking for function "ffs" : YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpis8_cv99
+Code:
+
+        #define ffsll meson_disable_define_of_ffsll
+        
+        #include <limits.h>
+        #undef ffsll
+        
+        #ifdef __cplusplus
+        extern "C"
+        #endif
+        char ffsll (void);
+        
+        #if defined __stub_ffsll || defined __stub___ffsll
+        fail fail fail this function is not going to work
+        #endif
+        
+        int main(void) {
+          return ffsll ();
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpis8_cv99/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpis8_cv99/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group` -> 1
+stderr:
+/usr/bin/x86_64-w64-mingw32-ld: /tmp/cczVnkyy.o:testfile.c:(.text+0xe): undefined reference to `ffsll'
+collect2: error: ld returned 1 exit status
+-----------
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpafwva5ej
+Code:
+
+        int main(void) {
+
+        /* With some toolchains (MSYS2/mingw for example) the compiler
+         * provides various builtins which are not really implemented and
+         * fall back to the stdlib where they aren't provided and fail at
+         * build/link time. In case the user provides a header, including
+         * the header didn't lead to the function being defined, and the
+         * function we are checking isn't a builtin itself we assume the
+         * builtin is not functional and we just error out. */
+        #if !1 && !defined(ffsll) && !0
+            #error "No definition for __builtin_ffsll found in the prefix"
+        #endif
+
+        #ifdef __has_builtin
+            #if !__has_builtin(__builtin_ffsll)
+                #error "__builtin_ffsll not found"
+            #endif
+        #elif ! defined(ffsll)
+            __builtin_ffsll;
+        #endif
+        return 0;
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpafwva5ej/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpafwva5ej/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group` -> 0
+Checking for function "ffsll" : YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpnpiy2pmo
+Code:
+
+        #define popcount meson_disable_define_of_popcount
+        
+        #include <limits.h>
+        #undef popcount
+        
+        #ifdef __cplusplus
+        extern "C"
+        #endif
+        char popcount (void);
+        
+        #if defined __stub_popcount || defined __stub___popcount
+        fail fail fail this function is not going to work
+        #endif
+        
+        int main(void) {
+          return popcount ();
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpnpiy2pmo/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpnpiy2pmo/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group` -> 1
+stderr:
+/usr/bin/x86_64-w64-mingw32-ld: /tmp/ccrP5HXO.o:testfile.c:(.text+0xe): undefined reference to `popcount'
+collect2: error: ld returned 1 exit status
+-----------
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpkkb1wiv8
+Code:
+
+        int main(void) {
+
+        /* With some toolchains (MSYS2/mingw for example) the compiler
+         * provides various builtins which are not really implemented and
+         * fall back to the stdlib where they aren't provided and fail at
+         * build/link time. In case the user provides a header, including
+         * the header didn't lead to the function being defined, and the
+         * function we are checking isn't a builtin itself we assume the
+         * builtin is not functional and we just error out. */
+        #if !1 && !defined(popcount) && !0
+            #error "No definition for __builtin_popcount found in the prefix"
+        #endif
+
+        #ifdef __has_builtin
+            #if !__has_builtin(__builtin_popcount)
+                #error "__builtin_popcount not found"
+            #endif
+        #elif ! defined(popcount)
+            __builtin_popcount;
+        #endif
+        return 0;
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpkkb1wiv8/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpkkb1wiv8/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group` -> 0
+Checking for function "popcount" : YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmp6z6jpnjc
+Code:
+
+        #define popcountll meson_disable_define_of_popcountll
+        
+        #include <limits.h>
+        #undef popcountll
+        
+        #ifdef __cplusplus
+        extern "C"
+        #endif
+        char popcountll (void);
+        
+        #if defined __stub_popcountll || defined __stub___popcountll
+        fail fail fail this function is not going to work
+        #endif
+        
+        int main(void) {
+          return popcountll ();
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmp6z6jpnjc/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmp6z6jpnjc/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group` -> 1
+stderr:
+/usr/bin/x86_64-w64-mingw32-ld: /tmp/ccwTa0Ve.o:testfile.c:(.text+0xe): undefined reference to `popcountll'
+collect2: error: ld returned 1 exit status
+-----------
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpufyzkxk8
+Code:
+
+        int main(void) {
+
+        /* With some toolchains (MSYS2/mingw for example) the compiler
+         * provides various builtins which are not really implemented and
+         * fall back to the stdlib where they aren't provided and fail at
+         * build/link time. In case the user provides a header, including
+         * the header didn't lead to the function being defined, and the
+         * function we are checking isn't a builtin itself we assume the
+         * builtin is not functional and we just error out. */
+        #if !1 && !defined(popcountll) && !0
+            #error "No definition for __builtin_popcountll found in the prefix"
+        #endif
+
+        #ifdef __has_builtin
+            #if !__has_builtin(__builtin_popcountll)
+                #error "__builtin_popcountll not found"
+            #endif
+        #elif ! defined(popcountll)
+            __builtin_popcountll;
+        #endif
+        return 0;
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpufyzkxk8/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpufyzkxk8/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group` -> 0
+Checking for function "popcountll" : YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpnqba8q92
+Code:
+
+        #define unreachable meson_disable_define_of_unreachable
+        
+        #include <limits.h>
+        #undef unreachable
+        
+        #ifdef __cplusplus
+        extern "C"
+        #endif
+        char unreachable (void);
+        
+        #if defined __stub_unreachable || defined __stub___unreachable
+        fail fail fail this function is not going to work
+        #endif
+        
+        int main(void) {
+          return unreachable ();
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpnqba8q92/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpnqba8q92/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group` -> 1
+stderr:
+/usr/bin/x86_64-w64-mingw32-ld: /tmp/ccVCZByO.o:testfile.c:(.text+0xe): undefined reference to `unreachable'
+collect2: error: ld returned 1 exit status
+-----------
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmphqcjnwvx
+Code:
+
+        int main(void) {
+
+        /* With some toolchains (MSYS2/mingw for example) the compiler
+         * provides various builtins which are not really implemented and
+         * fall back to the stdlib where they aren't provided and fail at
+         * build/link time. In case the user provides a header, including
+         * the header didn't lead to the function being defined, and the
+         * function we are checking isn't a builtin itself we assume the
+         * builtin is not functional and we just error out. */
+        #if !1 && !defined(unreachable) && !0
+            #error "No definition for __builtin_unreachable found in the prefix"
+        #endif
+
+        #ifdef __has_builtin
+            #if !__has_builtin(__builtin_unreachable)
+                #error "__builtin_unreachable not found"
+            #endif
+        #elif ! defined(unreachable)
+            __builtin_unreachable;
+        #endif
+        return 0;
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmphqcjnwvx/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmphqcjnwvx/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group` -> 0
+Checking for function "unreachable" : YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmp0m19vqbs
+Code:
+
+        #define types_compatible_p meson_disable_define_of_types_compatible_p
+        
+        #include <limits.h>
+        #undef types_compatible_p
+        
+        #ifdef __cplusplus
+        extern "C"
+        #endif
+        char types_compatible_p (void);
+        
+        #if defined __stub_types_compatible_p || defined __stub___types_compatible_p
+        fail fail fail this function is not going to work
+        #endif
+        
+        int main(void) {
+          return types_compatible_p ();
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmp0m19vqbs/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmp0m19vqbs/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group` -> 1
+stderr:
+/usr/bin/x86_64-w64-mingw32-ld: /tmp/cc6CKYit.o:testfile.c:(.text+0xe): undefined reference to `types_compatible_p'
+collect2: error: ld returned 1 exit status
+-----------
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmp4v_er5zr
+Code:
+
+        int main(void) {
+
+        /* With some toolchains (MSYS2/mingw for example) the compiler
+         * provides various builtins which are not really implemented and
+         * fall back to the stdlib where they aren't provided and fail at
+         * build/link time. In case the user provides a header, including
+         * the header didn't lead to the function being defined, and the
+         * function we are checking isn't a builtin itself we assume the
+         * builtin is not functional and we just error out. */
+        #if !1 && !defined(types_compatible_p) && !0
+            #error "No definition for __builtin_types_compatible_p found in the prefix"
+        #endif
+
+        #ifdef __has_builtin
+            #if !__has_builtin(__builtin_types_compatible_p)
+                #error "__builtin_types_compatible_p not found"
+            #endif
+        #elif ! defined(types_compatible_p)
+            __builtin_types_compatible_p;
+        #endif
+        return 0;
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmp4v_er5zr/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmp4v_er5zr/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group` -> 0
+Checking for function "types_compatible_p" : YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmptavbvs67
+Code:
+int foo(void) __attribute__((const));
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmptavbvs67/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmptavbvs67/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -Werror=attributes` -> 0
+Compiler for C supports function attribute const: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpm3dkt4a9
+Code:
+int foo(void) __attribute__((flatten));
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpm3dkt4a9/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpm3dkt4a9/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -Werror=attributes` -> 0
+Compiler for C supports function attribute flatten: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpao4_1d09
+Code:
+int *foo(void) __attribute__((malloc));
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpao4_1d09/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpao4_1d09/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -Werror=attributes` -> 0
+Compiler for C supports function attribute malloc: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmphttyyko1
+Code:
+int foo(void) __attribute__((pure));
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmphttyyko1/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmphttyyko1/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -Werror=attributes` -> 0
+Compiler for C supports function attribute pure: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpwwvse30j
+Code:
+int foo(void) __attribute__((unused));
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpwwvse30j/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpwwvse30j/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -Werror=attributes` -> 0
+Compiler for C supports function attribute unused: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpyce9o8iw
+Code:
+int foo(void) __attribute__((warn_unused_result));
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpyce9o8iw/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpyce9o8iw/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -Werror=attributes` -> 0
+Compiler for C supports function attribute warn_unused_result: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmph4__13y2
+Code:
+int foo(void) __attribute__((weak));
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmph4__13y2/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmph4__13y2/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -Werror=attributes` -> 0
+Compiler for C supports function attribute weak: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpfkp8r9l3
+Code:
+int foo(const char * p, ...) __attribute__((format(printf, 1, 2)));
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpfkp8r9l3/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpfkp8r9l3/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -Werror=attributes` -> 0
+Compiler for C supports function attribute format: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmplpvjjyc9
+Code:
+struct __attribute__((packed)) foo { int bar; };
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmplpvjjyc9/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmplpvjjyc9/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -Werror=attributes` -> 0
+Compiler for C supports function attribute packed: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpbf3flbko
+Code:
+int *foo(void) __attribute__((returns_nonnull));
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpbf3flbko/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpbf3flbko/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -Werror=attributes` -> 0
+Compiler for C supports function attribute returns_nonnull: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmph4gw7lwj
+Code:
+
+        int foo(void) { return 0; }
+        int bar(void) __attribute__((alias("foo")));
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmph4gw7lwj/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmph4gw7lwj/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -Werror=attributes` -> 0
+Compiler for C supports function attribute alias: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpke6nnabo
+Code:
+int foo(void) __attribute__((noreturn));
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpke6nnabo/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpke6nnabo/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -Werror=attributes` -> 0
+Compiler for C supports function attribute noreturn: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpdg60u64u
+Code:
+__attribute__((optimize(3))) int foo(void) { return 0; }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpdg60u64u/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpdg60u64u/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -Werror=attributes` -> 0
+Compiler for C supports function attribute optimize: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpgwsgg_ax
+Code:
+int foo(void) __attribute__((visibility("hidden"))); int foo(void) { return 0; }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpgwsgg_ax/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpgwsgg_ax/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -Werror=attributes` -> 1
+stderr:
+/workspace/xbox-readiness/dzn/build/meson-private/tmpgwsgg_ax/testfile.c: In function 'foo':
+/workspace/xbox-readiness/dzn/build/meson-private/tmpgwsgg_ax/testfile.c:1:80: error: visibility attribute not supported in this configuration; ignored [-Werror=attributes]
+    1 | int foo(void) __attribute__((visibility("hidden"))); int foo(void) { return 0; }
+      |                                                                                ^
+cc1: some warnings being treated as errors
+-----------
+Compiler for C supports function attribute visibility:hidden: NO 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmp80o9241b
+Code:
+__uint128_t foo(void) { return 0; }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmp80o9241b/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmp80o9241b/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11` -> 0
+Checking if "__uint128_t" compiles: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpwlbffqid
+Code:
+
+        #define reallocarray meson_disable_define_of_reallocarray
+        
+        #include <limits.h>
+        #undef reallocarray
+        
+        #ifdef __cplusplus
+        extern "C"
+        #endif
+        char reallocarray (void);
+        
+        #if defined __stub_reallocarray || defined __stub___reallocarray
+        fail fail fail this function is not going to work
+        #endif
+        
+        int main(void) {
+          return reallocarray ();
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpwlbffqid/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpwlbffqid/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group` -> 1
+stderr:
+/usr/bin/x86_64-w64-mingw32-ld: /tmp/cciT7cc4.o:testfile.c:(.text+0xe): undefined reference to `reallocarray'
+collect2: error: ld returned 1 exit status
+-----------
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpgc6w2frd
+Code:
+
+        int main(void) {
+
+        /* With some toolchains (MSYS2/mingw for example) the compiler
+         * provides various builtins which are not really implemented and
+         * fall back to the stdlib where they aren't provided and fail at
+         * build/link time. In case the user provides a header, including
+         * the header didn't lead to the function being defined, and the
+         * function we are checking isn't a builtin itself we assume the
+         * builtin is not functional and we just error out. */
+        #if !1 && !defined(reallocarray) && !0
+            #error "No definition for __builtin_reallocarray found in the prefix"
+        #endif
+
+        #ifdef __has_builtin
+            #if !__has_builtin(__builtin_reallocarray)
+                #error "__builtin_reallocarray not found"
+            #endif
+        #elif ! defined(reallocarray)
+            __builtin_reallocarray;
+        #endif
+        return 0;
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpgc6w2frd/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpgc6w2frd/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group` -> 1
+stderr:
+/workspace/xbox-readiness/dzn/build/meson-private/tmpgc6w2frd/testfile.c: In function 'main':
+/workspace/xbox-readiness/dzn/build/meson-private/tmpgc6w2frd/testfile.c:17:18: error: #error "__builtin_reallocarray not found"
+   17 |                 #error "__builtin_reallocarray not found"
+      |                  ^~~~~
+-----------
+Checking for function "reallocarray" : NO 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpoxkfxw6z
+Code:
+
+        #define fmemopen meson_disable_define_of_fmemopen
+        
+        #include <limits.h>
+        #undef fmemopen
+        
+        #ifdef __cplusplus
+        extern "C"
+        #endif
+        char fmemopen (void);
+        
+        #if defined __stub_fmemopen || defined __stub___fmemopen
+        fail fail fail this function is not going to work
+        #endif
+        
+        int main(void) {
+          return fmemopen ();
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpoxkfxw6z/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpoxkfxw6z/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group` -> 1
+stderr:
+/usr/bin/x86_64-w64-mingw32-ld: /tmp/ccDHXzJj.o:testfile.c:(.text+0xe): undefined reference to `fmemopen'
+collect2: error: ld returned 1 exit status
+-----------
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmp_2f0x2b7
+Code:
+
+        int main(void) {
+
+        /* With some toolchains (MSYS2/mingw for example) the compiler
+         * provides various builtins which are not really implemented and
+         * fall back to the stdlib where they aren't provided and fail at
+         * build/link time. In case the user provides a header, including
+         * the header didn't lead to the function being defined, and the
+         * function we are checking isn't a builtin itself we assume the
+         * builtin is not functional and we just error out. */
+        #if !1 && !defined(fmemopen) && !0
+            #error "No definition for __builtin_fmemopen found in the prefix"
+        #endif
+
+        #ifdef __has_builtin
+            #if !__has_builtin(__builtin_fmemopen)
+                #error "__builtin_fmemopen not found"
+            #endif
+        #elif ! defined(fmemopen)
+            __builtin_fmemopen;
+        #endif
+        return 0;
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmp_2f0x2b7/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmp_2f0x2b7/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group` -> 1
+stderr:
+/workspace/xbox-readiness/dzn/build/meson-private/tmp_2f0x2b7/testfile.c: In function 'main':
+/workspace/xbox-readiness/dzn/build/meson-private/tmp_2f0x2b7/testfile.c:17:18: error: #error "__builtin_fmemopen not found"
+   17 |                 #error "__builtin_fmemopen not found"
+      |                  ^~~~~
+-----------
+Checking for function "fmemopen" : NO 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpv_du8kxc
+Code:
+
+      #include <string.h>
+      #if defined(__MINGW32__) && defined(_UCRT)
+      #error
+      #endif
+      int main(void) { return 0; }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpv_du8kxc/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpv_du8kxc/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11` -> 0
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpx7t2hffc
+Code:
+static char unused() { return 5; } int main() { return 0; }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpx7t2hffc/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpx7t2hffc/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group -Wl,--gc-sections` -> 0
+Checking if "gc-sections" links: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpf2l95hll
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpf2l95hll/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpf2l95hll/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -Werror=implicit-function-declaration` -> 0
+Compiler for C supports arguments -Werror=implicit-function-declaration: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpq7mwqqzs
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpq7mwqqzs/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpq7mwqqzs/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -Werror=missing-prototypes` -> 0
+Compiler for C supports arguments -Werror=missing-prototypes: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmph71pwyne
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmph71pwyne/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmph71pwyne/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -Werror=return-type` -> 0
+Compiler for C supports arguments -Werror=return-type: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpq1n8dqf4
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpq1n8dqf4/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpq1n8dqf4/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -Werror=empty-body` -> 0
+Compiler for C supports arguments -Werror=empty-body: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpwe7a7jdb
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpwe7a7jdb/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpwe7a7jdb/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -Werror=incompatible-pointer-types` -> 0
+Compiler for C supports arguments -Werror=incompatible-pointer-types: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpeugmtt0p
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpeugmtt0p/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpeugmtt0p/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -Werror=int-conversion` -> 0
+Compiler for C supports arguments -Werror=int-conversion: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmp_a6nx3gl
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmp_a6nx3gl/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmp_a6nx3gl/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -Wimplicit-fallthrough` -> 0
+Compiler for C supports arguments -Wimplicit-fallthrough: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpmvfrqflb
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpmvfrqflb/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpmvfrqflb/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -Wmisleading-indentation` -> 0
+Compiler for C supports arguments -Wmisleading-indentation: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmp8mlaibqa
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmp8mlaibqa/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmp8mlaibqa/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -Wmissing-field-initializers -Wno-missing-field-initializers` -> 0
+Compiler for C supports arguments -Wno-missing-field-initializers: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpxyam2juk
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpxyam2juk/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpxyam2juk/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -Wformat-truncation -Wno-format-truncation` -> 0
+Compiler for C supports arguments -Wno-format-truncation: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpkh9nhaki
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpkh9nhaki/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpkh9nhaki/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -Wnonnull-compare -Wno-nonnull-compare` -> 0
+Compiler for C supports arguments -Wno-nonnull-compare: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmp7brfpz1_
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmp7brfpz1_/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmp7brfpz1_/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -fno-math-errno` -> 0
+Compiler for C supports arguments -fno-math-errno: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmp4409dm1q
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmp4409dm1q/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmp4409dm1q/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -fno-trapping-math` -> 0
+Compiler for C supports arguments -fno-trapping-math: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpfent_nxw
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpfent_nxw/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpfent_nxw/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -Qunused-arguments` -> 1
+stderr:
+x86_64-w64-mingw32-gcc: error: unrecognized command-line option '-Qunused-arguments'
+-----------
+Compiler for C supports arguments -Qunused-arguments: NO 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmp2c8zu2lj
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmp2c8zu2lj/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmp2c8zu2lj/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -fno-common` -> 0
+Compiler for C supports arguments -fno-common: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpv5aexgn0
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpv5aexgn0/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpv5aexgn0/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -Wunknown-pragmas -Wno-unknown-pragmas` -> 0
+Compiler for C supports arguments -Wno-unknown-pragmas: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpky8i0v7j
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpky8i0v7j/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpky8i0v7j/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -Wmicrosoft-enum-value -Wno-microsoft-enum-value` -> 1
+stderr:
+x86_64-w64-mingw32-gcc: error: unrecognized command-line option '-Wmicrosoft-enum-value'
+-----------
+Compiler for C supports arguments -Wno-microsoft-enum-value: NO 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpfj1iexau
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpfj1iexau/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpfj1iexau/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -Wunused-function -Wno-unused-function` -> 0
+Compiler for C supports arguments -Wno-unused-function: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmp103kt7ew
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmp103kt7ew/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmp103kt7ew/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -Werror=thread-safety` -> 1
+stderr:
+cc1: error: '-Werror=thread-safety': no option '-Wthread-safety'
+-----------
+Compiler for C supports arguments -Werror=thread-safety: NO 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmp6y_toh5e
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmp6y_toh5e/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmp6y_toh5e/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -ffunction-sections` -> 0
+Compiler for C supports arguments -ffunction-sections: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpplnvkm1t
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpplnvkm1t/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpplnvkm1t/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -fdata-sections` -> 0
+Compiler for C supports arguments -fdata-sections: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpr084i018
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpr084i018/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpr084i018/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -Wunused-variable -Wno-unused-variable` -> 0
+Compiler for C supports arguments -Wno-unused-variable: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmp5bmcd57_
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmp5bmcd57_/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmp5bmcd57_/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -Wunused-but-set-variable -Wno-unused-but-set-variable` -> 0
+Compiler for C supports arguments -Wno-unused-but-set-variable: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpzfk8tky8
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpzfk8tky8/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpzfk8tky8/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE /wd4189` -> 1
+stderr:
+x86_64-w64-mingw32-gcc: warning: /wd4189: linker input file unused because linking not done
+x86_64-w64-mingw32-gcc: error: /wd4189: linker input file not found: No such file or directory
+-----------
+Compiler for C supports arguments /wd4189: NO 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpqls1h9nb
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-g++ /workspace/xbox-readiness/dzn/build/meson-private/tmpqls1h9nb/testfile.cpp -o /workspace/xbox-readiness/dzn/build/meson-private/tmpqls1h9nb/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -fpermissive -Werror=return-type` -> 0
+Compiler for C++ supports arguments -Werror=return-type: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmp13_ahjom
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-g++ /workspace/xbox-readiness/dzn/build/meson-private/tmp13_ahjom/testfile.cpp -o /workspace/xbox-readiness/dzn/build/meson-private/tmp13_ahjom/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -fpermissive -Werror=empty-body` -> 0
+Compiler for C++ supports arguments -Werror=empty-body: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmplvfspci_
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-g++ /workspace/xbox-readiness/dzn/build/meson-private/tmplvfspci_/testfile.cpp -o /workspace/xbox-readiness/dzn/build/meson-private/tmplvfspci_/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -fpermissive -Wmisleading-indentation` -> 0
+Compiler for C++ supports arguments -Wmisleading-indentation: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmp8537ql0y
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-g++ /workspace/xbox-readiness/dzn/build/meson-private/tmp8537ql0y/testfile.cpp -o /workspace/xbox-readiness/dzn/build/meson-private/tmp8537ql0y/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -fpermissive -Wnon-virtual-dtor -Wno-non-virtual-dtor` -> 0
+Compiler for C++ supports arguments -Wno-non-virtual-dtor: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpv1880e7w
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-g++ /workspace/xbox-readiness/dzn/build/meson-private/tmpv1880e7w/testfile.cpp -o /workspace/xbox-readiness/dzn/build/meson-private/tmpv1880e7w/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -fpermissive -Wmissing-field-initializers -Wno-missing-field-initializers` -> 0
+Compiler for C++ supports arguments -Wno-missing-field-initializers: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpqeligna9
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-g++ /workspace/xbox-readiness/dzn/build/meson-private/tmpqeligna9/testfile.cpp -o /workspace/xbox-readiness/dzn/build/meson-private/tmpqeligna9/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -fpermissive -Wformat-truncation -Wno-format-truncation` -> 0
+Compiler for C++ supports arguments -Wno-format-truncation: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmprofd__xh
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-g++ /workspace/xbox-readiness/dzn/build/meson-private/tmprofd__xh/testfile.cpp -o /workspace/xbox-readiness/dzn/build/meson-private/tmprofd__xh/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -fpermissive -fno-math-errno` -> 0
+Compiler for C++ supports arguments -fno-math-errno: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmp5a39aku4
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-g++ /workspace/xbox-readiness/dzn/build/meson-private/tmp5a39aku4/testfile.cpp -o /workspace/xbox-readiness/dzn/build/meson-private/tmp5a39aku4/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -fpermissive -fno-trapping-math` -> 0
+Compiler for C++ supports arguments -fno-trapping-math: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpfbgtvdg4
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-g++ /workspace/xbox-readiness/dzn/build/meson-private/tmpfbgtvdg4/testfile.cpp -o /workspace/xbox-readiness/dzn/build/meson-private/tmpfbgtvdg4/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -fpermissive -Qunused-arguments` -> 1
+stderr:
+x86_64-w64-mingw32-g++: error: unrecognized command-line option '-Qunused-arguments'
+-----------
+Compiler for C++ supports arguments -Qunused-arguments: NO 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpvumpwnbs
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-g++ /workspace/xbox-readiness/dzn/build/meson-private/tmpvumpwnbs/testfile.cpp -o /workspace/xbox-readiness/dzn/build/meson-private/tmpvumpwnbs/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -fpermissive -flifetime-dse=1` -> 0
+Compiler for C++ supports arguments -flifetime-dse=1: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpzseja_oj
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-g++ /workspace/xbox-readiness/dzn/build/meson-private/tmpzseja_oj/testfile.cpp -o /workspace/xbox-readiness/dzn/build/meson-private/tmpzseja_oj/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -fpermissive -Wunknown-pragmas -Wno-unknown-pragmas` -> 0
+Compiler for C++ supports arguments -Wno-unknown-pragmas: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmp2ypsxq4m
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-g++ /workspace/xbox-readiness/dzn/build/meson-private/tmp2ypsxq4m/testfile.cpp -o /workspace/xbox-readiness/dzn/build/meson-private/tmp2ypsxq4m/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -fpermissive -Wmicrosoft-enum-value -Wno-microsoft-enum-value` -> 1
+stderr:
+x86_64-w64-mingw32-g++: error: unrecognized command-line option '-Wmicrosoft-enum-value'
+-----------
+Compiler for C++ supports arguments -Wno-microsoft-enum-value: NO 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpvzgsrqpk
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-g++ /workspace/xbox-readiness/dzn/build/meson-private/tmpvzgsrqpk/testfile.cpp -o /workspace/xbox-readiness/dzn/build/meson-private/tmpvzgsrqpk/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -fpermissive -ffunction-sections` -> 0
+Compiler for C++ supports arguments -ffunction-sections: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmp91giffqb
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-g++ /workspace/xbox-readiness/dzn/build/meson-private/tmp91giffqb/testfile.cpp -o /workspace/xbox-readiness/dzn/build/meson-private/tmp91giffqb/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -fpermissive -fdata-sections` -> 0
+Compiler for C++ supports arguments -fdata-sections: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmp1wbdnm56
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-g++ /workspace/xbox-readiness/dzn/build/meson-private/tmp1wbdnm56/testfile.cpp -o /workspace/xbox-readiness/dzn/build/meson-private/tmp1wbdnm56/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -fpermissive -Wunused-variable -Wno-unused-variable` -> 0
+Compiler for C++ supports arguments -Wno-unused-variable: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpa1wcxz2v
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-g++ /workspace/xbox-readiness/dzn/build/meson-private/tmpa1wcxz2v/testfile.cpp -o /workspace/xbox-readiness/dzn/build/meson-private/tmpa1wcxz2v/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -fpermissive -Wunused-but-set-variable -Wno-unused-but-set-variable` -> 0
+Compiler for C++ supports arguments -Wno-unused-but-set-variable: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmplum30qcf
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-g++ /workspace/xbox-readiness/dzn/build/meson-private/tmplum30qcf/testfile.cpp -o /workspace/xbox-readiness/dzn/build/meson-private/tmplum30qcf/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -fpermissive /wd4189` -> 1
+stderr:
+x86_64-w64-mingw32-g++: warning: /wd4189: linker input file unused because linking not done
+x86_64-w64-mingw32-g++: error: /wd4189: linker input file not found: No such file or directory
+-----------
+Compiler for C++ supports arguments /wd4189: NO 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpcgh3265w
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpcgh3265w/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpcgh3265w/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -Woverride-init -Wno-override-init` -> 0
+Compiler for C supports arguments -Wno-override-init: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmppd0ogwi0
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmppd0ogwi0/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmppd0ogwi0/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -Winitializer-overrides -Wno-initializer-overrides` -> 1
+stderr:
+x86_64-w64-mingw32-gcc: error: unrecognized command-line option '-Winitializer-overrides'
+-----------
+Compiler for C supports arguments -Wno-initializer-overrides: NO 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpttvzmsbk
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpttvzmsbk/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpttvzmsbk/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -Werror=pointer-arith` -> 0
+Compiler for C supports arguments -Werror=pointer-arith: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpafsjo5sv
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpafsjo5sv/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpafsjo5sv/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -Werror=vla` -> 0
+Compiler for C supports arguments -Werror=vla: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmppl5ek_hp
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmppl5ek_hp/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmppl5ek_hp/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -Werror=gnu-empty-initializer` -> 1
+stderr:
+cc1: error: '-Werror=gnu-empty-initializer': no option '-Wgnu-empty-initializer'
+-----------
+Compiler for C supports arguments -Werror=gnu-empty-initializer: NO 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpm2ggt5sh
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-g++ /workspace/xbox-readiness/dzn/build/meson-private/tmpm2ggt5sh/testfile.cpp -o /workspace/xbox-readiness/dzn/build/meson-private/tmpm2ggt5sh/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -fpermissive -Werror=pointer-arith` -> 0
+Compiler for C++ supports arguments -Werror=pointer-arith: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpj420s_b6
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-g++ /workspace/xbox-readiness/dzn/build/meson-private/tmpj420s_b6/testfile.cpp -o /workspace/xbox-readiness/dzn/build/meson-private/tmpj420s_b6/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -fpermissive -Werror=vla` -> 0
+Compiler for C++ supports arguments -Werror=vla: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpo_a68mch
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-g++ /workspace/xbox-readiness/dzn/build/meson-private/tmpo_a68mch/testfile.cpp -o /workspace/xbox-readiness/dzn/build/meson-private/tmpo_a68mch/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -fpermissive -Werror=gnu-empty-initializer` -> 1
+stderr:
+cc1plus: error: '-Werror=gnu-empty-initializer': no option '-Wgnu-empty-initializer'
+-----------
+Compiler for C++ supports arguments -Werror=gnu-empty-initializer: NO 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmppdkzqdld
+Code:
+int main(void) { return 0; }
+
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmppdkzqdld/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmppdkzqdld/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -Wl,--fatal-warnings -Wl,--nxcompat` -> 0
+Compiler for C supports link arguments -Wl,--nxcompat: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpruqi0mum
+Code:
+int main(void) { return 0; }
+
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpruqi0mum/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpruqi0mum/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -Wl,--fatal-warnings -Wl,--dynamicbase` -> 0
+Compiler for C supports link arguments -Wl,--dynamicbase: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpxt8qtg_n
+Code:
+int main(void) { return 0; }
+
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpxt8qtg_n/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpxt8qtg_n/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -Wl,--fatal-warnings -static-libgcc` -> 0
+Compiler for C supports link arguments -static-libgcc: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpssrpvhak
+Code:
+int main(void) { return 0; }
+
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpssrpvhak/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpssrpvhak/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -Wl,--fatal-warnings -static-libstdc++` -> 0
+Compiler for C supports link arguments -static-libstdc++: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpgh8uffto
+Code:
+int main(void) { return 0; }
+
+-----------
+Command line: `x86_64-w64-mingw32-g++ /workspace/xbox-readiness/dzn/build/meson-private/tmpgh8uffto/testfile.cpp -o /workspace/xbox-readiness/dzn/build/meson-private/tmpgh8uffto/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -fpermissive -Wl,--fatal-warnings -Wl,--nxcompat` -> 0
+Compiler for C++ supports link arguments -Wl,--nxcompat: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpjfoui_ly
+Code:
+int main(void) { return 0; }
+
+-----------
+Command line: `x86_64-w64-mingw32-g++ /workspace/xbox-readiness/dzn/build/meson-private/tmpjfoui_ly/testfile.cpp -o /workspace/xbox-readiness/dzn/build/meson-private/tmpjfoui_ly/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -fpermissive -Wl,--fatal-warnings -Wl,--dynamicbase` -> 0
+Compiler for C++ supports link arguments -Wl,--dynamicbase: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpb3cn2jhd
+Code:
+int main(void) { return 0; }
+
+-----------
+Command line: `x86_64-w64-mingw32-g++ /workspace/xbox-readiness/dzn/build/meson-private/tmpb3cn2jhd/testfile.cpp -o /workspace/xbox-readiness/dzn/build/meson-private/tmpb3cn2jhd/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -fpermissive -Wl,--fatal-warnings -static-libgcc` -> 0
+Compiler for C++ supports link arguments -static-libgcc: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpw9f7szcp
+Code:
+int main(void) { return 0; }
+
+-----------
+Command line: `x86_64-w64-mingw32-g++ /workspace/xbox-readiness/dzn/build/meson-private/tmpw9f7szcp/testfile.cpp -o /workspace/xbox-readiness/dzn/build/meson-private/tmpw9f7szcp/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -fpermissive -Wl,--fatal-warnings -static-libstdc++` -> 0
+Compiler for C++ supports link arguments -static-libstdc++: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpse7lwkhf
+Code:
+
+        #define __builtin_ia32_clflushopt meson_disable_define_of___builtin_ia32_clflushopt
+        
+        #include <limits.h>
+        #undef __builtin_ia32_clflushopt
+        
+        #ifdef __cplusplus
+        extern "C"
+        #endif
+        char __builtin_ia32_clflushopt (void);
+        
+        #if defined __stub___builtin_ia32_clflushopt || defined __stub_____builtin_ia32_clflushopt
+        fail fail fail this function is not going to work
+        #endif
+        
+        int main(void) {
+          return __builtin_ia32_clflushopt ();
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpse7lwkhf/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpse7lwkhf/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group -mclflushopt` -> 1
+stderr:
+/usr/bin/x86_64-w64-mingw32-ld: /tmp/ccRYm9N2.o:testfile.c:(.text+0xe): undefined reference to `__builtin_ia32_clflushopt'
+collect2: error: ld returned 1 exit status
+-----------
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpp6_jg76v
+Code:
+
+        int main(void) {
+
+        /* With some toolchains (MSYS2/mingw for example) the compiler
+         * provides various builtins which are not really implemented and
+         * fall back to the stdlib where they aren't provided and fail at
+         * build/link time. In case the user provides a header, including
+         * the header didn't lead to the function being defined, and the
+         * function we are checking isn't a builtin itself we assume the
+         * builtin is not functional and we just error out. */
+        #if !1 && !defined(__builtin_ia32_clflushopt) && !1
+            #error "No definition for __builtin_ia32_clflushopt found in the prefix"
+        #endif
+
+        #ifdef __has_builtin
+            #if !__has_builtin(__builtin_ia32_clflushopt)
+                #error "__builtin_ia32_clflushopt not found"
+            #endif
+        #elif ! defined(__builtin_ia32_clflushopt)
+            __builtin_ia32_clflushopt;
+        #endif
+        return 0;
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpp6_jg76v/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpp6_jg76v/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group -mclflushopt` -> 0
+Checking for function "__builtin_ia32_clflushopt" : YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmptu2j5eje
+Code:
+#include <stdint.h>
+                  int main() {
+                    struct {
+                      uint64_t *v;
+                    } x;
+                    return (int)__atomic_load_n(x.v, __ATOMIC_ACQUIRE) &
+                           (int)__atomic_add_fetch(x.v, (uint64_t)1, __ATOMIC_ACQ_REL);
+
+                  }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmptu2j5eje/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmptu2j5eje/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11` -> 0
+Checking if "GCC atomic builtins" compiles: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpb5ssmmw5
+Code:
+#include <stdint.h>
+                     int main() {
+                       struct {
+                         uint64_t *v;
+                       } x;
+                       return (int)__atomic_load_n(x.v, __ATOMIC_ACQUIRE) &
+                              (int)__atomic_add_fetch(x.v, (uint64_t)1, __ATOMIC_ACQ_REL);
+                     }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpb5ssmmw5/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpb5ssmmw5/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group` -> 0
+Checking if "GCC atomic builtins required -latomic" links: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpkl4urp6h
+Code:
+#include <stdint.h>
+                   uint64_t v;
+                   int main() {
+                     return __sync_add_and_fetch(&v, (uint64_t)1);
+                   }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpkl4urp6h/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpkl4urp6h/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group` -> 0
+Checking if "GCC 64bit atomics" with dependency  links: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpgg73fllm
+Code:
+int main(void) { return 0; }
+
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpgg73fllm/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpgg73fllm/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -lws2_32 -Wl,--allow-shlib-undefined` -> 0
+Library ws2_32 found: YES
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmp1xavlymi
+Code:
+
+        #include <sys/sysmacros.h>
+        int main(void) {
+            /* If it's not defined as a macro, try to use as a symbol */
+            #ifndef major
+                major;
+            #endif
+            return 0;
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmp1xavlymi/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmp1xavlymi/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11` -> 1
+stderr:
+/workspace/xbox-readiness/dzn/build/meson-private/tmp1xavlymi/testfile.c:2:18: fatal error: sys/sysmacros.h: No such file or directory
+    2 |         #include <sys/sysmacros.h>
+      |                  ^~~~~~~~~~~~~~~~~
+compilation terminated.
+-----------
+Header "sys/sysmacros.h" has symbol "major" : NO 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpw815fuht
+Code:
+
+        #include <sys/mkdev.h>
+        int main(void) {
+            /* If it's not defined as a macro, try to use as a symbol */
+            #ifndef major
+                major;
+            #endif
+            return 0;
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpw815fuht/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpw815fuht/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11` -> 1
+stderr:
+/workspace/xbox-readiness/dzn/build/meson-private/tmpw815fuht/testfile.c:2:18: fatal error: sys/mkdev.h: No such file or directory
+    2 |         #include <sys/mkdev.h>
+      |                  ^~~~~~~~~~~~~
+compilation terminated.
+-----------
+Header "sys/mkdev.h" has symbol "major" : NO 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpe77dyrfq
+Code:
+
+        #include <sched.h>
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpe77dyrfq/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpe77dyrfq/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11` -> 0
+Check usable header "sched.h" : YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpkiuaf5fv
+Code:
+
+        #define sched_getaffinity meson_disable_define_of_sched_getaffinity
+        
+        #include <limits.h>
+        #undef sched_getaffinity
+        
+        #ifdef __cplusplus
+        extern "C"
+        #endif
+        char sched_getaffinity (void);
+        
+        #if defined __stub_sched_getaffinity || defined __stub___sched_getaffinity
+        fail fail fail this function is not going to work
+        #endif
+        
+        int main(void) {
+          return sched_getaffinity ();
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpkiuaf5fv/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpkiuaf5fv/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group` -> 1
+stderr:
+/usr/bin/x86_64-w64-mingw32-ld: /tmp/ccjl4Z9a.o:testfile.c:(.text+0xe): undefined reference to `sched_getaffinity'
+collect2: error: ld returned 1 exit status
+-----------
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmp2mfp342a
+Code:
+
+        int main(void) {
+
+        /* With some toolchains (MSYS2/mingw for example) the compiler
+         * provides various builtins which are not really implemented and
+         * fall back to the stdlib where they aren't provided and fail at
+         * build/link time. In case the user provides a header, including
+         * the header didn't lead to the function being defined, and the
+         * function we are checking isn't a builtin itself we assume the
+         * builtin is not functional and we just error out. */
+        #if !1 && !defined(sched_getaffinity) && !0
+            #error "No definition for __builtin_sched_getaffinity found in the prefix"
+        #endif
+
+        #ifdef __has_builtin
+            #if !__has_builtin(__builtin_sched_getaffinity)
+                #error "__builtin_sched_getaffinity not found"
+            #endif
+        #elif ! defined(sched_getaffinity)
+            __builtin_sched_getaffinity;
+        #endif
+        return 0;
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmp2mfp342a/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmp2mfp342a/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group` -> 1
+stderr:
+/workspace/xbox-readiness/dzn/build/meson-private/tmp2mfp342a/testfile.c: In function 'main':
+/workspace/xbox-readiness/dzn/build/meson-private/tmp2mfp342a/testfile.c:17:18: error: #error "__builtin_sched_getaffinity not found"
+   17 |                 #error "__builtin_sched_getaffinity not found"
+      |                  ^~~~~
+-----------
+Checking for function "sched_getaffinity" : NO 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpxy507sv4
+Code:
+#include <sys/types.h>
+        #include <sys/sysctl.h>
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpxy507sv4/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpxy507sv4/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11` -> 1
+stderr:
+/workspace/xbox-readiness/dzn/build/meson-private/tmpxy507sv4/testfile.c:2:18: fatal error: sys/sysctl.h: No such file or directory
+    2 |         #include <sys/sysctl.h>
+      |                  ^~~~~~~~~~~~~~
+compilation terminated.
+-----------
+Check usable header "sys/sysctl.h" : NO 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpjbmdemsc
+Code:
+
+        #include <xlocale.h>
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpjbmdemsc/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpjbmdemsc/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11` -> 1
+stderr:
+/workspace/xbox-readiness/dzn/build/meson-private/tmpjbmdemsc/testfile.c:2:18: fatal error: xlocale.h: No such file or directory
+    2 |         #include <xlocale.h>
+      |                  ^~~~~~~~~~~
+compilation terminated.
+-----------
+Check usable header "xlocale.h" : NO 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpd312n0mo
+Code:
+
+        #include <linux/futex.h>
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpd312n0mo/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpd312n0mo/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11` -> 1
+stderr:
+/workspace/xbox-readiness/dzn/build/meson-private/tmpd312n0mo/testfile.c:2:18: fatal error: linux/futex.h: No such file or directory
+    2 |         #include <linux/futex.h>
+      |                  ^~~~~~~~~~~~~~~
+compilation terminated.
+-----------
+Check usable header "linux/futex.h" : NO 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpygu2xz5n
+Code:
+
+        #include <endian.h>
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpygu2xz5n/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpygu2xz5n/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11` -> 1
+stderr:
+/workspace/xbox-readiness/dzn/build/meson-private/tmpygu2xz5n/testfile.c:2:18: fatal error: endian.h: No such file or directory
+    2 |         #include <endian.h>
+      |                  ^~~~~~~~~~
+compilation terminated.
+-----------
+Check usable header "endian.h" : NO 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmp4zjw6bbc
+Code:
+
+        #include <dlfcn.h>
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmp4zjw6bbc/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmp4zjw6bbc/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11` -> 1
+stderr:
+/workspace/xbox-readiness/dzn/build/meson-private/tmp4zjw6bbc/testfile.c:2:18: fatal error: dlfcn.h: No such file or directory
+    2 |         #include <dlfcn.h>
+      |                  ^~~~~~~~~
+compilation terminated.
+-----------
+Check usable header "dlfcn.h" : NO 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpitbcrmod
+Code:
+
+        #include <sys/shm.h>
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpitbcrmod/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpitbcrmod/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11` -> 1
+stderr:
+/workspace/xbox-readiness/dzn/build/meson-private/tmpitbcrmod/testfile.c:2:18: fatal error: sys/shm.h: No such file or directory
+    2 |         #include <sys/shm.h>
+      |                  ^~~~~~~~~~~
+compilation terminated.
+-----------
+Check usable header "sys/shm.h" : NO 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmp7_rq6hkh
+Code:
+
+        #include <cet.h>
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmp7_rq6hkh/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmp7_rq6hkh/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11` -> 0
+Check usable header "cet.h" : YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpagoowd8a
+Code:
+
+        #include <pthread_np.h>
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpagoowd8a/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpagoowd8a/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11` -> 1
+stderr:
+/workspace/xbox-readiness/dzn/build/meson-private/tmpagoowd8a/testfile.c:2:18: fatal error: pthread_np.h: No such file or directory
+    2 |         #include <pthread_np.h>
+      |                  ^~~~~~~~~~~~~~
+compilation terminated.
+-----------
+Check usable header "pthread_np.h" : NO 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmp_k24wu0j
+Code:
+
+        #include <sys/inotify.h>
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmp_k24wu0j/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmp_k24wu0j/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11` -> 1
+stderr:
+/workspace/xbox-readiness/dzn/build/meson-private/tmp_k24wu0j/testfile.c:2:18: fatal error: sys/inotify.h: No such file or directory
+    2 |         #include <sys/inotify.h>
+      |                  ^~~~~~~~~~~~~~~
+compilation terminated.
+-----------
+Check usable header "sys/inotify.h" : NO 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpyhvvm_sg
+Code:
+
+        #include <linux/udmabuf.h>
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpyhvvm_sg/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpyhvvm_sg/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11` -> 1
+stderr:
+/workspace/xbox-readiness/dzn/build/meson-private/tmpyhvvm_sg/testfile.c:2:18: fatal error: linux/udmabuf.h: No such file or directory
+    2 |         #include <linux/udmabuf.h>
+      |                  ^~~~~~~~~~~~~~~~~
+compilation terminated.
+-----------
+Check usable header "linux/udmabuf.h" : NO 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpt5up_z9z
+Code:
+
+        #define strtof meson_disable_define_of_strtof
+        
+        #include <limits.h>
+        #undef strtof
+        
+        #ifdef __cplusplus
+        extern "C"
+        #endif
+        char strtof (void);
+        
+        #if defined __stub_strtof || defined __stub___strtof
+        fail fail fail this function is not going to work
+        #endif
+        
+        int main(void) {
+          return strtof ();
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpt5up_z9z/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpt5up_z9z/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group` -> 0
+Checking for function "strtof" : YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpehmhyw8k
+Code:
+
+        #define mkostemp meson_disable_define_of_mkostemp
+        
+        #include <limits.h>
+        #undef mkostemp
+        
+        #ifdef __cplusplus
+        extern "C"
+        #endif
+        char mkostemp (void);
+        
+        #if defined __stub_mkostemp || defined __stub___mkostemp
+        fail fail fail this function is not going to work
+        #endif
+        
+        int main(void) {
+          return mkostemp ();
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpehmhyw8k/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpehmhyw8k/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group` -> 1
+stderr:
+/usr/bin/x86_64-w64-mingw32-ld: /tmp/ccctJEZT.o:testfile.c:(.text+0xe): undefined reference to `mkostemp'
+collect2: error: ld returned 1 exit status
+-----------
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpt71pumwn
+Code:
+
+        int main(void) {
+
+        /* With some toolchains (MSYS2/mingw for example) the compiler
+         * provides various builtins which are not really implemented and
+         * fall back to the stdlib where they aren't provided and fail at
+         * build/link time. In case the user provides a header, including
+         * the header didn't lead to the function being defined, and the
+         * function we are checking isn't a builtin itself we assume the
+         * builtin is not functional and we just error out. */
+        #if !1 && !defined(mkostemp) && !0
+            #error "No definition for __builtin_mkostemp found in the prefix"
+        #endif
+
+        #ifdef __has_builtin
+            #if !__has_builtin(__builtin_mkostemp)
+                #error "__builtin_mkostemp not found"
+            #endif
+        #elif ! defined(mkostemp)
+            __builtin_mkostemp;
+        #endif
+        return 0;
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpt71pumwn/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpt71pumwn/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group` -> 1
+stderr:
+/workspace/xbox-readiness/dzn/build/meson-private/tmpt71pumwn/testfile.c: In function 'main':
+/workspace/xbox-readiness/dzn/build/meson-private/tmpt71pumwn/testfile.c:17:18: error: #error "__builtin_mkostemp not found"
+   17 |                 #error "__builtin_mkostemp not found"
+      |                  ^~~~~
+-----------
+Checking for function "mkostemp" : NO 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpg55walj5
+Code:
+
+        #define memfd_create meson_disable_define_of_memfd_create
+        
+        #include <limits.h>
+        #undef memfd_create
+        
+        #ifdef __cplusplus
+        extern "C"
+        #endif
+        char memfd_create (void);
+        
+        #if defined __stub_memfd_create || defined __stub___memfd_create
+        fail fail fail this function is not going to work
+        #endif
+        
+        int main(void) {
+          return memfd_create ();
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpg55walj5/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpg55walj5/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group` -> 1
+stderr:
+/usr/bin/x86_64-w64-mingw32-ld: /tmp/ccZciPMq.o:testfile.c:(.text+0xe): undefined reference to `memfd_create'
+collect2: error: ld returned 1 exit status
+-----------
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpqrv9o5ro
+Code:
+
+        int main(void) {
+
+        /* With some toolchains (MSYS2/mingw for example) the compiler
+         * provides various builtins which are not really implemented and
+         * fall back to the stdlib where they aren't provided and fail at
+         * build/link time. In case the user provides a header, including
+         * the header didn't lead to the function being defined, and the
+         * function we are checking isn't a builtin itself we assume the
+         * builtin is not functional and we just error out. */
+        #if !1 && !defined(memfd_create) && !0
+            #error "No definition for __builtin_memfd_create found in the prefix"
+        #endif
+
+        #ifdef __has_builtin
+            #if !__has_builtin(__builtin_memfd_create)
+                #error "__builtin_memfd_create not found"
+            #endif
+        #elif ! defined(memfd_create)
+            __builtin_memfd_create;
+        #endif
+        return 0;
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpqrv9o5ro/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpqrv9o5ro/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group` -> 1
+stderr:
+/workspace/xbox-readiness/dzn/build/meson-private/tmpqrv9o5ro/testfile.c: In function 'main':
+/workspace/xbox-readiness/dzn/build/meson-private/tmpqrv9o5ro/testfile.c:17:18: error: #error "__builtin_memfd_create not found"
+   17 |                 #error "__builtin_memfd_create not found"
+      |                  ^~~~~
+-----------
+Checking for function "memfd_create" : NO 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmp32mpeoxx
+Code:
+
+        #define random_r meson_disable_define_of_random_r
+        
+        #include <limits.h>
+        #undef random_r
+        
+        #ifdef __cplusplus
+        extern "C"
+        #endif
+        char random_r (void);
+        
+        #if defined __stub_random_r || defined __stub___random_r
+        fail fail fail this function is not going to work
+        #endif
+        
+        int main(void) {
+          return random_r ();
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmp32mpeoxx/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmp32mpeoxx/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group` -> 1
+stderr:
+/usr/bin/x86_64-w64-mingw32-ld: /tmp/ccaVyXlC.o:testfile.c:(.text+0xe): undefined reference to `random_r'
+collect2: error: ld returned 1 exit status
+-----------
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpiz44muun
+Code:
+
+        int main(void) {
+
+        /* With some toolchains (MSYS2/mingw for example) the compiler
+         * provides various builtins which are not really implemented and
+         * fall back to the stdlib where they aren't provided and fail at
+         * build/link time. In case the user provides a header, including
+         * the header didn't lead to the function being defined, and the
+         * function we are checking isn't a builtin itself we assume the
+         * builtin is not functional and we just error out. */
+        #if !1 && !defined(random_r) && !0
+            #error "No definition for __builtin_random_r found in the prefix"
+        #endif
+
+        #ifdef __has_builtin
+            #if !__has_builtin(__builtin_random_r)
+                #error "__builtin_random_r not found"
+            #endif
+        #elif ! defined(random_r)
+            __builtin_random_r;
+        #endif
+        return 0;
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpiz44muun/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpiz44muun/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group` -> 1
+stderr:
+/workspace/xbox-readiness/dzn/build/meson-private/tmpiz44muun/testfile.c: In function 'main':
+/workspace/xbox-readiness/dzn/build/meson-private/tmpiz44muun/testfile.c:17:18: error: #error "__builtin_random_r not found"
+   17 |                 #error "__builtin_random_r not found"
+      |                  ^~~~~
+-----------
+Checking for function "random_r" : NO 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmp59q0o7kw
+Code:
+
+        #define flock meson_disable_define_of_flock
+        
+        #include <limits.h>
+        #undef flock
+        
+        #ifdef __cplusplus
+        extern "C"
+        #endif
+        char flock (void);
+        
+        #if defined __stub_flock || defined __stub___flock
+        fail fail fail this function is not going to work
+        #endif
+        
+        int main(void) {
+          return flock ();
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmp59q0o7kw/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmp59q0o7kw/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group` -> 1
+stderr:
+/usr/bin/x86_64-w64-mingw32-ld: /tmp/cc4Oges5.o:testfile.c:(.text+0xe): undefined reference to `flock'
+collect2: error: ld returned 1 exit status
+-----------
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmp7__2llm7
+Code:
+
+        int main(void) {
+
+        /* With some toolchains (MSYS2/mingw for example) the compiler
+         * provides various builtins which are not really implemented and
+         * fall back to the stdlib where they aren't provided and fail at
+         * build/link time. In case the user provides a header, including
+         * the header didn't lead to the function being defined, and the
+         * function we are checking isn't a builtin itself we assume the
+         * builtin is not functional and we just error out. */
+        #if !1 && !defined(flock) && !0
+            #error "No definition for __builtin_flock found in the prefix"
+        #endif
+
+        #ifdef __has_builtin
+            #if !__has_builtin(__builtin_flock)
+                #error "__builtin_flock not found"
+            #endif
+        #elif ! defined(flock)
+            __builtin_flock;
+        #endif
+        return 0;
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmp7__2llm7/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmp7__2llm7/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group` -> 1
+stderr:
+/workspace/xbox-readiness/dzn/build/meson-private/tmp7__2llm7/testfile.c: In function 'main':
+/workspace/xbox-readiness/dzn/build/meson-private/tmp7__2llm7/testfile.c:17:18: error: #error "__builtin_flock not found"
+   17 |                 #error "__builtin_flock not found"
+      |                  ^~~~~
+-----------
+Checking for function "flock" : NO 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpgspfwdk0
+Code:
+
+        #define strtok_r meson_disable_define_of_strtok_r
+        
+        #include <limits.h>
+        #undef strtok_r
+        
+        #ifdef __cplusplus
+        extern "C"
+        #endif
+        char strtok_r (void);
+        
+        #if defined __stub_strtok_r || defined __stub___strtok_r
+        fail fail fail this function is not going to work
+        #endif
+        
+        int main(void) {
+          return strtok_r ();
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpgspfwdk0/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpgspfwdk0/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group` -> 0
+Checking for function "strtok_r" : YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpgj7verfm
+Code:
+
+        #define getrandom meson_disable_define_of_getrandom
+        
+        #include <limits.h>
+        #undef getrandom
+        
+        #ifdef __cplusplus
+        extern "C"
+        #endif
+        char getrandom (void);
+        
+        #if defined __stub_getrandom || defined __stub___getrandom
+        fail fail fail this function is not going to work
+        #endif
+        
+        int main(void) {
+          return getrandom ();
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpgj7verfm/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpgj7verfm/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group` -> 1
+stderr:
+/usr/bin/x86_64-w64-mingw32-ld: /tmp/cclKTKZq.o:testfile.c:(.text+0xe): undefined reference to `getrandom'
+collect2: error: ld returned 1 exit status
+-----------
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmp_9fklgn4
+Code:
+
+        int main(void) {
+
+        /* With some toolchains (MSYS2/mingw for example) the compiler
+         * provides various builtins which are not really implemented and
+         * fall back to the stdlib where they aren't provided and fail at
+         * build/link time. In case the user provides a header, including
+         * the header didn't lead to the function being defined, and the
+         * function we are checking isn't a builtin itself we assume the
+         * builtin is not functional and we just error out. */
+        #if !1 && !defined(getrandom) && !0
+            #error "No definition for __builtin_getrandom found in the prefix"
+        #endif
+
+        #ifdef __has_builtin
+            #if !__has_builtin(__builtin_getrandom)
+                #error "__builtin_getrandom not found"
+            #endif
+        #elif ! defined(getrandom)
+            __builtin_getrandom;
+        #endif
+        return 0;
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmp_9fklgn4/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmp_9fklgn4/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group` -> 1
+stderr:
+/workspace/xbox-readiness/dzn/build/meson-private/tmp_9fklgn4/testfile.c: In function 'main':
+/workspace/xbox-readiness/dzn/build/meson-private/tmp_9fklgn4/testfile.c:17:18: error: #error "__builtin_getrandom not found"
+   17 |                 #error "__builtin_getrandom not found"
+      |                  ^~~~~
+-----------
+Checking for function "getrandom" : NO 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpvepq8e4n
+Code:
+
+        #define qsort_s meson_disable_define_of_qsort_s
+        
+        #include <limits.h>
+        #undef qsort_s
+        
+        #ifdef __cplusplus
+        extern "C"
+        #endif
+        char qsort_s (void);
+        
+        #if defined __stub_qsort_s || defined __stub___qsort_s
+        fail fail fail this function is not going to work
+        #endif
+        
+        int main(void) {
+          return qsort_s ();
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpvepq8e4n/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpvepq8e4n/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group` -> 0
+Checking for function "qsort_s" : YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmp7aiww0zp
+Code:
+
+        #define posix_fallocate meson_disable_define_of_posix_fallocate
+        
+        #include <limits.h>
+        #undef posix_fallocate
+        
+        #ifdef __cplusplus
+        extern "C"
+        #endif
+        char posix_fallocate (void);
+        
+        #if defined __stub_posix_fallocate || defined __stub___posix_fallocate
+        fail fail fail this function is not going to work
+        #endif
+        
+        int main(void) {
+          return posix_fallocate ();
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmp7aiww0zp/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmp7aiww0zp/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group` -> 1
+stderr:
+/usr/bin/x86_64-w64-mingw32-ld: /tmp/ccZJxAPt.o:testfile.c:(.text+0xe): undefined reference to `posix_fallocate'
+collect2: error: ld returned 1 exit status
+-----------
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpn4l9siup
+Code:
+
+        int main(void) {
+
+        /* With some toolchains (MSYS2/mingw for example) the compiler
+         * provides various builtins which are not really implemented and
+         * fall back to the stdlib where they aren't provided and fail at
+         * build/link time. In case the user provides a header, including
+         * the header didn't lead to the function being defined, and the
+         * function we are checking isn't a builtin itself we assume the
+         * builtin is not functional and we just error out. */
+        #if !1 && !defined(posix_fallocate) && !0
+            #error "No definition for __builtin_posix_fallocate found in the prefix"
+        #endif
+
+        #ifdef __has_builtin
+            #if !__has_builtin(__builtin_posix_fallocate)
+                #error "__builtin_posix_fallocate not found"
+            #endif
+        #elif ! defined(posix_fallocate)
+            __builtin_posix_fallocate;
+        #endif
+        return 0;
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpn4l9siup/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpn4l9siup/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group` -> 1
+stderr:
+/workspace/xbox-readiness/dzn/build/meson-private/tmpn4l9siup/testfile.c: In function 'main':
+/workspace/xbox-readiness/dzn/build/meson-private/tmpn4l9siup/testfile.c:17:18: error: #error "__builtin_posix_fallocate not found"
+   17 |                 #error "__builtin_posix_fallocate not found"
+      |                  ^~~~~
+-----------
+Checking for function "posix_fallocate" : NO 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpz3th5vsa
+Code:
+
+        #define secure_getenv meson_disable_define_of_secure_getenv
+        
+        #include <limits.h>
+        #undef secure_getenv
+        
+        #ifdef __cplusplus
+        extern "C"
+        #endif
+        char secure_getenv (void);
+        
+        #if defined __stub_secure_getenv || defined __stub___secure_getenv
+        fail fail fail this function is not going to work
+        #endif
+        
+        int main(void) {
+          return secure_getenv ();
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpz3th5vsa/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpz3th5vsa/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group` -> 1
+stderr:
+/usr/bin/x86_64-w64-mingw32-ld: /tmp/ccCAt51b.o:testfile.c:(.text+0xe): undefined reference to `secure_getenv'
+collect2: error: ld returned 1 exit status
+-----------
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpukz10pby
+Code:
+
+        int main(void) {
+
+        /* With some toolchains (MSYS2/mingw for example) the compiler
+         * provides various builtins which are not really implemented and
+         * fall back to the stdlib where they aren't provided and fail at
+         * build/link time. In case the user provides a header, including
+         * the header didn't lead to the function being defined, and the
+         * function we are checking isn't a builtin itself we assume the
+         * builtin is not functional and we just error out. */
+        #if !1 && !defined(secure_getenv) && !0
+            #error "No definition for __builtin_secure_getenv found in the prefix"
+        #endif
+
+        #ifdef __has_builtin
+            #if !__has_builtin(__builtin_secure_getenv)
+                #error "__builtin_secure_getenv not found"
+            #endif
+        #elif ! defined(secure_getenv)
+            __builtin_secure_getenv;
+        #endif
+        return 0;
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpukz10pby/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpukz10pby/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group` -> 1
+stderr:
+/workspace/xbox-readiness/dzn/build/meson-private/tmpukz10pby/testfile.c: In function 'main':
+/workspace/xbox-readiness/dzn/build/meson-private/tmpukz10pby/testfile.c:17:18: error: #error "__builtin_secure_getenv not found"
+   17 |                 #error "__builtin_secure_getenv not found"
+      |                  ^~~~~
+-----------
+Checking for function "secure_getenv" : NO 
+Running compile:
+Working directory:  /tmp/tmptbrfxzgg
+Code:
+int i = static_cast<int>(0);
+-----------
+Command line: `x86_64-w64-mingw32-g++ /tmp/tmptbrfxzgg/testfile.cpp -o /tmp/tmptbrfxzgg/output.obj -D_FILE_OFFSET_BITS=64 -c -std=c++17` -> 0
+Compiler accepts -std=c++17: YES
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpjoodrjfp
+Code:
+
+    #define _GNU_SOURCE
+    #include <stdlib.h>
+
+    static int dcomp(const void *l, const void *r, void *t) { return 0; }
+
+    int main(int ac, char **av) {
+      int arr[] = { 1 };
+      void *t = NULL;
+      qsort_r((void*)&arr[0], 1, 1, dcomp, t);
+      return (0);
+    }
+-----------
+Command line: `x86_64-w64-mingw32-g++ /workspace/xbox-readiness/dzn/build/meson-private/tmpjoodrjfp/testfile.cpp -o /workspace/xbox-readiness/dzn/build/meson-private/tmpjoodrjfp/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -fpermissive -std=c++17 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS '-DPACKAGE_VERSION="25.1.9"' '-DPACKAGE_BUGREPORT="https://gitlab.freedesktop.org/mesa/mesa/-/issues"' -DHAVE_OPENGL=0 -DHAVE_OPENGL_ES_1=0 -DHAVE_OPENGL_ES_2=0 -DVIDEO_CODEC_VC1DEC=0 -DVIDEO_CODEC_H264DEC=0 -DVIDEO_CODEC_H264ENC=0 -DVIDEO_CODEC_H265DEC=0 -DVIDEO_CODEC_H265ENC=0 -DVIDEO_CODEC_AV1DEC=0 -DVIDEO_CODEC_AV1ENC=0 -DVIDEO_CODEC_VP9DEC=0 -DHAVE_WINDOWS_PLATFORM -DUSE_LIBGLVND=0 -DGLAPI_EXPORT_PROTO_ENTRY_POINTS=1 -DALLOW_KCMP -DMESA_DEBUG=0 -DHAVE___BUILTIN_BSWAP32 -DHAVE___BUILTIN_BSWAP64 -DHAVE___BUILTIN_CLZ -DHAVE___BUILTIN_CLZLL -DHAVE___BUILTIN_CTZ -DHAVE___BUILTIN_EXPECT -DHAVE___BUILTIN_FFS -DHAVE___BUILTIN_FFSLL -DHAVE___BUILTIN_POPCOUNT -DHAVE___BUILTIN_POPCOUNTLL -DHAVE___BUILTIN_UNREACHABLE -DHAVE___BUILTIN_TYPES_COMPATIBLE_P -DHAVE_FUNC_ATTRIBUTE_CONST -DHAVE_FUNC_ATTRIBUTE_FLATTEN -DHAVE_FUNC_ATTRIBUTE_MALLOC -DHAVE_FUNC_ATTRIBUTE_PURE -DHAVE_FUNC_ATTRIBUTE_UNUSED -DHAVE_FUNC_ATTRIBUTE_WARN_UNUSED_RESULT -DHAVE_FUNC_ATTRIBUTE_WEAK -DHAVE_FUNC_ATTRIBUTE_FORMAT -DHAVE_FUNC_ATTRIBUTE_PACKED -DHAVE_FUNC_ATTRIBUTE_RETURNS_NONNULL -DHAVE_FUNC_ATTRIBUTE_ALIAS -DHAVE_FUNC_ATTRIBUTE_NORETURN -DHAVE_FUNC_ATTRIBUTE_OPTIMIZE -DHAVE_UINT128 -D_WINDOWS -D_WIN32_WINNT=0x0A00 -DWINVER=0x0A00 -DPIPE_SUBSYSTEM_WINDOWS_USER -D_USE_MATH_DEFINES -D__MSVCRT_VERSION__=0x0700 -DUSE_SSE41 -DHAVE___BUILTIN_IA32_CLFLUSHOPT -DUSE_GCC_ATOMIC_BUILTINS -DHAS_SCHED_H -DHAVE_CET_H -DHAVE_STRTOF -DHAVE_STRTOK_R -DHAVE_QSORT_S` -> 1
+stderr:
+/workspace/xbox-readiness/dzn/build/meson-private/tmpjoodrjfp/testfile.cpp: In function 'int main(int, char**)':
+/workspace/xbox-readiness/dzn/build/meson-private/tmpjoodrjfp/testfile.cpp:10:7: error: 'qsort_r' was not declared in this scope; did you mean 'qsort_s'?
+   10 |       qsort_r((void*)&arr[0], 1, 1, dcomp, t);
+      |       ^~~~~~~
+      |       qsort_s
+-----------
+Checking if "GNU qsort_r" links: NO 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpc3ua6836
+Code:
+
+    #include <stdlib.h>
+
+    static int dcomp(void *t, const void *l, const void *r) { return 0; }
+
+    int main(int ac, char **av) {
+      int arr[] = { 1 };
+      void *t = NULL;
+      qsort_r((void*)&arr[0], 1, 1, t, dcomp);
+      return (0);
+    }
+-----------
+Command line: `x86_64-w64-mingw32-g++ /workspace/xbox-readiness/dzn/build/meson-private/tmpc3ua6836/testfile.cpp -o /workspace/xbox-readiness/dzn/build/meson-private/tmpc3ua6836/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -fpermissive -std=c++17 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS '-DPACKAGE_VERSION="25.1.9"' '-DPACKAGE_BUGREPORT="https://gitlab.freedesktop.org/mesa/mesa/-/issues"' -DHAVE_OPENGL=0 -DHAVE_OPENGL_ES_1=0 -DHAVE_OPENGL_ES_2=0 -DVIDEO_CODEC_VC1DEC=0 -DVIDEO_CODEC_H264DEC=0 -DVIDEO_CODEC_H264ENC=0 -DVIDEO_CODEC_H265DEC=0 -DVIDEO_CODEC_H265ENC=0 -DVIDEO_CODEC_AV1DEC=0 -DVIDEO_CODEC_AV1ENC=0 -DVIDEO_CODEC_VP9DEC=0 -DHAVE_WINDOWS_PLATFORM -DUSE_LIBGLVND=0 -DGLAPI_EXPORT_PROTO_ENTRY_POINTS=1 -DALLOW_KCMP -DMESA_DEBUG=0 -DHAVE___BUILTIN_BSWAP32 -DHAVE___BUILTIN_BSWAP64 -DHAVE___BUILTIN_CLZ -DHAVE___BUILTIN_CLZLL -DHAVE___BUILTIN_CTZ -DHAVE___BUILTIN_EXPECT -DHAVE___BUILTIN_FFS -DHAVE___BUILTIN_FFSLL -DHAVE___BUILTIN_POPCOUNT -DHAVE___BUILTIN_POPCOUNTLL -DHAVE___BUILTIN_UNREACHABLE -DHAVE___BUILTIN_TYPES_COMPATIBLE_P -DHAVE_FUNC_ATTRIBUTE_CONST -DHAVE_FUNC_ATTRIBUTE_FLATTEN -DHAVE_FUNC_ATTRIBUTE_MALLOC -DHAVE_FUNC_ATTRIBUTE_PURE -DHAVE_FUNC_ATTRIBUTE_UNUSED -DHAVE_FUNC_ATTRIBUTE_WARN_UNUSED_RESULT -DHAVE_FUNC_ATTRIBUTE_WEAK -DHAVE_FUNC_ATTRIBUTE_FORMAT -DHAVE_FUNC_ATTRIBUTE_PACKED -DHAVE_FUNC_ATTRIBUTE_RETURNS_NONNULL -DHAVE_FUNC_ATTRIBUTE_ALIAS -DHAVE_FUNC_ATTRIBUTE_NORETURN -DHAVE_FUNC_ATTRIBUTE_OPTIMIZE -DHAVE_UINT128 -D_WINDOWS -D_WIN32_WINNT=0x0A00 -DWINVER=0x0A00 -DPIPE_SUBSYSTEM_WINDOWS_USER -D_USE_MATH_DEFINES -D__MSVCRT_VERSION__=0x0700 -DUSE_SSE41 -DHAVE___BUILTIN_IA32_CLFLUSHOPT -DUSE_GCC_ATOMIC_BUILTINS -DHAS_SCHED_H -DHAVE_CET_H -DHAVE_STRTOF -DHAVE_STRTOK_R -DHAVE_QSORT_S` -> 1
+stderr:
+/workspace/xbox-readiness/dzn/build/meson-private/tmpc3ua6836/testfile.cpp: In function 'int main(int, char**)':
+/workspace/xbox-readiness/dzn/build/meson-private/tmpc3ua6836/testfile.cpp:9:7: error: 'qsort_r' was not declared in this scope; did you mean 'qsort_s'?
+    9 |       qsort_r((void*)&arr[0], 1, 1, t, dcomp);
+      |       ^~~~~~~
+      |       qsort_s
+-----------
+Checking if "BSD qsort_r" links: NO 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpxtua29jy
+Code:
+
+        #include <time.h>
+        int main(void) {
+            /* If it's not defined as a macro, try to use as a symbol */
+            #ifndef struct timespec
+                struct timespec;
+            #endif
+            return 0;
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpxtua29jy/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpxtua29jy/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11` -> 0
+stderr:
+/workspace/xbox-readiness/dzn/build/meson-private/tmpxtua29jy/testfile.c: In function 'main':
+/workspace/xbox-readiness/dzn/build/meson-private/tmpxtua29jy/testfile.c:5:28: warning: extra tokens at end of #ifndef directive
+    5 |             #ifndef struct timespec
+      |                            ^~~~~~~~
+-----------
+Header "time.h" has symbol "struct timespec" : YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmp1uxdzar2
+Code:
+#include <threads.h>
+#include <limits.h>
+
+        #if defined __stub_thrd_create || defined __stub___thrd_create
+        fail fail fail this function is not going to work
+        #endif
+        
+int main(void) {
+            void *a = (void*) &thrd_create;
+            long long b = (long long) a;
+            return (int) b;
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmp1uxdzar2/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmp1uxdzar2/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group` -> 1
+stderr:
+/workspace/xbox-readiness/dzn/build/meson-private/tmp1uxdzar2/testfile.c:1:10: fatal error: threads.h: No such file or directory
+    1 | #include <threads.h>
+      |          ^~~~~~~~~~~
+compilation terminated.
+-----------
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpg075nxt5
+Code:
+#include <threads.h>
+        int main(void) {
+
+        /* With some toolchains (MSYS2/mingw for example) the compiler
+         * provides various builtins which are not really implemented and
+         * fall back to the stdlib where they aren't provided and fail at
+         * build/link time. In case the user provides a header, including
+         * the header didn't lead to the function being defined, and the
+         * function we are checking isn't a builtin itself we assume the
+         * builtin is not functional and we just error out. */
+        #if !0 && !defined(thrd_create) && !0
+            #error "No definition for __builtin_thrd_create found in the prefix"
+        #endif
+
+        #ifdef __has_builtin
+            #if !__has_builtin(__builtin_thrd_create)
+                #error "__builtin_thrd_create not found"
+            #endif
+        #elif ! defined(thrd_create)
+            __builtin_thrd_create;
+        #endif
+        return 0;
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpg075nxt5/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpg075nxt5/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group` -> 1
+stderr:
+/workspace/xbox-readiness/dzn/build/meson-private/tmpg075nxt5/testfile.c:1:10: fatal error: threads.h: No such file or directory
+    1 | #include <threads.h>
+      |          ^~~~~~~~~~~
+compilation terminated.
+-----------
+Checking for function "thrd_create" : NO 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpsgbeuexe
+Code:
+
+        #include <errno.h>
+        int main(void) {
+            /* If it's not defined as a macro, try to use as a symbol */
+            #ifndef program_invocation_name
+                program_invocation_name;
+            #endif
+            return 0;
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpsgbeuexe/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpsgbeuexe/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -D_GNU_SOURCE` -> 1
+stderr:
+/workspace/xbox-readiness/dzn/build/meson-private/tmpsgbeuexe/testfile.c: In function 'main':
+/workspace/xbox-readiness/dzn/build/meson-private/tmpsgbeuexe/testfile.c:6:17: error: 'program_invocation_name' undeclared (first use in this function)
+    6 |                 program_invocation_name;
+      |                 ^~~~~~~~~~~~~~~~~~~~~~~
+/workspace/xbox-readiness/dzn/build/meson-private/tmpsgbeuexe/testfile.c:6:17: note: each undeclared identifier is reported only once for each function it appears in
+-----------
+Header "errno.h" has symbol "program_invocation_name" : NO 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmp7ezn4df0
+Code:
+
+        #include <math.h>
+        int main(void) {
+            /* If it's not defined as a macro, try to use as a symbol */
+            #ifndef issignaling
+                issignaling;
+            #endif
+            return 0;
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmp7ezn4df0/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmp7ezn4df0/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -D_GNU_SOURCE` -> 1
+stderr:
+/workspace/xbox-readiness/dzn/build/meson-private/tmp7ezn4df0/testfile.c: In function 'main':
+/workspace/xbox-readiness/dzn/build/meson-private/tmp7ezn4df0/testfile.c:6:17: error: 'issignaling' undeclared (first use in this function)
+    6 |                 issignaling;
+      |                 ^~~~~~~~~~~
+/workspace/xbox-readiness/dzn/build/meson-private/tmp7ezn4df0/testfile.c:6:17: note: each undeclared identifier is reported only once for each function it appears in
+-----------
+Header "math.h" has symbol "issignaling" : NO 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpqsojl_3j
+Code:
+#include <sys/types.h>
+   #include <dirent.h>
+        void bar(void) {
+            struct dirent foo;
+            (void) ( foo.d_type );
+
+            (void) foo;
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpqsojl_3j/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpqsojl_3j/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11` -> 1
+stderr:
+/workspace/xbox-readiness/dzn/build/meson-private/tmpqsojl_3j/testfile.c: In function 'bar':
+/workspace/xbox-readiness/dzn/build/meson-private/tmpqsojl_3j/testfile.c:5:25: error: 'struct dirent' has no member named 'd_type'
+    5 |             (void) ( foo.d_type );
+      |                         ^
+-----------
+Checking whether type "struct dirent" has member "d_type" : NO 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpvup8emru
+Code:
+
+    #define _GNU_SOURCE
+    #include <stdlib.h>
+    #include <locale.h>
+    #ifdef HAVE_XLOCALE_H
+    #include <xlocale.h>
+    #endif
+    int main() {
+      locale_t loc = newlocale(LC_CTYPE_MASK, "C", NULL);
+      const char *s = "1.0";
+      char *end;
+      double d = strtod_l(s, &end, loc);
+      float f = strtof_l(s, &end, loc);
+      freelocale(loc);
+      return 0;
+    }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpvup8emru/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpvup8emru/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS '-DPACKAGE_VERSION="25.1.9"' '-DPACKAGE_BUGREPORT="https://gitlab.freedesktop.org/mesa/mesa/-/issues"' -DHAVE_OPENGL=0 -DHAVE_OPENGL_ES_1=0 -DHAVE_OPENGL_ES_2=0 -DVIDEO_CODEC_VC1DEC=0 -DVIDEO_CODEC_H264DEC=0 -DVIDEO_CODEC_H264ENC=0 -DVIDEO_CODEC_H265DEC=0 -DVIDEO_CODEC_H265ENC=0 -DVIDEO_CODEC_AV1DEC=0 -DVIDEO_CODEC_AV1ENC=0 -DVIDEO_CODEC_VP9DEC=0 -DHAVE_WINDOWS_PLATFORM -DUSE_LIBGLVND=0 -DGLAPI_EXPORT_PROTO_ENTRY_POINTS=1 -DALLOW_KCMP -DMESA_DEBUG=0 -DHAVE___BUILTIN_BSWAP32 -DHAVE___BUILTIN_BSWAP64 -DHAVE___BUILTIN_CLZ -DHAVE___BUILTIN_CLZLL -DHAVE___BUILTIN_CTZ -DHAVE___BUILTIN_EXPECT -DHAVE___BUILTIN_FFS -DHAVE___BUILTIN_FFSLL -DHAVE___BUILTIN_POPCOUNT -DHAVE___BUILTIN_POPCOUNTLL -DHAVE___BUILTIN_UNREACHABLE -DHAVE___BUILTIN_TYPES_COMPATIBLE_P -DHAVE_FUNC_ATTRIBUTE_CONST -DHAVE_FUNC_ATTRIBUTE_FLATTEN -DHAVE_FUNC_ATTRIBUTE_MALLOC -DHAVE_FUNC_ATTRIBUTE_PURE -DHAVE_FUNC_ATTRIBUTE_UNUSED -DHAVE_FUNC_ATTRIBUTE_WARN_UNUSED_RESULT -DHAVE_FUNC_ATTRIBUTE_WEAK -DHAVE_FUNC_ATTRIBUTE_FORMAT -DHAVE_FUNC_ATTRIBUTE_PACKED -DHAVE_FUNC_ATTRIBUTE_RETURNS_NONNULL -DHAVE_FUNC_ATTRIBUTE_ALIAS -DHAVE_FUNC_ATTRIBUTE_NORETURN -DHAVE_FUNC_ATTRIBUTE_OPTIMIZE -DHAVE_UINT128 -D_WINDOWS -D_WIN32_WINNT=0x0A00 -DWINVER=0x0A00 -DPIPE_SUBSYSTEM_WINDOWS_USER -D_USE_MATH_DEFINES -D__MSVCRT_VERSION__=0x0700 -DUSE_SSE41 -DHAVE___BUILTIN_IA32_CLFLUSHOPT -DUSE_GCC_ATOMIC_BUILTINS -DHAS_SCHED_H -DHAVE_CET_H -DHAVE_STRTOF -DHAVE_STRTOK_R -DHAVE_QSORT_S -DHAVE_STRUCT_TIMESPEC` -> 1
+stderr:
+/workspace/xbox-readiness/dzn/build/meson-private/tmpvup8emru/testfile.c: In function 'main':
+/workspace/xbox-readiness/dzn/build/meson-private/tmpvup8emru/testfile.c:9:7: error: unknown type name 'locale_t'; did you mean '_locale_t'?
+    9 |       locale_t loc = newlocale(LC_CTYPE_MASK, "C", NULL);
+      |       ^~~~~~~~
+      |       _locale_t
+/workspace/xbox-readiness/dzn/build/meson-private/tmpvup8emru/testfile.c:9:22: error: implicit declaration of function 'newlocale'; did you mean 'setlocale'? [-Wimplicit-function-declaration]
+    9 |       locale_t loc = newlocale(LC_CTYPE_MASK, "C", NULL);
+      |                      ^~~~~~~~~
+      |                      setlocale
+/workspace/xbox-readiness/dzn/build/meson-private/tmpvup8emru/testfile.c:9:32: error: 'LC_CTYPE_MASK' undeclared (first use in this function); did you mean 'LC_CTYPE'?
+    9 |       locale_t loc = newlocale(LC_CTYPE_MASK, "C", NULL);
+      |                                ^~~~~~~~~~~~~
+      |                                LC_CTYPE
+/workspace/xbox-readiness/dzn/build/meson-private/tmpvup8emru/testfile.c:9:32: note: each undeclared identifier is reported only once for each function it appears in
+/workspace/xbox-readiness/dzn/build/meson-private/tmpvup8emru/testfile.c:12:18: error: implicit declaration of function 'strtod_l'; did you mean '_strtod_l'? [-Wimplicit-function-declaration]
+   12 |       double d = strtod_l(s, &end, loc);
+      |                  ^~~~~~~~
+      |                  _strtod_l
+/workspace/xbox-readiness/dzn/build/meson-private/tmpvup8emru/testfile.c:13:17: error: implicit declaration of function 'strtof_l'; did you mean '_strtof_l'? [-Wimplicit-function-declaration]
+   13 |       float f = strtof_l(s, &end, loc);
+      |                 ^~~~~~~~
+      |                 _strtof_l
+/workspace/xbox-readiness/dzn/build/meson-private/tmpvup8emru/testfile.c:14:7: error: implicit declaration of function 'freelocale'; did you mean '_free_locale'? [-Wimplicit-function-declaration]
+   14 |       freelocale(loc);
+      |       ^~~~~~~~~~
+      |       _free_locale
+-----------
+Checking if "strtod has locale support" links: NO 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpypb3w03j
+Code:
+int main() { return 0; }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpypb3w03j/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpypb3w03j/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group -Wl,-Bsymbolic` -> 0
+Checking if "Bsymbolic" links: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmp04rc2m1s
+Code:
+int main() { return 0; }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmp04rc2m1s/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmp04rc2m1s/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group -Wl,--version-script=/workspace/xbox-readiness/dzn/src/mesa-25.1.9/build-support/conftest.map` -> 0
+Checking if "version-script" links: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpunp1jp3k
+Code:
+int main() { return 0; }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpunp1jp3k/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpunp1jp3k/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group -Wl,--dynamic-list=/workspace/xbox-readiness/dzn/src/mesa-25.1.9/build-support/conftest.dyn` -> 0
+Checking if "dynamic-list" links: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpez499m_i
+Code:
+int main(void) { return 0; }
+
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpez499m_i/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpez499m_i/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -Wl,--fatal-warnings -Wl,--build-id=sha1` -> 0
+Compiler for C supports link arguments -Wl,--build-id=sha1: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmp9ely_e3h
+Code:
+
+        #define dl_iterate_phdr meson_disable_define_of_dl_iterate_phdr
+        
+        #include <limits.h>
+        #undef dl_iterate_phdr
+        
+        #ifdef __cplusplus
+        extern "C"
+        #endif
+        char dl_iterate_phdr (void);
+        
+        #if defined __stub_dl_iterate_phdr || defined __stub___dl_iterate_phdr
+        fail fail fail this function is not going to work
+        #endif
+        
+        int main(void) {
+          return dl_iterate_phdr ();
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmp9ely_e3h/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmp9ely_e3h/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group` -> 1
+stderr:
+/usr/bin/x86_64-w64-mingw32-ld: /tmp/ccn5oLHl.o:testfile.c:(.text+0xe): undefined reference to `dl_iterate_phdr'
+collect2: error: ld returned 1 exit status
+-----------
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpq_jrb_5k
+Code:
+
+        int main(void) {
+
+        /* With some toolchains (MSYS2/mingw for example) the compiler
+         * provides various builtins which are not really implemented and
+         * fall back to the stdlib where they aren't provided and fail at
+         * build/link time. In case the user provides a header, including
+         * the header didn't lead to the function being defined, and the
+         * function we are checking isn't a builtin itself we assume the
+         * builtin is not functional and we just error out. */
+        #if !1 && !defined(dl_iterate_phdr) && !0
+            #error "No definition for __builtin_dl_iterate_phdr found in the prefix"
+        #endif
+
+        #ifdef __has_builtin
+            #if !__has_builtin(__builtin_dl_iterate_phdr)
+                #error "__builtin_dl_iterate_phdr not found"
+            #endif
+        #elif ! defined(dl_iterate_phdr)
+            __builtin_dl_iterate_phdr;
+        #endif
+        return 0;
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpq_jrb_5k/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpq_jrb_5k/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -std=c11 -Wl,--start-group -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -Wl,--end-group` -> 1
+stderr:
+/workspace/xbox-readiness/dzn/build/meson-private/tmpq_jrb_5k/testfile.c: In function 'main':
+/workspace/xbox-readiness/dzn/build/meson-private/tmpq_jrb_5k/testfile.c:17:18: error: #error "__builtin_dl_iterate_phdr not found"
+   17 |                 #error "__builtin_dl_iterate_phdr not found"
+      |                  ^~~~~
+-----------
+Checking for function "dl_iterate_phdr" : NO 
+Dependency zlib for host machine skipped: feature zlib disabled
+Dependency libzstd for host machine skipped: feature zstd disabled
+Dependency expat for host machine skipped: feature expat disabled
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmp1fic0txh
+Code:
+int main(void) { return 0; }
+
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmp1fic0txh/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmp1fic0txh/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -lm -Wl,--allow-shlib-undefined` -> 0
+Library m found: YES
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpp7gqlcev
+Code:
+int main(void) { return 0; }
+
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpp7gqlcev/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpp7gqlcev/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -lregex -Wl,--allow-shlib-undefined` -> 1
+stderr:
+/usr/bin/x86_64-w64-mingw32-ld: cannot find -lregex: No such file or directory
+collect2: error: ld returned 1 exit status
+-----------
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmp64kvbjb7
+Code:
+
+        #include <stddef.h>
+        int main(void) {
+            void * something;
+            return 0;
+        }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmp64kvbjb7/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmp64kvbjb7/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE` -> 0
+Running compile:
+Working directory:  /tmp/tmp54wndhfl
+Code:
+
+        
+        #ifndef sizeof(void *)
+        # define sizeof(void *) "MESON_GET_DEFINE_UNDEFINED_SENTINEL"
+        #endif
+        "MESON_GET_DEFINE_DELIMITER_START"
+sizeof(void *)
+"MESON_GET_DEFINE_DELIMITER_END"
+-----------
+Command line: `x86_64-w64-mingw32-gcc /tmp/tmp54wndhfl/testfile.c -E -P -D_FILE_OFFSET_BITS=64 -P -O0 -U_FORTIFY_SOURCE` -> 1
+stdout:
+"MESON_GET_DEFINE_DELIMITER_START"
+sizeof(void *)
+"MESON_GET_DEFINE_DELIMITER_END"
+-----------
+stderr:
+/tmp/tmp54wndhfl/testfile.c:3:23: warning: extra tokens at end of #ifndef directive
+    3 |         #ifndef sizeof(void *)
+      |                       ^
+/tmp/tmp54wndhfl/testfile.c:4:30: error: expected ',' or ')', found "*"
+    4 |         # define sizeof(void *) "MESON_GET_DEFINE_UNDEFINED_SENTINEL"
+      |                              ^
+-----------
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpdzjiucfi
+Code:
+
+        #include <stddef.h>
+        int main(void) { static int a[1-2*!(sizeof(void *) >= 0)]; a[0]=0; return 0; }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpdzjiucfi/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpdzjiucfi/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE` -> 0
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpxjsm6b17
+Code:
+
+        #include <stddef.h>
+        int main(void) { static int a[1-2*!(sizeof(void *) > 0)]; a[0]=0; return 0; }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpxjsm6b17/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpxjsm6b17/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE` -> 0
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpzgkeidzq
+Code:
+
+        #include <stddef.h>
+        int main(void) { static int a[1-2*!(sizeof(void *) > 1)]; a[0]=0; return 0; }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpzgkeidzq/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpzgkeidzq/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE` -> 0
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmp1kk1ud87
+Code:
+
+        #include <stddef.h>
+        int main(void) { static int a[1-2*!(sizeof(void *) > 3)]; a[0]=0; return 0; }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmp1kk1ud87/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmp1kk1ud87/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE` -> 0
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmp0kful6sv
+Code:
+
+        #include <stddef.h>
+        int main(void) { static int a[1-2*!(sizeof(void *) > 7)]; a[0]=0; return 0; }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmp0kful6sv/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmp0kful6sv/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE` -> 0
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmppay_l8jf
+Code:
+
+        #include <stddef.h>
+        int main(void) { static int a[1-2*!(sizeof(void *) > 15)]; a[0]=0; return 0; }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmppay_l8jf/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmppay_l8jf/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE` -> 1
+stderr:
+/workspace/xbox-readiness/dzn/build/meson-private/tmppay_l8jf/testfile.c: In function 'main':
+/workspace/xbox-readiness/dzn/build/meson-private/tmppay_l8jf/testfile.c:3:37: error: size of array 'a' is negative
+    3 |         int main(void) { static int a[1-2*!(sizeof(void *) > 15)]; a[0]=0; return 0; }
+      |                                     ^
+-----------
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpykq08hbh
+Code:
+
+        #include <stddef.h>
+        int main(void) { static int a[1-2*!(sizeof(void *) <= 11)]; a[0]=0; return 0; }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpykq08hbh/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpykq08hbh/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE` -> 0
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpm_wepew3
+Code:
+
+        #include <stddef.h>
+        int main(void) { static int a[1-2*!(sizeof(void *) <= 9)]; a[0]=0; return 0; }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpm_wepew3/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpm_wepew3/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE` -> 0
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmp4r6w5f0n
+Code:
+
+        #include <stddef.h>
+        int main(void) { static int a[1-2*!(sizeof(void *) <= 8)]; a[0]=0; return 0; }
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmp4r6w5f0n/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmp4r6w5f0n/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE` -> 0
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpbvq1v8pm
+Code:
+
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpbvq1v8pm/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpbvq1v8pm/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE --print-search-dirs` -> 0
+stdout:
+install: /usr/lib/gcc/x86_64-w64-mingw32/14-win32/
+programs: =/usr/lib/gcc/x86_64-w64-mingw32/14-win32/:/usr/lib/gcc/x86_64-w64-mingw32/14-win32/:/usr/lib/gcc/x86_64-w64-mingw32/:/usr/lib/gcc/x86_64-w64-mingw32/14-win32/:/usr/lib/gcc/x86_64-w64-mingw32/:/usr/lib/gcc/x86_64-w64-mingw32/14-win32/../../../../x86_64-w64-mingw32/bin/x86_64-w64-mingw32/14-win32/:/usr/lib/gcc/x86_64-w64-mingw32/14-win32/../../../../x86_64-w64-mingw32/bin/
+libraries: =/usr/lib/gcc/x86_64-w64-mingw32/14-win32/:/usr/lib/gcc/x86_64-w64-mingw32/14-win32/../../../../x86_64-w64-mingw32/lib/x86_64-w64-mingw32/14-win32/:/usr/lib/gcc/x86_64-w64-mingw32/14-win32/../../../../x86_64-w64-mingw32/lib/
+-----------
+Library regex found: NO
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpda4exfdp
+Code:
+int main(void) { return 0; }
+
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpda4exfdp/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpda4exfdp/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -lsynchronization -Wl,--allow-shlib-undefined` -> 0
+Library synchronization found: YES
+Determining dependency 'libudev' with pkg-config executable '/usr/bin/pkg-config'
+env[PKG_CONFIG_PATH]: 
+env[PKG_CONFIG_LIBDIR]: /workspace/xbox-readiness/dzn/install/lib/pkgconfig
+env[PKG_CONFIG]: /usr/bin/pkg-config
+-----------
+Called: `/usr/bin/pkg-config --modversion libudev` -> 1
+stderr:
+Package libudev was not found in the pkg-config search path.
+Perhaps you should add the directory containing `libudev.pc'
+to the PKG_CONFIG_PATH environment variable
+Package 'libudev', required by 'virtual:world', not found
+-----------
+CMake binary for host machine is cached as not found
+CMake binary for machine host machine not found. Giving up.
+Run-time dependency libudev found: NO  (tried pkg-config and cmake)
+Determining dependency 'SPIRV-Tools' with pkg-config executable '/usr/bin/pkg-config'
+env[PKG_CONFIG_PATH]: 
+env[PKG_CONFIG_LIBDIR]: /workspace/xbox-readiness/dzn/install/lib/pkgconfig
+env[PKG_CONFIG]: /usr/bin/pkg-config
+-----------
+Called: `/usr/bin/pkg-config --modversion SPIRV-Tools` -> 1
+stderr:
+Package SPIRV-Tools was not found in the pkg-config search path.
+Perhaps you should add the directory containing `SPIRV-Tools.pc'
+to the PKG_CONFIG_PATH environment variable
+Package 'SPIRV-Tools', required by 'virtual:world', not found
+-----------
+CMake binary for host machine is cached as not found
+CMake binary for machine host machine not found. Giving up.
+Run-time dependency spirv-tools found: NO  (tried pkg-config and cmake)
+Determining dependency 'lua54' with pkg-config executable '/usr/bin/pkg-config'
+env[PKG_CONFIG_PATH]: 
+env[PKG_CONFIG_LIBDIR]: /workspace/xbox-readiness/dzn/install/lib/pkgconfig
+env[PKG_CONFIG]: /usr/bin/pkg-config
+-----------
+Called: `/usr/bin/pkg-config --modversion lua54` -> 1
+stderr:
+Package lua54 was not found in the pkg-config search path.
+Perhaps you should add the directory containing `lua54.pc'
+to the PKG_CONFIG_PATH environment variable
+Package 'lua54', required by 'virtual:world', not found
+-----------
+CMake binary for host machine is cached as not found
+CMake binary for machine host machine not found. Giving up.
+Run-time dependency lua54 found: NO  (tried pkg-config and cmake)
+Determining dependency 'lua5.4' with pkg-config executable '/usr/bin/pkg-config'
+env[PKG_CONFIG_PATH]: 
+env[PKG_CONFIG_LIBDIR]: /workspace/xbox-readiness/dzn/install/lib/pkgconfig
+env[PKG_CONFIG]: /usr/bin/pkg-config
+-----------
+Called: `/usr/bin/pkg-config --modversion lua5.4` -> 1
+stderr:
+Package lua5.4 was not found in the pkg-config search path.
+Perhaps you should add the directory containing `lua5.4.pc'
+to the PKG_CONFIG_PATH environment variable
+Package 'lua5.4', required by 'virtual:world', not found
+-----------
+CMake binary for host machine is cached as not found
+CMake binary for machine host machine not found. Giving up.
+Run-time dependency lua5.4 found: NO  (tried pkg-config and cmake)
+Determining dependency 'lua-5.4' with pkg-config executable '/usr/bin/pkg-config'
+env[PKG_CONFIG_PATH]: 
+env[PKG_CONFIG_LIBDIR]: /workspace/xbox-readiness/dzn/install/lib/pkgconfig
+env[PKG_CONFIG]: /usr/bin/pkg-config
+-----------
+Called: `/usr/bin/pkg-config --modversion lua-5.4` -> 1
+stderr:
+Package lua-5.4 was not found in the pkg-config search path.
+Perhaps you should add the directory containing `lua-5.4.pc'
+to the PKG_CONFIG_PATH environment variable
+Package 'lua-5.4', required by 'virtual:world', not found
+-----------
+CMake binary for host machine is cached as not found
+CMake binary for machine host machine not found. Giving up.
+Run-time dependency lua-5.4 found: NO  (tried pkg-config and cmake)
+Determining dependency 'lua53' with pkg-config executable '/usr/bin/pkg-config'
+env[PKG_CONFIG_PATH]: 
+env[PKG_CONFIG_LIBDIR]: /workspace/xbox-readiness/dzn/install/lib/pkgconfig
+env[PKG_CONFIG]: /usr/bin/pkg-config
+-----------
+Called: `/usr/bin/pkg-config --modversion lua53` -> 1
+stderr:
+Package lua53 was not found in the pkg-config search path.
+Perhaps you should add the directory containing `lua53.pc'
+to the PKG_CONFIG_PATH environment variable
+Package 'lua53', required by 'virtual:world', not found
+-----------
+CMake binary for host machine is cached as not found
+CMake binary for machine host machine not found. Giving up.
+Run-time dependency lua53 found: NO  (tried pkg-config and cmake)
+Determining dependency 'lua5.3' with pkg-config executable '/usr/bin/pkg-config'
+env[PKG_CONFIG_PATH]: 
+env[PKG_CONFIG_LIBDIR]: /workspace/xbox-readiness/dzn/install/lib/pkgconfig
+env[PKG_CONFIG]: /usr/bin/pkg-config
+-----------
+Called: `/usr/bin/pkg-config --modversion lua5.3` -> 1
+stderr:
+Package lua5.3 was not found in the pkg-config search path.
+Perhaps you should add the directory containing `lua5.3.pc'
+to the PKG_CONFIG_PATH environment variable
+Package 'lua5.3', required by 'virtual:world', not found
+-----------
+CMake binary for host machine is cached as not found
+CMake binary for machine host machine not found. Giving up.
+Run-time dependency lua5.3 found: NO  (tried pkg-config and cmake)
+Determining dependency 'lua-5.3' with pkg-config executable '/usr/bin/pkg-config'
+env[PKG_CONFIG_PATH]: 
+env[PKG_CONFIG_LIBDIR]: /workspace/xbox-readiness/dzn/install/lib/pkgconfig
+env[PKG_CONFIG]: /usr/bin/pkg-config
+-----------
+Called: `/usr/bin/pkg-config --modversion lua-5.3` -> 1
+stderr:
+Package lua-5.3 was not found in the pkg-config search path.
+Perhaps you should add the directory containing `lua-5.3.pc'
+to the PKG_CONFIG_PATH environment variable
+Package 'lua-5.3', required by 'virtual:world', not found
+-----------
+CMake binary for host machine is cached as not found
+CMake binary for machine host machine not found. Giving up.
+Run-time dependency lua-5.3 found: NO  (tried pkg-config and cmake)
+Determining dependency 'lua' with pkg-config executable '/usr/bin/pkg-config'
+env[PKG_CONFIG_PATH]: 
+env[PKG_CONFIG_LIBDIR]: /workspace/xbox-readiness/dzn/install/lib/pkgconfig
+env[PKG_CONFIG]: /usr/bin/pkg-config
+-----------
+Called: `/usr/bin/pkg-config --modversion lua` -> 1
+stderr:
+Package lua was not found in the pkg-config search path.
+Perhaps you should add the directory containing `lua.pc'
+to the PKG_CONFIG_PATH environment variable
+Package 'lua', required by 'virtual:world', not found
+-----------
+CMake binary for host machine is cached as not found
+CMake binary for machine host machine not found. Giving up.
+Run-time dependency lua found: NO  (tried pkg-config and cmake)
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpsmzo3a5k
+Code:
+int main(void) { return 0; }
+
+-----------
+Command line: `x86_64-w64-mingw32-g++ /workspace/xbox-readiness/dzn/build/meson-private/tmpsmzo3a5k/testfile.cpp -o /workspace/xbox-readiness/dzn/build/meson-private/tmpsmzo3a5k/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -fpermissive -lversion -Wl,--allow-shlib-undefined` -> 0
+Library version found: YES
+Determining dependency 'libelf' with pkg-config executable '/usr/bin/pkg-config'
+env[PKG_CONFIG_PATH]: 
+env[PKG_CONFIG_LIBDIR]: /workspace/xbox-readiness/dzn/install/lib/pkgconfig
+env[PKG_CONFIG]: /usr/bin/pkg-config
+-----------
+Called: `/usr/bin/pkg-config --modversion libelf` -> 1
+stderr:
+Package libelf was not found in the pkg-config search path.
+Perhaps you should add the directory containing `libelf.pc'
+to the PKG_CONFIG_PATH environment variable
+Package 'libelf', required by 'virtual:world', not found
+-----------
+CMake binary for host machine is cached as not found
+CMake binary for machine host machine not found. Giving up.
+Run-time dependency libelf found: NO  (tried pkg-config and cmake)
+Determining dependency 'valgrind' with pkg-config executable '/usr/bin/pkg-config'
+env[PKG_CONFIG_PATH]: 
+env[PKG_CONFIG_LIBDIR]: /workspace/xbox-readiness/dzn/install/lib/pkgconfig
+env[PKG_CONFIG]: /usr/bin/pkg-config
+-----------
+Called: `/usr/bin/pkg-config --modversion valgrind` -> 1
+stderr:
+Package valgrind was not found in the pkg-config search path.
+Perhaps you should add the directory containing `valgrind.pc'
+to the PKG_CONFIG_PATH environment variable
+Package 'valgrind', required by 'virtual:world', not found
+-----------
+Run-time dependency valgrind found: NO  (tried pkg-config)
+Program bison found: YES (/usr/bin/bison)
+Running command: /usr/bin/bison --version
+--- stdout ---
+bison (GNU Bison) 3.8.2
+Written by Robert Corbett and Richard Stallman.
+
+Copyright (C) 2021 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+--- stderr ---
+
+
+Program bison found: YES 3.8.2 3.8.2 (/usr/bin/bison)
+Program flex found: YES (/usr/bin/flex)
+Determining dependency 'libunwind' with pkg-config executable '/usr/bin/pkg-config'
+env[PKG_CONFIG_PATH]: 
+env[PKG_CONFIG_LIBDIR]: /workspace/xbox-readiness/dzn/install/lib/pkgconfig
+env[PKG_CONFIG]: /usr/bin/pkg-config
+-----------
+Called: `/usr/bin/pkg-config --modversion libunwind` -> 1
+stderr:
+Package libunwind was not found in the pkg-config search path.
+Perhaps you should add the directory containing `libunwind.pc'
+to the PKG_CONFIG_PATH environment variable
+Package 'libunwind', required by 'virtual:world', not found
+-----------
+CMake binary for host machine is cached as not found
+CMake binary for machine host machine not found. Giving up.
+Run-time dependency libunwind found: NO  (tried pkg-config and cmake)
+Running compile:
+Working directory:  /tmp/tmpnkwtgh0h
+Code:
+
+        
+        #ifndef _OPENMP
+        # define _OPENMP "MESON_GET_DEFINE_UNDEFINED_SENTINEL"
+        #endif
+        "MESON_GET_DEFINE_DELIMITER_START"
+_OPENMP
+"MESON_GET_DEFINE_DELIMITER_END"
+-----------
+Command line: `x86_64-w64-mingw32-g++ /tmp/tmpnkwtgh0h/testfile.cpp -E -P -fopenmp -D_FILE_OFFSET_BITS=64 -P -O0 -U_FORTIFY_SOURCE -fpermissive` -> 0
+stdout:
+"MESON_GET_DEFINE_DELIMITER_START"
+201511
+"MESON_GET_DEFINE_DELIMITER_END"
+-----------
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmprr614j37
+Code:
+
+        #ifdef __has_include
+         #if !__has_include("omp.h")
+          #error "Header 'omp.h' could not be found"
+         #endif
+        #else
+         #include <omp.h>
+        #endif
+-----------
+Command line: `x86_64-w64-mingw32-g++ /workspace/xbox-readiness/dzn/build/meson-private/tmprr614j37/testfile.cpp -E -P -fopenmp -D_FILE_OFFSET_BITS=64 -P -O0 -U_FORTIFY_SOURCE -fpermissive` -> 0
+Run-time dependency OpenMP found: YES 4.5
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpgyde9_5b
+Code:
+int main(void) { return 0; }
+
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpgyde9_5b/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpgyde9_5b/output.exe -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -lsensors -Wl,--allow-shlib-undefined` -> 1
+stderr:
+/usr/bin/x86_64-w64-mingw32-ld: cannot find -lsensors: No such file or directory
+collect2: error: ld returned 1 exit status
+-----------
+Library sensors found: NO
+Program dumpbin found: NO
+Program symbols-check.py found: YES (/workspace/xbox-readiness/dzn/venv/bin/python3 /workspace/xbox-readiness/dzn/src/mesa-25.1.9/bin/symbols-check.py)
+Program install_megadrivers.py found: YES (/workspace/xbox-readiness/dzn/venv/bin/python3 /workspace/xbox-readiness/dzn/src/mesa-25.1.9/bin/install_megadrivers.py)
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpth_khwl2
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpth_khwl2/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpth_khwl2/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -Wmisleading-indentation -Wno-misleading-indentation` -> 0
+Compiler for C supports arguments -Wno-misleading-indentation: YES 
+Program decode.py found: YES (/workspace/xbox-readiness/dzn/src/mesa-25.1.9/src/compiler/isaspec/decode.py)
+Program encode.py found: YES (/workspace/xbox-readiness/dzn/src/mesa-25.1.9/src/compiler/isaspec/encode.py)
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpo6n0h58s
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpo6n0h58s/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpo6n0h58s/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -Werror=unused-variable` -> 0
+Compiler for C supports arguments -Werror=unused-variable: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpow7epjgj
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpow7epjgj/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpow7epjgj/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -Werror=unused-but-set-variable` -> 0
+Compiler for C supports arguments -Werror=unused-but-set-variable: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpadsojyc6
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpadsojyc6/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpadsojyc6/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -Werror=unused-value` -> 0
+Compiler for C supports arguments -Werror=unused-value: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmp_d22a9wg
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmp_d22a9wg/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmp_d22a9wg/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -Werror=format` -> 0
+Compiler for C supports arguments -Werror=format: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpxuznsnpn
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-gcc /workspace/xbox-readiness/dzn/build/meson-private/tmpxuznsnpn/testfile.c -o /workspace/xbox-readiness/dzn/build/meson-private/tmpxuznsnpn/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -Werror=switch` -> 0
+Compiler for C supports arguments -Werror=switch: YES 
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpaz2unk18
+Code:
+extern int i;
+int i;
+
+-----------
+Command line: `x86_64-w64-mingw32-g++ /workspace/xbox-readiness/dzn/build/meson-private/tmpaz2unk18/testfile.cpp -o /workspace/xbox-readiness/dzn/build/meson-private/tmpaz2unk18/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -fpermissive -Werror=unused-value -Wno-error=unused-value` -> 0
+Compiler for C++ supports arguments -Wno-error=unused-value: YES 
+Program sphinx-build skipped: feature html-docs disabled
+Build targets in project: 80
+
+mesa 25.1.9
+
+  Directories
+    prefix                    : /workspace/xbox-readiness/dzn/install
+    libdir                    : lib
+    includedir                : include
+
+  Common C and C++ arguments
+    c_cpp_args                :
+
+  OpenGL
+    OpenGL                    : NO
+    ES1                       : NO
+    ES2                       : NO
+    GLVND                     : NO
+
+  DRI
+    Platform                  : windows
+    Driver dir                : /workspace/xbox-readiness/dzn/install/lib/dri
+
+  GLX
+    Enabled                   : NO
+    Provider                  : None
+
+  EGL
+    Enabled                   : NO
+
+  GBM
+    Enabled                   : NO
+
+  Vulkan
+    Drivers                   : microsoft-experimental
+    Platforms                 : windows
+    ICD dir                   : share/vulkan/icd.d
+    Intel Ray tracing         : NO
+
+  Video
+    Codecs                    : NO
+    APIs                      : vulkan
+
+  LLVM
+    Enabled                   : NO
+
+  Gallium
+    Enabled                   : NO
+
+  Perfetto
+    Enabled                   : NO
+
+  Teflon (TensorFlow Lite delegate)
+    Enabled                   : NO
+
+  Subprojects (for host machine)
+    DirectX-Headers           : YES
+
+  User defined options
+    Cross files               : cross-win64.ini
+    DirectX-Headers:build-test: false
+    build-tests               : false
+    buildtype                 : release
+    egl                       : disabled
+    gallium-drivers           : 
+    gbm                       : disabled
+    gles1                     : disabled
+    gles2                     : disabled
+    glx                       : disabled
+    llvm                      : disabled
+    opengl                    : false
+    platforms                 : windows
+    prefix                    : /workspace/xbox-readiness/dzn/install
+    spirv-to-dxil             : true
+    video-codecs              : 
+    vulkan-drivers            : microsoft-experimental
+    zlib                      : disabled
+    zstd                      : disabled
+
+Running compile:
+Working directory:  /workspace/xbox-readiness/dzn/build/meson-private/tmpcrmffkuk
+Code:
+
+-----------
+Command line: `x86_64-w64-mingw32-g++ /workspace/xbox-readiness/dzn/build/meson-private/tmpcrmffkuk/testfile.cpp -o /workspace/xbox-readiness/dzn/build/meson-private/tmpcrmffkuk/output.obj -c -D_FILE_OFFSET_BITS=64 -O0 -U_FORTIFY_SOURCE -fpermissive --print-search-dirs` -> 0
+stdout:
+install: /usr/lib/gcc/x86_64-w64-mingw32/14-win32/
+programs: =/usr/lib/gcc/x86_64-w64-mingw32/14-win32/:/usr/lib/gcc/x86_64-w64-mingw32/14-win32/:/usr/lib/gcc/x86_64-w64-mingw32/:/usr/lib/gcc/x86_64-w64-mingw32/14-win32/:/usr/lib/gcc/x86_64-w64-mingw32/:/usr/lib/gcc/x86_64-w64-mingw32/14-win32/../../../../x86_64-w64-mingw32/bin/x86_64-w64-mingw32/14-win32/:/usr/lib/gcc/x86_64-w64-mingw32/14-win32/../../../../x86_64-w64-mingw32/bin/
+libraries: =/usr/lib/gcc/x86_64-w64-mingw32/14-win32/:/usr/lib/gcc/x86_64-w64-mingw32/14-win32/../../../../x86_64-w64-mingw32/lib/x86_64-w64-mingw32/14-win32/:/usr/lib/gcc/x86_64-w64-mingw32/14-win32/../../../../x86_64-w64-mingw32/lib/
+-----------
+Found ninja-1.13.2.git.kitware.jobserver-pipe-1 at /workspace/xbox-readiness/dzn/venv/bin/ninja
+Running compile:
+Working directory:  /tmp/tmpi6rpyla8
+Code:
+int i = static_cast<int>(0);
+-----------
+Command line: `x86_64-w64-mingw32-g++ /tmp/tmpi6rpyla8/testfile.cpp -o /tmp/tmpi6rpyla8/output.obj -D_FILE_OFFSET_BITS=64 -c -std=c++14` -> 0
+Compiler accepts -std=c++14: YES
+Failed to guess install tag for /workspace/xbox-readiness/dzn/install/dummy
+Command line for building ['src/microsoft/spirv_to_dxil/libspirv_to_dxil.a'] is long, using a response file
+Failed to guess install tag for /workspace/xbox-readiness/dzn/install/dummy
+Failed to guess install tag for /workspace/xbox-readiness/dzn/install/dummy
+Failed to guess install tag for /workspace/xbox-readiness/dzn/install/dummy
