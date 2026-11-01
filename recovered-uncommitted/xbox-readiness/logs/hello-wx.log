@@ -1,0 +1,2 @@
+uwpjail: seccomp wx=1 nofork=0 (23 insns)
+wine: failed to load start.exe: c000000d

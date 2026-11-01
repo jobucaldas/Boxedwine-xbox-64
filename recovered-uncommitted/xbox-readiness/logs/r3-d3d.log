@@ -1,0 +1,31 @@
+== D3D11 / D3D12 with Wine builtins (wined3d, vkd3d)
+d3d11.dll: C:\windows\system32\d3d11.dll
+d3d11.dll kind: Wine builtin (wined3d)
+feature level: 0xb000
+adapter: NVIDIA GeForce GTX 470 (vendor 0x10de)
+readback pixel(0,0) RGBA = 0,128,255,255 (expect 0,128,255,255)
+d3d11 probe done
+adapter: NVIDIA GeForce GTX 470 (vendor 0x10de)
+d3d12.dll: C:\windows\system32\d3d12.dll
+d3d12.dll kind: Wine builtin (vkd3d)
+presented 30 frames, fence=30
+d3d12 probe done
+== installing DXVK + VKD3D-Proton into the prefix (native override, as Proton/GameNative do)
+== D3D11 via DXVK
+   screenshot /workspace/xbox-readiness/results/r3/d3d11-dxvk.png
+info:  DXVK: v3.1.1
+info:  Found device: llvmpipe (LLVM 19.1.7, 256 bits) (llvmpipe 0.0.1)
+d3d11.dll: C:\windows\system32\d3d11.dll
+d3d11.dll kind: native (e.g. DXVK)
+feature level: 0xb000
+adapter: llvmpipe (LLVM 19.1.7, 256 bits) (vendor 0x10005)
+readback pixel(0,0) RGBA = 0,128,255,255 (expect 0,128,255,255)
+d3d11 probe done
+== D3D12 via VKD3D-Proton
+   screenshot /workspace/xbox-readiness/results/r3/d3d12-vkd3dp.png
+adapter: llvmpipe (LLVM 19.1.7, 256 bits) (vendor 0x10005)
+36542.510:013c:0140:info:vkd3d-proton:vkd3d_get_vk_version: vkd3d-proton - applicationVersion: 3.0.1.
+d3d12.dll: C:\windows\system32\d3d12.dll
+d3d12.dll kind: native (e.g. VKD3D-Proton)
+presented 30 frames, fence=30
+d3d12 probe done

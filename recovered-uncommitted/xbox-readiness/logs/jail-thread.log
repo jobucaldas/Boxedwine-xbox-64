@@ -1,0 +1,16 @@
+uwpjail: landlock abi=6 fs=off net=bind>=1024
+uwpjail: seccomp wx=0 nofork=1 (16 insns)
+PASS create 64 threads                          64
+PASS WaitForMultipleObjects(64, all)            ret=0
+PASS per-thread TLS isolation                   ok=1
+PASS CS + SRW counters exact                    640000 640000
+PASS event ping-pong (wineserver round trip)    22.0 us/round trip
+METRIC event_roundtrip_us=22.0
+PASS Sleep(16) accuracy (frame pacing)          16.07 ms
+PASS high-resolution waitable timer             h=0000000000000140 err=0
+PASS named mutex (Local\)                       err=0
+PASS semaphore                                  ok
+PASS condition variable timeout                 ok
+INFO logical processors visible: 8 (Xbox Game mode: 4 exclusive + 2 shared)
+INFO physical mem visible: 16002 MB (Xbox Game mode budget: 5120 MB)
+SUMMARY thread_probe pass=10 fail=0

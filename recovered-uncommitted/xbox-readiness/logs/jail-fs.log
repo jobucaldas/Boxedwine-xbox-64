@@ -1,0 +1,13 @@
+uwpjail: landlock abi=6 fs=off net=bind>=1024
+uwpjail: seccomp wx=0 nofork=1 (16 insns)
+INFO exe: Z:\workspace\xbox-readiness\bin\fs_probe.exe
+INSTALL_DIR_WRITABLE=1
+INFO install dir writable: 1 (UWP package dir is read-only; games that write next to their exe need redirection)
+PASS write %LOCALAPPDATA% (-> LocalState)       C:\users\box\AppData\Local\uwp_probe\save.dat
+PASS write %APPDATA%                            C:\users\box\AppData\Roaming\uwp_probe.tmp
+PASS write Documents (Unity/Unreal saves)       C:\users\box\Documents\uwp_probe.tmp
+PASS write %TEMP%                               C:\users\box\AppData\Local\Temp\uwp_probe.tmp
+PASS case-insensitive open                      C:\users\box\AppData\Local\Temp\\uwp_case.tmp
+PASS 1MB memory-mapped file RW                  v=00007ffffeab0000
+PASS GetDiskFreeSpaceEx                         free=96722 MB
+SUMMARY fs_probe pass=7 fail=0

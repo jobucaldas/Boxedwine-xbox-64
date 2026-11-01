@@ -1,0 +1,5 @@
+create(&ci,NULL,&inst): 0
+MESA: error: Failed to create DXCore adapter factory
+WARNING: dzn is not a conformant Vulkan implementation, testing use only.
+MESA: error: failed to enable experimental shader models
+vkEnumeratePhysicalDevices(inst,&count,NULL): -3

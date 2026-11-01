@@ -1,0 +1,269 @@
+create(&ci,NULL,&inst): 0
+MESA: error: Failed to create DXCore adapter factory
+[Vulkan Loader] DRIVER:         Searching for driver manifest files
+[Vulkan Loader] DRIVER:            In following locations:
+[Vulkan Loader] DRIVER:               /usr/share/vulkan/icd.d/lvp_icd.json
+[Vulkan Loader] DRIVER:            Found the following files:
+[Vulkan Loader] DRIVER:               /usr/share/vulkan/icd.d/lvp_icd.json
+[Vulkan Loader] DRIVER:         Found ICD manifest file /usr/share/vulkan/icd.d/lvp_icd.json, version 1.0.0
+[Vulkan Loader] DEBUG | DRIVER: Searching for ICD drivers named libvulkan_lvp.so
+[Vulkan Loader] INFO | DRIVER:  linux_read_sorted_physical_devices:
+[Vulkan Loader] INFO | DRIVER:       Original order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)
+[Vulkan Loader] INFO | DRIVER:       Sorted order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)  
+[Vulkan Loader] INFO | DRIVER:  linux_read_sorted_physical_devices:
+[Vulkan Loader] INFO | DRIVER:       Original order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)
+[Vulkan Loader] INFO | DRIVER:       Sorted order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)  
+[Vulkan Loader] DEBUG | DRIVER: Copying old device 0 into new device 0
+[Vulkan Loader] INFO | DRIVER:  linux_read_sorted_physical_devices:
+[Vulkan Loader] INFO | DRIVER:       Original order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)
+[Vulkan Loader] INFO | DRIVER:       Sorted order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)  
+[Vulkan Loader] DEBUG | DRIVER: Copying old device 0 into new device 0
+[Vulkan Loader] INFO | DRIVER:  linux_read_sorted_physical_devices:
+[Vulkan Loader] INFO | DRIVER:       Original order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)
+[Vulkan Loader] INFO | DRIVER:       Sorted order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)  
+[Vulkan Loader] DEBUG | DRIVER: Copying old device 0 into new device 0
+[Vulkan Loader] INFO | DRIVER:  linux_read_sorted_physical_devices:
+[Vulkan Loader] INFO | DRIVER:       Original order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)
+[Vulkan Loader] INFO | DRIVER:       Sorted order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)  
+[Vulkan Loader] DEBUG | DRIVER: Copying old device 0 into new device 0
+[Vulkan Loader] INFO | DRIVER:  linux_read_sorted_physical_devices:
+[Vulkan Loader] INFO | DRIVER:       Original order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)
+[Vulkan Loader] INFO | DRIVER:       Sorted order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)  
+[Vulkan Loader] DEBUG | DRIVER: Copying old device 0 into new device 0
+[Vulkan Loader] INFO | DRIVER:  linux_read_sorted_physical_devices:
+[Vulkan Loader] INFO | DRIVER:       Original order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)
+[Vulkan Loader] INFO | DRIVER:       Sorted order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)  
+[Vulkan Loader] DEBUG | DRIVER: Copying old device 0 into new device 0
+[Vulkan Loader] INFO | DRIVER:  linux_read_sorted_physical_devices:
+[Vulkan Loader] INFO | DRIVER:       Original order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)
+[Vulkan Loader] INFO | DRIVER:       Sorted order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)  
+[Vulkan Loader] DEBUG | DRIVER: Copying old device 0 into new device 0
+[Vulkan Loader] INFO | DRIVER:  linux_read_sorted_physical_devices:
+[Vulkan Loader] INFO | DRIVER:       Original order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)
+[Vulkan Loader] INFO | DRIVER:       Sorted order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)  
+[Vulkan Loader] DEBUG | DRIVER: Copying old device 0 into new device 0
+[Vulkan Loader] INFO | DRIVER:  linux_read_sorted_physical_devices:
+[Vulkan Loader] INFO | DRIVER:       Original order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)
+[Vulkan Loader] INFO | DRIVER:       Sorted order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)  
+[Vulkan Loader] DEBUG | DRIVER: Copying old device 0 into new device 0
+[Vulkan Loader] INFO | DRIVER:  linux_read_sorted_physical_devices:
+[Vulkan Loader] INFO | DRIVER:       Original order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)
+[Vulkan Loader] INFO | DRIVER:       Sorted order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)  
+[Vulkan Loader] DEBUG | DRIVER: Copying old device 0 into new device 0
+[Vulkan Loader] INFO | DRIVER:  linux_read_sorted_physical_devices:
+[Vulkan Loader] INFO | DRIVER:       Original order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)
+[Vulkan Loader] INFO | DRIVER:       Sorted order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)  
+[Vulkan Loader] DEBUG | DRIVER: Copying old device 0 into new device 0
+WARNING: dzn is not a conformant Vulkan implementation, testing use only.
+36002.928:0128:0130:info:vkd3d-proton:vkd3d_instance_apply_application_workarounds: Program name: "dzn_probe.exe" (hash: 712ed4f1f21a0536)
+36002.928:0128:0130:info:vkd3d-proton:vkd3d_instance_deduce_config_flags_from_environment: shader_cache is used, global_pipeline_cache is enforced.
+36002.928:0128:0130:info:vkd3d-proton:vkd3d_config_flags_init_once: VKD3D_CONFIG=''.
+[Vulkan Loader] DRIVER:         Searching for driver manifest files
+[Vulkan Loader] DRIVER:            In following locations:
+[Vulkan Loader] DRIVER:               /usr/share/vulkan/icd.d/lvp_icd.json
+[Vulkan Loader] DRIVER:            Found the following files:
+[Vulkan Loader] DRIVER:               /usr/share/vulkan/icd.d/lvp_icd.json
+[Vulkan Loader] DRIVER:         Found ICD manifest file /usr/share/vulkan/icd.d/lvp_icd.json, version 1.0.0
+[Vulkan Loader] DEBUG | DRIVER: Searching for ICD drivers named libvulkan_lvp.so
+[Vulkan Loader] DRIVER:         Searching for driver manifest files
+[Vulkan Loader] DRIVER:            In following locations:
+[Vulkan Loader] DRIVER:               /usr/share/vulkan/icd.d/lvp_icd.json
+[Vulkan Loader] DRIVER:            Found the following files:
+[Vulkan Loader] DRIVER:               /usr/share/vulkan/icd.d/lvp_icd.json
+[Vulkan Loader] DRIVER:         Found ICD manifest file /usr/share/vulkan/icd.d/lvp_icd.json, version 1.0.0
+[Vulkan Loader] DEBUG | DRIVER: Searching for ICD drivers named libvulkan_lvp.so
+[Vulkan Loader] DRIVER:         Searching for driver manifest files
+[Vulkan Loader] DRIVER:            In following locations:
+[Vulkan Loader] DRIVER:               /usr/share/vulkan/icd.d/lvp_icd.json
+[Vulkan Loader] DRIVER:            Found the following files:
+[Vulkan Loader] DRIVER:               /usr/share/vulkan/icd.d/lvp_icd.json
+[Vulkan Loader] DRIVER:         Found ICD manifest file /usr/share/vulkan/icd.d/lvp_icd.json, version 1.0.0
+[Vulkan Loader] DEBUG | DRIVER: Searching for ICD drivers named libvulkan_lvp.so
+[Vulkan Loader] DRIVER:         Searching for driver manifest files
+[Vulkan Loader] DRIVER:            In following locations:
+[Vulkan Loader] DRIVER:               /usr/share/vulkan/icd.d/lvp_icd.json
+[Vulkan Loader] DRIVER:            Found the following files:
+[Vulkan Loader] DRIVER:               /usr/share/vulkan/icd.d/lvp_icd.json
+[Vulkan Loader] DRIVER:         Found ICD manifest file /usr/share/vulkan/icd.d/lvp_icd.json, version 1.0.0
+[Vulkan Loader] DEBUG | DRIVER: Searching for ICD drivers named libvulkan_lvp.so
+[Vulkan Loader] DRIVER:         Searching for driver manifest files
+[Vulkan Loader] DRIVER:            In following locations:
+[Vulkan Loader] DRIVER:               /usr/share/vulkan/icd.d/lvp_icd.json
+[Vulkan Loader] DRIVER:            Found the following files:
+[Vulkan Loader] DRIVER:               /usr/share/vulkan/icd.d/lvp_icd.json
+[Vulkan Loader] DRIVER:         Found ICD manifest file /usr/share/vulkan/icd.d/lvp_icd.json, version 1.0.0
+[Vulkan Loader] DEBUG | DRIVER: Searching for ICD drivers named libvulkan_lvp.so
+36002.928:0128:0130:info:vkd3d-proton:vkd3d_get_vk_version: vkd3d-proton - applicationVersion: 3.0.1.
+36002.928:0128:0130:info:vkd3d-proton:vkd3d_instance_init: vkd3d-proton - build: 3b10bd7a7ec6a73.
+[Vulkan Loader] DRIVER:         Searching for driver manifest files
+[Vulkan Loader] DRIVER:            In following locations:
+[Vulkan Loader] DRIVER:               /usr/share/vulkan/icd.d/lvp_icd.json
+[Vulkan Loader] DRIVER:            Found the following files:
+[Vulkan Loader] DRIVER:               /usr/share/vulkan/icd.d/lvp_icd.json
+[Vulkan Loader] DRIVER:         Found ICD manifest file /usr/share/vulkan/icd.d/lvp_icd.json, version 1.0.0
+[Vulkan Loader] DEBUG | DRIVER: Searching for ICD drivers named libvulkan_lvp.so
+[Vulkan Loader] INFO | DRIVER:  linux_read_sorted_physical_devices:
+[Vulkan Loader] INFO | DRIVER:       Original order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)
+[Vulkan Loader] INFO | DRIVER:       Sorted order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)  
+[Vulkan Loader] INFO | DRIVER:  linux_read_sorted_physical_devices:
+[Vulkan Loader] INFO | DRIVER:       Original order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)
+[Vulkan Loader] INFO | DRIVER:       Sorted order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)  
+[Vulkan Loader] DEBUG | DRIVER: Copying old device 0 into new device 0
+[Vulkan Loader] INFO | DRIVER:  linux_read_sorted_physical_devices:
+[Vulkan Loader] INFO | DRIVER:       Original order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)
+[Vulkan Loader] INFO | DRIVER:       Sorted order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)  
+[Vulkan Loader] DEBUG | DRIVER: Copying old device 0 into new device 0
+[Vulkan Loader] INFO | DRIVER:  linux_read_sorted_physical_devices:
+[Vulkan Loader] INFO | DRIVER:       Original order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)
+[Vulkan Loader] INFO | DRIVER:       Sorted order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)  
+[Vulkan Loader] DEBUG | DRIVER: Copying old device 0 into new device 0
+36002.930:0128:0130:info:vkd3d-proton:d3d12_device_create: Forcing singleton device due to RenderDoc being enabled.
+[Vulkan Loader] DRIVER:         vkCreateDevice layer callstack setup to:
+[Vulkan Loader] DRIVER:            <Application>
+[Vulkan Loader] DRIVER:              ||
+[Vulkan Loader] DRIVER:            <Loader>
+[Vulkan Loader] DRIVER:              ||
+[Vulkan Loader] DRIVER:            <Device>
+[Vulkan Loader] DRIVER:                Using "llvmpipe (LLVM 19.1.7, 256 bits)" with driver: "libvulkan_lvp.so"
+36002.979:0128:0130:info:vkd3d-proton:vkd3d_memory_info_decide_hvv_usage: Topology: UMA-like topology.
+36002.979:0128:0130:info:vkd3d-proton:vkd3d_memory_info_upload_hvv_memory_properties: Topology: HVV usage is allowed, using DEVICE_LOCAL | HOST_COHERENT for UPLOAD.
+36002.979:0128:0130:info:vkd3d-proton:vkd3d_bindless_state_get_bindless_flags: Enabling fast paths for advanced ExecuteIndirect() graphics and compute (EXT_dgc).
+36002.979:0128:0130:info:vkd3d-proton:vkd3d_bindless_state_get_bindless_flags: Device supports VK_EXT_mutable_descriptor_type.
+36003.074:0128:0130:info:vkd3d-proton:d3d12_device_determine_ray_tracing_tier: DXR support enabled.
+36003.074:0128:0130:info:vkd3d-proton:d3d12_device_determine_ray_tracing_tier: DXR 1.1 support enabled.
+36003.075:0128:0130:info:vkd3d-proton:vkd3d_pipeline_library_init_disk_cache: Remapping VKD3D_SHADER_CACHE to: vkd3d-proton.cache.
+36003.075:0128:0130:info:vkd3d-proton:vkd3d_pipeline_library_init_disk_cache: Attempting to load disk cache from: vkd3d-proton.cache.
+[Vulkan Loader] INFO | DRIVER:  linux_read_sorted_physical_devices:
+[Vulkan Loader] INFO | DRIVER:       Original order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)
+[Vulkan Loader] INFO | DRIVER:       Sorted order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)  
+[Vulkan Loader] DEBUG | DRIVER: Copying old device 0 into new device 0
+[Vulkan Loader] INFO | DRIVER:  linux_read_sorted_physical_devices:
+[Vulkan Loader] INFO | DRIVER:       Original order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)
+[Vulkan Loader] INFO | DRIVER:       Sorted order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)  
+[Vulkan Loader] DEBUG | DRIVER: Copying old device 0 into new device 0
+[Vulkan Loader] INFO | DRIVER:  linux_read_sorted_physical_devices:
+[Vulkan Loader] INFO | DRIVER:       Original order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)
+[Vulkan Loader] INFO | DRIVER:       Sorted order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)  
+[Vulkan Loader] DEBUG | DRIVER: Copying old device 0 into new device 0
+[Vulkan Loader] INFO | DRIVER:  linux_read_sorted_physical_devices:
+[Vulkan Loader] INFO | DRIVER:       Original order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)
+[Vulkan Loader] INFO | DRIVER:       Sorted order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)  
+[Vulkan Loader] DEBUG | DRIVER: Copying old device 0 into new device 0
+36003.076:0128:013c:info:vkd3d-proton:vkd3d_pipeline_library_disk_thread_main: Performing async setup of stream archive ...
+36003.076:0128:013c:info:vkd3d-proton:vkd3d_pipeline_library_disk_cache_merge: No write cache exists. No need to merge any disk caches.
+36003.076:0128:013c:info:vkd3d-proton:vkd3d_pipeline_library_disk_cache_initial_setup: Merging pipeline libraries took 0.101 ms.
+36003.076:0128:013c:info:vkd3d-proton:vkd3d_pipeline_library_disk_cache_initial_setup: Failed to map read-only cache: vkd3d-proton.cache.
+36003.076:0128:013c:info:vkd3d-proton:vkd3d_pipeline_library_disk_thread_main: Done performing async setup of stream archive.
+[Vulkan Loader] INFO | DRIVER:  linux_read_sorted_physical_devices:
+[Vulkan Loader] INFO | DRIVER:       Original order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)
+[Vulkan Loader] INFO | DRIVER:       Sorted order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)  
+[Vulkan Loader] DEBUG | DRIVER: Copying old device 0 into new device 0
+[Vulkan Loader] INFO | DRIVER:  linux_read_sorted_physical_devices:
+[Vulkan Loader] INFO | DRIVER:       Original order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)
+[Vulkan Loader] INFO | DRIVER:       Sorted order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)  
+[Vulkan Loader] DEBUG | DRIVER: Copying old device 0 into new device 0
+[Vulkan Loader] INFO | DRIVER:  linux_read_sorted_physical_devices:
+[Vulkan Loader] INFO | DRIVER:       Original order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)
+[Vulkan Loader] INFO | DRIVER:       Sorted order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)  
+[Vulkan Loader] DEBUG | DRIVER: Copying old device 0 into new device 0
+[Vulkan Loader] INFO | DRIVER:  linux_read_sorted_physical_devices:
+[Vulkan Loader] INFO | DRIVER:       Original order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)
+[Vulkan Loader] INFO | DRIVER:       Sorted order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)  
+[Vulkan Loader] DEBUG | DRIVER: Copying old device 0 into new device 0
+[Vulkan Loader] INFO | DRIVER:  linux_read_sorted_physical_devices:
+[Vulkan Loader] INFO | DRIVER:       Original order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)
+[Vulkan Loader] INFO | DRIVER:       Sorted order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)  
+[Vulkan Loader] DEBUG | DRIVER: Copying old device 0 into new device 0
+[Vulkan Loader] INFO | DRIVER:  linux_read_sorted_physical_devices:
+[Vulkan Loader] INFO | DRIVER:       Original order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)
+[Vulkan Loader] INFO | DRIVER:       Sorted order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)  
+[Vulkan Loader] DEBUG | DRIVER: Copying old device 0 into new device 0
+[Vulkan Loader] INFO | DRIVER:  linux_read_sorted_physical_devices:
+[Vulkan Loader] INFO | DRIVER:       Original order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)
+[Vulkan Loader] INFO | DRIVER:       Sorted order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)  
+[Vulkan Loader] DEBUG | DRIVER: Copying old device 0 into new device 0
+[Vulkan Loader] INFO | DRIVER:  linux_read_sorted_physical_devices:
+[Vulkan Loader] INFO | DRIVER:       Original order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)
+[Vulkan Loader] INFO | DRIVER:       Sorted order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)  
+[Vulkan Loader] DEBUG | DRIVER: Copying old device 0 into new device 0
+[Vulkan Loader] INFO | DRIVER:  linux_read_sorted_physical_devices:
+[Vulkan Loader] INFO | DRIVER:       Original order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)
+[Vulkan Loader] INFO | DRIVER:       Sorted order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)  
+[Vulkan Loader] DEBUG | DRIVER: Copying old device 0 into new device 0
+[Vulkan Loader] INFO | DRIVER:  linux_read_sorted_physical_devices:
+[Vulkan Loader] INFO | DRIVER:       Original order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)
+[Vulkan Loader] INFO | DRIVER:       Sorted order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)  
+[Vulkan Loader] DEBUG | DRIVER: Copying old device 0 into new device 0
+[Vulkan Loader] INFO | DRIVER:  linux_read_sorted_physical_devices:
+[Vulkan Loader] INFO | DRIVER:       Original order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)
+[Vulkan Loader] INFO | DRIVER:       Sorted order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)  
+[Vulkan Loader] DEBUG | DRIVER: Copying old device 0 into new device 0
+[Vulkan Loader] INFO | DRIVER:  linux_read_sorted_physical_devices:
+[Vulkan Loader] INFO | DRIVER:       Original order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)
+[Vulkan Loader] INFO | DRIVER:       Sorted order:
+[Vulkan Loader] INFO | DRIVER:             [0] llvmpipe (LLVM 19.1.7, 256 bits)  
+[Vulkan Loader] DEBUG | DRIVER: Copying old device 0 into new device 0
+vkEnumeratePhysicalDevices(inst,&count,NULL): -3

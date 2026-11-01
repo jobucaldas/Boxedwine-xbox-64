@@ -1,0 +1,7 @@
+	DLL Name: GDI32.dll
+	DLL Name: KERNEL32.dll
+	DLL Name: msvcrt.dll
+	DLL Name: SHELL32.dll
+	DLL Name: api-ms-win-core-synch-l1-2-0.dll
+	DLL Name: USER32.dll
+	DLL Name: VERSION.dll

@@ -1,0 +1,6 @@
+d3d11.dll: C:\windows\system32\d3d11.dll
+d3d11.dll kind: Wine builtin (wined3d)
+feature level: 0xb000
+adapter: NVIDIA GeForce GTX 470 (vendor 0x10de)
+readback pixel(0,0) RGBA = 0,128,255,255 (expect 0,128,255,255)
+d3d11 probe done

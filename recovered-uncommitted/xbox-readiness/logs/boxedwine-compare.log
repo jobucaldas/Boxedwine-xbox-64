@@ -1,0 +1,37 @@
+=== t_fp ===
+FAIL  t_fp  (native 102 lines, guest 102 lines, boxedwine exit 1)
+--- diff native vs boxedwine (first 20 lines) ---
+--- native
++++ boxedwine
+@@ -40,13 +40,13 @@
+    c=0
+ r=-nan
+ fenv_flags   b15ddaf0c116484a
+-ld: 0.3333333333333333333423684 0xa.aaaaaaaaaaaaaabp-5
++ld: 0.3333333333333333148296163 0xa.aaaaaaaaaaaa8p-5
+ ld size=16 ldbl_max_exp=16384 mant=64
+-ld big: 5.000000e+3999 0xd.6c315a5e19f4811p+13274
++ld big: inf inf
+ ld sqrt2: 1.4142135623730950487637881
+ ld u64max: 18446744073709551615
+-ld from u64: 18446744073709551615
+-longdouble   f1660d633ee4db0f
++ld from u64: 18446744073709551616
++longdouble   4c4b140906824cfb
+ ld compare: 1 1
+ strtod 0x1.8p3                        -> 0x1.8p+3 12 errno=0 off=7
+ strtod 1e-310                         -> 0x0.012688b70e62bp-1022 9.9999999999999694e-311 errno=34 off=6
+--- end diff ---
+=== t_int ===
+PASS  t_int  (native 18 lines, guest 18 lines)
+=== t_misc ===
+PASS  t_misc  (native 32 lines, guest 32 lines)
+=== t_str ===
+PASS  t_str  (native 132 lines, guest 132 lines)
+
+SUMMARY
+test             result   native_lines guest_lines  x64_errors
+t_fp             FAIL     102          102          0         
+t_int            PASS     18           18           0         
+t_misc           PASS     32           32           0         
+t_str            PASS     132          132          0         

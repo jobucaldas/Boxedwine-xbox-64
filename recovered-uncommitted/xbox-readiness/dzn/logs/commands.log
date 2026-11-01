@@ -1,0 +1,24 @@
+sudo -n apt-get install -y meson ninja-build python3-mako python3-packaging bison flex glslang-tools pkg-config mingw-w64 
+curl -fL https://archive.mesa3d.org/mesa-25.1.9.tar.xz -o downloads/mesa-25.1.9.tar.xz 
+git clone --depth 1 https://github.com/microsoft/DirectX-Headers.git src/DirectX-Headers 
+venv/bin/pip install meson ninja mako packaging 
+meson setup build src/mesa-25.1.9 --cross-file cross-win64.ini --prefix /workspace/xbox-readiness/dzn/install --buildtype=release -Dvulkan-drivers=microsoft-experimental -Dgallium-drivers= -Dplatforms=windows -Dbuild-tests=false -Dspirv-to-dxil=true -Dllvm=disabled -Dopengl=false -Dgles1=disabled -Dgles2=disabled -Degl=disabled -Dglx=disabled -Dgbm=disabled -Dvideo-codecs= -Dzstd=disabled -Dzlib=disabled -DDirectX-Headers:build-test=false 
+venv/bin/pip install pyyaml 
+meson setup build src/mesa-25.1.9 --cross-file cross-win64.ini --prefix /workspace/xbox-readiness/dzn/install --buildtype=release -Dvulkan-drivers=microsoft-experimental -Dgallium-drivers= -Dplatforms=windows -Dbuild-tests=false -Dspirv-to-dxil=true -Dllvm=disabled -Dopengl=false -Dgles1=disabled -Dgles2=disabled -Degl=disabled -Dglx=disabled -Dgbm=disabled -Dvideo-codecs= -Dzstd=disabled -Dzlib=disabled -DDirectX-Headers:build-test=false 
+ninja -C build -j3 
+x86_64-w64-mingw32-gcc -O2 -Wall -Isrc/mesa-25.1.9/include dzn_probe.c -o runtime/dzn_probe.exe 
+env WINEPREFIX=/workspace/xbox-readiness/dzn/pfx WINEARCH=win64 WINEDEBUG=-all DISPLAY=:93 wineboot -u 
+glslangValidator -V compute.comp -o runtime/compute.spv 
+x86_64-w64-mingw32-gcc -O2 -Wall -Isrc/mesa-25.1.9/include dzn_probe.c -o runtime/dzn_probe.exe 
+bash -c date\ -u\;\ uname\ -a\;\ x86_64-w64-mingw32-gcc\ --version\;\ wine\ --version\;\ venv/bin/pip\ freeze\;\ dpkg-query\ -W\ mesa-vulkan-drivers\ libvulkan1\ mingw-w64-x86-64-dev\ bison\ flex\ glslang-tools\;\ git\ -C\ src/DirectX-Headers\ log\ -1\ --format=fuller\;\ sha256sum\ runtime/d3d12\*.dll\;\ ls\ -l\ /tmp/.X11-unix/X93 
+meson install -C build --no-rebuild 
+./probe-run.sh 
+env DZN_DEBUG=experimental ./probe-run.sh 
+curl -fL https://api.github.com/repos/microsoft/DirectXShaderCompiler/releases/latest -o downloads/dxc-release.json 
+env WINEDEBUG=+loaddll ./probe-run.sh 
+curl -fL https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.9.2609/dxc_2026_09_29.zip -o downloads/dxc_2026_09_29.zip 
+./probe-run.sh 
+./diagnostic-run.sh 
+x86_64-w64-mingw32-gcc -O2 -Wall dcomp_probe.c -o runtime/dcomp_probe.exe 
+env WINEPREFIX=/workspace/xbox-readiness/dzn/pfx WINEDEBUG=-all DISPLAY=:93 timeout 60s wine runtime/dcomp_probe.exe 
+env VK_LOADER_DEBUG=driver ./probe-run.sh 

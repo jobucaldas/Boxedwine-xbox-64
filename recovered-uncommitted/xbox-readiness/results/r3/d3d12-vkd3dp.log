@@ -1,0 +1,59 @@
+info:  Game: d3d12_probe.exe
+info:  DXVK: v3.1.1
+info:  Build: x86_64 gcc 16.2.0
+info:  Vulkan: Found vkGetInstanceProcAddr in winevulkan.dll @ 0x6ffffc03e6d0
+info:  Extension providers:
+info:    Platform WSI
+info:    OpenVR
+info:  OpenVR: could not open registry key, status 2
+info:  OpenVR: Failed to locate module
+info:    OpenXR
+info:  Enabled instance extensions:
+info:    VK_EXT_surface_maintenance1
+info:    VK_KHR_get_surface_capabilities2
+info:    VK_KHR_surface
+info:    VK_KHR_win32_surface
+info:  Found device: llvmpipe (LLVM 19.1.7, 256 bits) (llvmpipe 0.0.1)
+adapter: llvmpipe (LLVM 19.1.7, 256 bits) (vendor 0x10005)
+warn:  DxgiAdapter::QueryInterface: Unknown interface query
+warn:  f0db4c7f-fe5a-42a2-bd62-f2a6cf6fc83e
+36542.502:013c:0140:warn:vkd3d-proton:openvr_instance_extensions: Failed to open VR registry key, status 2.
+36542.502:013c:0140:warn:vkd3d-proton:openxr_vulkan_extensions: wineopenxr.dll is missing required symbols.
+36542.502:013c:0140:info:vkd3d-proton:vkd3d_instance_apply_application_workarounds: Program name: "d3d12_probe.exe" (hash: 4e8de2080e334a8e)
+36542.502:013c:0140:info:vkd3d-proton:vkd3d_instance_deduce_config_flags_from_environment: shader_cache is used, global_pipeline_cache is enforced.
+36542.502:013c:0140:info:vkd3d-proton:vkd3d_config_flags_init_once: VKD3D_CONFIG=''.
+36542.510:013c:0140:warn:vkd3d-proton:vkd3d_check_extensions: Optional user instance extension "VK_KHR_surface_maintenance1" is not supported.
+36542.510:013c:0140:info:vkd3d-proton:vkd3d_get_vk_version: vkd3d-proton - applicationVersion: 3.0.1.
+36542.510:013c:0140:info:vkd3d-proton:vkd3d_instance_init: vkd3d-proton - build: 3b10bd7a7ec6a73.
+36542.516:013c:0140:warn:vkd3d-proton:openvr_device_extensions: Failed to open VR registry key, status 2.
+36542.516:013c:0140:warn:vkd3d-proton:openxr_vulkan_extensions: wineopenxr.dll is missing required symbols.
+36542.552:013c:0140:warn:vkd3d-proton:vkd3d_check_extensions: Optional user device extension "VK_KHR_swapchain_maintenance1" is not supported.
+36542.553:013c:0140:warn:vkd3d-proton:vkd3d_physical_device_info_apply_workarounds: Mesh shaders are supported, but not barycentrics. Disabling mesh shaders as a global UE5 workaround.
+36542.564:013c:0140:warn:vkd3d-proton:d3d12_device_create_vkd3d_queues: Could not allocate an out of band queue for queue family 0. All out of band work will happen on the in band queue.
+36542.571:013c:0140:info:vkd3d-proton:vkd3d_memory_info_decide_hvv_usage: Topology: UMA-like topology.
+36542.571:013c:0140:info:vkd3d-proton:vkd3d_memory_info_upload_hvv_memory_properties: Topology: HVV usage is allowed, using DEVICE_LOCAL | HOST_COHERENT for UPLOAD.
+36542.571:013c:0140:info:vkd3d-proton:vkd3d_bindless_state_get_bindless_flags: Enabling fast paths for advanced ExecuteIndirect() graphics and compute (EXT_dgc).
+36542.571:013c:0140:info:vkd3d-proton:vkd3d_bindless_state_get_bindless_flags: Device supports VK_EXT_mutable_descriptor_type.
+36542.668:013c:0140:warn:vkd3d-proton:d3d12_device_caps_init_feature_options1: No device info available for TotalLaneCount = 256.
+36542.668:013c:0140:fixme:vkd3d-proton:d3d12_device_caps_init_feature_options1: TotalLaneCount = 256, may be inaccurate.
+36542.668:013c:0140:info:vkd3d-proton:d3d12_device_determine_ray_tracing_tier: DXR support enabled.
+36542.668:013c:0140:info:vkd3d-proton:d3d12_device_determine_ray_tracing_tier: DXR 1.1 support enabled.
+36542.668:013c:0140:info:vkd3d-proton:vkd3d_pipeline_library_init_disk_cache: Remapping VKD3D_SHADER_CACHE to: vkd3d-proton.cache.
+36542.668:013c:0140:info:vkd3d-proton:vkd3d_pipeline_library_init_disk_cache: Attempting to load disk cache from: vkd3d-proton.cache.
+d3d12.dll: C:\windows\system32\d3d12.dll
+d3d12.dll kind: native (e.g. VKD3D-Proton)
+36542.668:013c:0140:info:vkd3d-proton:dxgi_vk_swap_chain_init: Creating swapchain (320 x 240), BufferCount = 2.
+36542.671:013c:0140:info:vkd3d-proton:dxgi_vk_swap_chain_init_sync_objects: Ensure maximum latency of 3 frames with KHR_present_wait.
+36542.672:013c:0140:info:vkd3d-proton:dxgi_vk_swap_chain_init_sleep_state: Timer interval is 1.0 ms.
+36542.673:013c:0150:fixme:vkd3d-proton:dxgi_vk_swap_chain_update_wait_timing_capabilities: Implementation supports neither present_wait1 or present_wait2. Latency will increase.
+err:   readMonitorEdidFromKey: Failed to get EDID reg key size
+err:   DXGI: Failed to parse display metadata + colorimetry info, using blank.
+36542.674:013c:0150:info:vkd3d-proton:dxgi_vk_swap_chain_recreate_swapchain_in_present_task: Got 3 swapchain images.
+36542.674:013c:0148:info:vkd3d-proton:vkd3d_pipeline_library_disk_thread_main: Performing async setup of stream archive ...
+36542.674:013c:0148:info:vkd3d-proton:vkd3d_pipeline_library_disk_cache_merge: No write cache exists. No need to merge any disk caches.
+36542.674:013c:0148:info:vkd3d-proton:vkd3d_pipeline_library_disk_cache_initial_setup: Merging pipeline libraries took 0.135 ms.
+36542.674:013c:0148:info:vkd3d-proton:vkd3d_pipeline_library_disk_cache_initial_setup: Failed to map read-only cache: vkd3d-proton.cache.
+36542.674:013c:0148:info:vkd3d-proton:vkd3d_pipeline_library_disk_thread_main: Done performing async setup of stream archive.
+36542.707:013c:0150:info:vkd3d-proton:dxgi_vk_swap_chain_recreate_swapchain_in_present_task: Got 3 swapchain images.
+presented 30 frames, fence=30
+d3d12 probe done

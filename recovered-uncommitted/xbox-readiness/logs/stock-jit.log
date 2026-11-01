@@ -1,0 +1,11 @@
+PASS alloc RW                                   00007ffffe8e0000
+PASS W^X flip RW->RX (UWP-legal)                err=0
+PASS execute JIT code                           returned 42
+PASS flip back RX->RW to patch                  err=0
+PASS re-execute patched code                    ok=1
+PASS 1000 RW<->RX flip cycles                   1000 done, 4.0 us/cycle
+INFO RWX VirtualAlloc SUCCEEDED (UWP would reject this)
+RWX_ALLOC=1
+RWX_PROTECT=1
+PASS dual-mapping RW view + RX view             m=0000000000000030 w=00007ffffe900000 r=00007ffffe910000
+SUMMARY jit_probe pass=7 fail=0

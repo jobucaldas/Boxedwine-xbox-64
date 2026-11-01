@@ -1,0 +1,12 @@
+PASS WSAStartup 2.2                             ok
+BIND80_ERR=10013 BIND27036_ERR=0
+INFO bind 127.0.0.1:80 -> 10013, :1023 -> 10013 (UWP: privileged ports unavailable)
+PASS bind :27036 (Steam client local port)      err=0
+PASS bind ephemeral port                        err=0
+PASS same-process loopback TCP                  cr=0
+PASS DNS api.steampowered.com                   err=0
+PASS HTTPS (schannel/gnutls) Steam directory API status=200 bytes=631
+INFO CM websocket endpoint: cmp2-sea1.steamserver.net:443
+INFO websocket upgrade status=101 handle=0000000000000004
+PASS TLS WebSocket upgrade to Steam CM (/cmsocket/) cmp2-sea1.steamserver.net:443
+SUMMARY net_probe pass=7 fail=0
