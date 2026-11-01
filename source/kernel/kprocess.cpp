@@ -22,6 +22,7 @@
 
 #include "kscheduler.h"
 #include "loader.h"
+#include "loader/loader64.h"
 #include "kstat.h"
 #include "bufferaccess.h"
 #include "ksignal.h"
@@ -1170,7 +1171,12 @@ KThread* KProcess::startProcess(BString currentDirectory, const std::vector<BStr
         for (U32 i=0;i<envValues.size();i++) {
             env.push_back(envValues[i]);
         }
-        setupThreadStack(thread, thread->cpu, this->name, args, env);
+        if (this->isX64) {
+            x64ReplaceThreadCpu(thread);
+            x64SetupMainThread(thread, args, env);
+        } else {
+            setupThreadStack(thread, thread->cpu, this->name, args, env);
+        }
 
         this->currentDirectory = currentDirectory;
 
@@ -1527,12 +1533,21 @@ U32 KProcess::execve(KThread* thread, BString path, std::vector<BString>& args, 
         }
     }
 
+    bool wasX64 = this->isX64;
+    this->isX64 = false;
     if (!ElfLoader::loadProgram(thread, openNode, &thread->cpu->eip.u32)) {
         // :TODO: maybe alloc a new memory object and keep the old one until we know we are loaded
         kpanic("program failed to load, but memory was already reset");
     }	
+    if (this->isX64 != wasX64) {
+        x64ReplaceThreadCpu(thread);
+    }
     // must come after loadProgram because of process->phdr
-    setupThreadStack(thread, thread->cpu, this->name, args, envs);
+    if (this->isX64) {
+        x64SetupMainThread(thread, args, envs);
+    } else {
+        setupThreadStack(thread, thread->cpu, this->name, args, envs);
+    }
     openNode->close();
     delete openNode;
 
@@ -2396,6 +2411,7 @@ U32 KProcess::clone(KThread* thread, U32 flags, U32 child_stack, U32 ptid, U32 t
             newProcess = KProcess::createUnpublished();
             newProcess->memory = KMemory::create(newProcess.get());
             newProcess->parentId = this->id;
+            newProcess->isX64 = this->isX64;
             newProcess->cloneVM = vm;
             newProcess->cloneMemoryAndProcess(shared_from_this(), vm);
 
@@ -2412,7 +2428,9 @@ U32 KProcess::clone(KThread* thread, U32 flags, U32 child_stack, U32 ptid, U32 t
             if (child_stack!=0) {
                 newThread->cpu->reg[4].u32 = child_stack;
             }
-            if (vm) {
+            if (this->isX64) {
+                x64ForkChild(newThread, child_stack);
+            } else if (vm) {
                 newThread->cpu->reg[4].u32+=8;
                 newThread->cpu->eip.u32 = newThread->cpu->peek32(0);
             } else {

@@ -20,6 +20,7 @@
 
 #include "kelf.h"
 #include "loader.h"
+#include "loader64.h"
 
 #include <string.h>
 
@@ -41,7 +42,7 @@ bool isValidElf(struct k_Elf32_Ehdr* hdr) {
     if (hdr->e_ident[0] != 0x7F || hdr->e_ident[1] != 'E' || hdr->e_ident[2] != 'L' || hdr->e_ident[3] != 'F') {
         return false;
     }
-    if (hdr->e_ident[4] != 1) {
+    if (hdr->e_ident[4] != 1 && !isElf64X64(hdr->e_ident, sizeof(struct k_Elf32_Ehdr))) {
         return false;
     }
     if (hdr->e_ident[5] != 1) {
@@ -85,6 +86,8 @@ BString ElfLoader::getInterpreter(FsOpenNode* openNode, bool* isElf) {
             shell_interp[pos++]=0;
             return BString::copy(shell_interp);
         }
+    } else if (isElf64X64(buffer, sizeof(buffer))) {
+        return getInterpreter64(openNode);
     } else {
         U32 i;
 
@@ -168,7 +171,7 @@ int ElfLoader::getMemSizeOfElf(FsOpenNode* openNode) {
     if (len != sizeof(buffer)) {
         return 0;
     }
-    if (!isValidElf(hdr)) {
+    if (!isValidElf(hdr) || isElf64X64(buffer, sizeof(buffer))) {
         openNode->seek(pos);
         return 0;
     }
@@ -242,6 +245,9 @@ bool ElfLoader::loadProgram(KThread* thread, FsOpenNode* openNode, U32* eip) {
     }
     if (!isValidElf(hdr))
         return false;    
+    if (isElf64X64(buffer, sizeof(buffer))) {
+        return loadProgram64(thread, openNode);
+    }
     len=0;
     openNode->seek(hdr->e_phoff);	
     for (U32 i=0;i<hdr->e_phnum;i++) {

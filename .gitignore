@@ -48,3 +48,6 @@ project/linux/Deploy/LocalBuildSite/
 lib/mac
 project/mac-xcode/Boxedwine/DerivedDataCoverage
 .*/
+
+# Local pinned client packages and derived interface maps
+/out/

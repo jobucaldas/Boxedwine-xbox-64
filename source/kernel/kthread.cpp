@@ -23,6 +23,7 @@
 #include "../io/fsfilenode.h"
 #include "bufferaccess.h"
 #include "kstat.h"
+#include "loader/loader64.h"
 #include <cstdlib>
 
 static bool signalIsIgnoredByDefault(U32 signal) {
@@ -55,6 +56,8 @@ KThread::~KThread() {
     CPU* cpu = this->cpu;
     this->cpu = nullptr;
     delete cpu;
+    delete this->retiredCpu;
+    this->retiredCpu = nullptr;
 }
 
 void KThread::cleanup() {
@@ -1006,6 +1009,26 @@ void KThread::signalIllegalInstruction(int code) {
 }
 
 bool KThread::runSignals() {
+    if (this->process->isX64) {
+        // x86-64 threads deliver their own signals (64-bit frames) from X64CPU::run
+        // and after each syscall; here we only wake a thread blocked in the kernel.
+        U64 todo = (this->process->pendingSignals | this->pendingSignals) & ~this->sigMask;
+        if (todo && this != KThread::currentThread()) {
+            BOXEDWINE_CONDITION cond;
+            {
+                BOXEDWINE_CRITICAL_SECTION_WITH_MUTEX(this->waitingCondSync);
+                cond = this->waitingCond;
+                if (cond) {
+                    this->startSignal = true;
+                }
+            }
+            if (cond) {
+                BOXEDWINE_CRITICAL_SECTION_WITH_CONDITION(cond);
+                BOXEDWINE_CONDITION_SIGNAL_ALL(cond);
+            }
+        }
+        return false;
+    }
     U64 mask = this->inSignal ? this->inSigMask : this->sigMask;
     U64 todoProcess = this->process->pendingSignals & ~mask;
     U64 todoThread = this->pendingSignals & ~mask;
@@ -1457,6 +1480,11 @@ void OPCALL onExitSignal(CPU* cpu, DecodedOp* op) {
 
 // interrupted and condStartWaitTime are pushed because syscall's during the signal will clobber them
 void KThread::runSignal(U32 signal, U32 trapNo, U32 errorNo) {
+    if (this->process->isX64) {
+        // the i386 frame builder must not touch an x86-64 thread; X64CPU delivers it
+        this->queuePendingSignal(signal);
+        return;
+    }
     KSigAction* action = &this->process->sigActions[signal];
     if (action->handlerAndSigAction==K_SIG_DFL) {
         //klog("%x/%x default runSignal %d", this->id, this->process->id, signal);
@@ -1596,6 +1624,9 @@ U32 pageFaultError(bool protectionFault, bool writeFault, bool executeFault) {
 }
 
 void KThread::seg_mapper(U32 address, bool readFault, bool writeFault, bool throwException, bool executeFault) {
+    if (this->process->isX64) {
+        x64SegFault(this, address, false);
+    }
     if (this->process->sigActions[K_SIGSEGV].handlerAndSigAction!=K_SIG_IGN && this->process->sigActions[K_SIGSEGV].handlerAndSigAction!=K_SIG_DFL) {
         this->process->sigActions[K_SIGSEGV].sigInfo[0] = K_SIGSEGV;
         this->process->sigActions[K_SIGSEGV].sigInfo[1] = 0;
@@ -1612,6 +1643,9 @@ void KThread::seg_mapper(U32 address, bool readFault, bool writeFault, bool thro
 
 // motorhead demo installer, tomb raider 3 demo will trigger this
 void KThread::seg_access(U32 address, bool readFault, bool writeFault, bool throwException, bool executeFault) {
+    if (this->process->isX64) {
+        x64SegFault(this, address, true);
+    }
     if (this->process->sigActions[K_SIGSEGV].handlerAndSigAction!=K_SIG_IGN && this->process->sigActions[K_SIGSEGV].handlerAndSigAction!=K_SIG_DFL) {
 
         this->process->sigActions[K_SIGSEGV].sigInfo[0] = K_SIGSEGV;
@@ -1640,6 +1674,9 @@ void KThread::clone(KThread* from) {
     this->waitingForSignalToEndMaskToRestore = from->waitingForSignalToEndMaskToRestore;
     this->cpu->clone(from->cpu);
     this->cpu->thread = this;
+    if (this->process->isX64) {
+        x64CloneCpu(this, from);
+    }
 }
 
 U32 KThread::modify_ldt(U32 func, U32 ptr, U32 count) {

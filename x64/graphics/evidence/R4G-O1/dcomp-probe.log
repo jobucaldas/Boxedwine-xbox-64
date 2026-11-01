@@ -1,0 +1,1 @@
+DCompositionCreateDevice(NULL, IID_IDCompositionDevice): HRESULT=0x80004001 device=0000000000000000

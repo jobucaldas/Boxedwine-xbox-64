@@ -1,0 +1,13 @@
+48069.143:0020:0024:err:environ:run_wineboot failed to start wineboot c0000135
+48069.231:0020:0024:trace:process:NtCreateUserProcess L"\\??\\C:\\windows\\system32\\conhost.exe" pid 0030 tid 0034 handles 0x40/0x44
+48071.761:0038:003c:err:environ:init_peb starting L"C:\\Program Files (x86)\\Steam\\Steam.exe" in experimental wow64 mode
+48071.783:0020:0024:trace:process:NtCreateUserProcess L"\\??\\C:\\Program Files (x86)\\Steam\\Steam.exe" pid 0038 tid 003c handles 0x88/0x8c
+48074.221:0038:003c:trace:process:NtCreateUserProcess L"\\??\\C:\\windows\\system32\\explorer.exe" pid 0040 tid 0044 handles 0x6c/0x70
+48075.104:0040:0044:warn:module:load_dll Failed to load module L"winemac.drv"; status=c0000135
+48075.306:0040:0044:err:ole:start_rpcss flags 0x1, load_path 0000000000000000, dll_characteristics 0000000000000000, name 00007FFFFE2FE7A0, base 00007FFFFE2FE798.
+48075.479:0038:0054:warn:module:load_dll Failed to load module L"C:\\Program Files (x86)\\Steam\\crashhandler.dll"; status=c0000135
+48075.480:0038:0054:warn:module:load_dll Failed to load module L"C:\\Program Files (x86)\\Steam\\crashhandler.dll"; status=c0000135
+48111.639:0038:0058:err:wininet:open_http_connection flags 0x1, load_path 00000000, dll_characteristics 00000000, name 0196D9C4, base 0196D9C0.
+48147.224:0038:0058:err:wininet:open_http_connection create_netconn failed: 12029
+48182.816:0038:0058:err:wininet:open_http_connection create_netconn failed: 12029
+48250.110:0040:0044:err:ole:start_rpcss Failed to open service manager

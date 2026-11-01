@@ -5,6 +5,7 @@
 #include "kstat.h"
 #include "../../softmmu/kmemory_soft.h"
 #include "../normal/normalCPU.h"
+#include "../x64/x64CPU.h"
 #include <new>
 
 #if defined(BOXEDWINE_WASM_JIT) && defined(BOXEDWINE_MULTI_THREADED)
@@ -42,6 +43,9 @@ void CPU::operator delete(void* address) noexcept {
 #endif
 
 CPU* CPU::allocCPU(KMemory* memory) {
+    if (memory->process && memory->process->isX64) {
+        return new X64CPU(memory);
+    }
     return new NormalCPU(memory);
 }
 

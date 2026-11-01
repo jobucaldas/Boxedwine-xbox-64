@@ -374,6 +374,7 @@ public:
     std::vector<BString> path;        
     KThread* waitingThread = nullptr;
     U32 loaderBaseAddress = 0;
+    bool isX64 = false; // experimental x86-64 guest (see source/emulation/cpu/x64)
     U32 phdr = 0;
     U32 phnum = 0;
     U32 phentsize = 0;

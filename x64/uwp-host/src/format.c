@@ -1,0 +1,86 @@
+/* Formatting and locale entries Wine's Unix side calls; counted per O2 trace. */
+#include "internal.h"
+#include <stdio.h>
+#include <locale.h>
+#include <errno.h>
+
+static int format_impl(char *buf, size_t size, const char *fmt, va_list ap)
+{
+    int n;
+
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    UWPH_NATIVE(int, "vsnprintf", (char *, size_t, const char *, va_list));
+    n = fn(buf,size,fmt,ap);
+#else
+    n = vsnprintf(buf, size, fmt, ap);
+#endif
+    if (n < 0) uwph_errno = UWPH_EINVAL;
+    return n;
+}
+UWPH_API int uwph_vsnprintf(char *b, size_t n, const char *f, va_list ap)
+{ uwph_trace_hit(UWPH_TRACE_VSNPRINTF); return format_impl(b,n,f,ap); }
+int uwph_trace_snprintf(char *b, size_t n, const char *f, va_list ap)
+{ uwph_trace_hit(UWPH_TRACE_SNPRINTF); return format_impl(b,n,f,ap); }
+UWPH_API int uwph_snprintf(char *buf, size_t size, const char *fmt, ...)
+{ va_list ap; int n; va_start(ap, fmt); n=uwph_trace_snprintf(buf,size,fmt,ap); va_end(ap); return n; }
+UWPH_API int uwph_vasprintf(char **buf, const char *fmt, va_list ap)
+{
+    va_list cp;
+    int n;
+    uwph_trace_hit(UWPH_TRACE_ASPRINTF);
+    *buf = NULL;
+    va_copy(cp, ap);
+    n = format_impl(NULL, 0, fmt, cp);
+    va_end(cp);
+    if (n >= 0 && (*buf = malloc((size_t)n + 1))) format_impl(*buf, (size_t)n + 1, fmt, ap);
+    if (!*buf) return UWPH_FAIL(n < 0 ? UWPH_EINVAL : UWPH_ENOMEM);
+    return n;
+}
+UWPH_API int uwph_asprintf(char **buf, const char *fmt, ...)
+{ va_list ap; int n; va_start(ap, fmt); n=uwph_vasprintf(buf,fmt,ap); va_end(ap); return n; }
+UWPH_API char *uwph_setlocale(int category, const char *locale)
+{
+    /* Indexed by UWPH_LC_* (Linux numbering); host constants differ on the CRT.
+     * The CRT has no LC_MESSAGES: only the C/POSIX locale is accepted there. */
+    static const int categories[] = {
+        [UWPH_LC_CTYPE] = LC_CTYPE, [UWPH_LC_NUMERIC] = LC_NUMERIC, [UWPH_LC_TIME] = LC_TIME,
+        [UWPH_LC_COLLATE] = LC_COLLATE, [UWPH_LC_MONETARY] = LC_MONETARY,
+#ifdef LC_MESSAGES
+        [UWPH_LC_MESSAGES] = LC_MESSAGES,
+#else
+        [UWPH_LC_MESSAGES] = -1,
+#endif
+        [UWPH_LC_ALL] = LC_ALL,
+    };
+    char *r;
+    uwph_trace_hit(UWPH_TRACE_SETLOCALE);
+    if ((unsigned)category >= sizeof(categories) / sizeof(categories[0])) return UWPH_FAILP(UWPH_EINVAL);
+    if (categories[category] < 0) {
+        if (!locale || !*locale || !strcmp(locale, "C") || !strcmp(locale, "POSIX")) return "C";
+        return UWPH_FAILP(UWPH_EINVAL);
+    }
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    UWPH_NATIVE(char *, "setlocale", (int, const char *));
+    r = fn(categories[category], locale);
+#else
+    r = setlocale(categories[category], locale);
+#endif
+    if (!r) uwph_errno = UWPH_EINVAL;
+    return r;
+}
+
+/* Internal Linux nl_item ABI; Wine currently queries CODESET (14).
+ * UWP's C locale has an ASCII codeset; other items fail explicitly. */
+char *uwph_trace_nl_langinfo(int item)
+{
+    uwph_trace_hit(UWPH_TRACE_NL_LANGINFO);
+#ifdef UWPH_BACKEND_LINUX_PASSTHROUGH
+    UWPH_NATIVE(char *, "nl_langinfo", (int));
+    UWPH_NATIVE_RETURN(fn(item));
+#else
+    const char *locale = uwph_setlocale(UWPH_LC_CTYPE, NULL);
+    if (item == 14 && locale && (!strcmp(locale, "C") || !strcmp(locale, "POSIX")))
+        return "ANSI_X3.4-1968";
+    return UWPH_FAILP(UWPH_ENOSYS);
+#endif
+}

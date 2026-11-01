@@ -2691,6 +2691,15 @@ static const SyscallFunc syscallFunc[] = {
     syscall_faccessat2        // 439 __NR_faccessat2
 };
 
+// Used by the x86-64 syscall layer (syscall64.cpp) to reuse i386 handlers
+// whose arguments and struct layouts are identical on both ABIs.
+U32 ksyscallI386(CPU* cpu, U32 nr) {
+    if (nr > 439 || !syscallFunc[nr]) {
+        return -K_ENOSYS;
+    }
+    return syscallFunc[nr](cpu, 0);
+}
+
 #ifndef BOXEDWINE_MULTI_THREADED
 extern S32 contextTime; // about the # instruction per 10 ms
 #endif

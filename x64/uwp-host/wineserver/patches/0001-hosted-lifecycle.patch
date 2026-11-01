@@ -1,0 +1,149 @@
+--- a/main.c
++++ b/main.c
+@@ -214,17 +214,12 @@
+ 
+ int main( int argc, char *argv[] )
+ {
+-    setvbuf( stderr, NULL, _IOLBF, 0 );
++    /* Hosted stderr buffering belongs to the client. */
+     server_argv0 = argv[0];
+     parse_options( argc, argv, "d::fhk::p::vw", long_options, option_callback );
+ 
+     /* setup temporary handlers before the real signal initialization is done */
+-    signal( SIGPIPE, SIG_IGN );
+-    signal( SIGHUP, sigterm_handler );
+-    signal( SIGINT, sigterm_handler );
+-    signal( SIGQUIT, sigterm_handler );
+-    signal( SIGTERM, sigterm_handler );
+-    signal( SIGABRT, sigterm_handler );
++    /* Hosted: ntdll owns all process signal dispositions. */
+ 
+     sock_init();
+     open_master_socket();
+@@ -235,6 +230,7 @@
+     init_memory();
+     init_directories( load_intl_file() );
+     init_registry();
++    uwph_host_ready();
+     main_loop();
+     return 0;
+ }
+--- a/signal.c
++++ b/signal.c
+@@ -239,13 +239,13 @@
+ 
+ void start_watchdog(void)
+ {
+-    alarm( 3 );
++    /* Hosted: do not arm a process-wide alarm. */
+     watchdog = 0;
+ }
+ 
+ void stop_watchdog(void)
+ {
+-    alarm( 0 );
++    /* Hosted: do not cancel client alarms. */
+     watchdog = 0;
+ }
+ 
+@@ -265,60 +265,21 @@
+     return r;
+ }
+ 
++/* Control requests use Wine's existing pipe/event-loop handler, never signals. */
++static void hosted_stop(void)
++{
++    shutdown_master_socket();
++}
++void uwph_server_request_stop(void)
++{
++    char byte = 0;
++    write(handler_sigterm->pipe_write, &byte, 1);
++}
+ void init_signals(void)
+ {
+-    struct sigaction action;
+-    sigset_t blocked_sigset;
+-
+-    if (!(handler_sighup  = create_handler( sighup_callback ))) goto error;
+-    if (!(handler_sigterm = create_handler( sigterm_callback ))) goto error;
+-    if (!(handler_sigint  = create_handler( sigint_callback ))) goto error;
+-    if (!(handler_sigchld = create_handler( sigchld_callback ))) goto error;
+-    if (!(handler_sigio   = create_handler( sigio_callback ))) goto error;
+-
+-    sigemptyset( &blocked_sigset );
+-    sigaddset( &blocked_sigset, SIGCHLD );
+-    sigaddset( &blocked_sigset, SIGHUP );
+-    sigaddset( &blocked_sigset, SIGINT );
+-    sigaddset( &blocked_sigset, SIGALRM );
+-    sigaddset( &blocked_sigset, SIGIO );
+-    sigaddset( &blocked_sigset, SIGQUIT );
+-    sigaddset( &blocked_sigset, SIGTERM );
+-#ifdef SIG_PTHREAD_CANCEL
+-    sigaddset( &blocked_sigset, SIG_PTHREAD_CANCEL );
+-#endif
+-
+-    action.sa_mask = blocked_sigset;
+-    action.sa_flags = 0;
+-    action.sa_handler = do_sigchld;
+-    sigaction( SIGCHLD, &action, NULL );
+-#ifdef SIG_PTHREAD_CANCEL
+-    sigaction( SIG_PTHREAD_CANCEL, &action, NULL );
+-#endif
+-    action.sa_handler = do_sighup;
+-    sigaction( SIGHUP, &action, NULL );
+-    action.sa_handler = do_sigint;
+-    sigaction( SIGINT, &action, NULL );
+-    action.sa_handler = do_sigalrm;
+-    sigaction( SIGALRM, &action, NULL );
+-    action.sa_handler = do_sigterm;
+-    sigaction( SIGQUIT, &action, NULL );
+-    sigaction( SIGTERM, &action, NULL );
+-    if (core_dump_disabled())
+-    {
+-        action.sa_handler = do_sigsegv;
+-        sigaction( SIGSEGV, &action, NULL );
+-    }
+-    action.sa_handler = SIG_IGN;
+-    sigaction( SIGXFSZ, &action, NULL );
+-#ifdef HAVE_SIGINFO_T_SI_FD
+-    action.sa_sigaction = do_sigio;
+-    action.sa_flags = SA_SIGINFO;
+-    sigaction( SIGIO, &action, NULL );
+-#endif
+-    return;
+-
+-error:
+-    fprintf( stderr, "failed to initialize signal handlers\n" );
+-    exit(1);
+-}
++    if (!(handler_sigterm = create_handler(hosted_stop)))
++    {
++        fprintf(stderr, "failed to initialize hosted control pipe\n");
++        exit(1);
++    }
++}
+--- a/request.c
++++ b/request.c
+@@ -569,10 +569,13 @@
+ }
+ 
+ /* remove the socket upon exit */
++static int hosted_lock_fd = -1;
+ static void socket_cleanup(void)
+ {
++
+     static int do_it_once;
+     if (!do_it_once++) unlink( server_socket_name );
++    if (hosted_lock_fd != -1) { close(hosted_lock_fd); hosted_lock_fd = -1; }
+ }
+ 
+ /* create a directory and check its permissions */
+@@ -768,6 +772,7 @@
+     int fd, slen, got_lock = 0;
+ 
+     fd = create_server_lock();
++    hosted_lock_fd = fd;
+ 
+     fl.l_type   = F_WRLCK;
+     fl.l_whence = SEEK_SET;

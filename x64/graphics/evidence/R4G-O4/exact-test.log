@@ -1,0 +1,9 @@
+$ x86_64-w64-mingw32-gcc -O2 -std=c11 -Wall -Wextra -Werror -municode -static-libgcc -s x64/graphics/probe_d3d12.c -o x64/graphics/out/probe_d3d12.exe -ldxguid
+exit=0
+exists=yes
+-rwxr-xr-x 1 box box 82432 Oct 24 21:09 x64/graphics/out/probe_d3d12.exe
+x64/graphics/out/probe_d3d12.exe: PE32+ executable for MS Windows 5.02 (console), x86-64 (stripped to external PDB), 9 sections
+	DLL Name: KERNEL32.dll
+	DLL Name: msvcrt.dll
+	DLL Name: USER32.dll
+eaee3624392fc34f1f05e0f8ef7b1e8714a061c13d2ad63b88bd6c1cde657219  x64/graphics/out/probe_d3d12.exe

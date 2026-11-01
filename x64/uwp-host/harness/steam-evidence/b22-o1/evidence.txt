@@ -1,0 +1,18 @@
+THROUGH uwph; B22 launcher + B20 shim/private W^X loader; existing pfx-wow64-uwph; original WINEDLLPATH; no fix.
+[launcher] exec /workspace/wt/B20/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64 -> /workspace/x64-run/lanes/B22/o1/net_probe-i386.exe (handing guest to Wine's loader)
+0034:err:environ:init_peb starting L"Z:\\workspace\\x64-run\\lanes\\B22\\o1\\net_probe-i386.exe" in experimental wow64 mode
+0034:trace:module:MODULE_InitDLL (7B250000 L"WS2_32.dll",PROCESS_ATTACH,0022FD24) - CALL
+0034:warn:module:get_builtin_unix_funcs failed to load "/usr/lib/i386-linux-gnu/wine/x86_64-unix/ws2_32.so": /usr/lib/i386-linux-gnu/wine/x86_64-unix/ws2_32.so: cannot open shared object file: No such file or directory
+0034:trace:module:MODULE_InitDLL (7B250000,PROCESS_ATTACH,0022FD24) - RETURN 0
+0034:trace:module:MODULE_InitDLL (7B250000 L"WS2_32.dll",PROCESS_DETACH,0022FD24) - CALL
+0034:trace:module:MODULE_InitDLL (7B250000,PROCESS_DETACH,0022FD24) - RETURN 1
+0034:err:module:loader_init "WS2_32.dll" failed to initialize, aborting
+0034:err:module:loader_init Initializing dlls for L"Z:\\workspace\\x64-run\\lanes\\B22\\o1\\net_probe-i386.exe" failed, status c0000142
+696563 execve("/usr/bin/env", ["env", "LD_PRELOAD=/workspace/wt/B20/x64/uwp-host/harness/out/libuwph_wine_shim.so", "UWPH_REPORT=/workspace/x64-run/lanes/B22/o1/probe.counters", "UWPH_REPORT_PID=1", "/workspace/x64-run/lanes/B22/o1/run_via_wine", "/workspace/x64-run/lanes/B22/o1/net_probe-i386.exe"], 0x7ffc5fa39710 /* 83 vars */) = 0
+696563 execve("/workspace/x64-run/lanes/B22/o1/run_via_wine", ["/workspace/x64-run/lanes/B22/o1/run_via_wine", "/workspace/x64-run/lanes/B22/o1/net_probe-i386.exe"], 0x55b64d068e10 /* 86 vars */) = 0
+696563 execve("/workspace/wt/B20/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64", ["/workspace/wt/B20/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64", "/workspace/x64-run/lanes/B22/o1/net_probe-i386.exe"], 0x7ffcad726d10 /* 86 vars */) = 0
+696563 execve("/workspace/wt/B20/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64", ["/workspace/wt/B20/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64", "/workspace/x64-run/lanes/B22/o1/net_probe-i386.exe"], 0x555cd22ece70 /* 88 vars */) = 0
+697616 execve("/workspace/wt/B20/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64", ["/workspace/wt/B20/x64/uwp-host/harness/out/wine-wx/lib/wine/wine64", "Z:\\workspace\\x64-run\\lanes\\B22\\o1\\net_probe-i386.exe"], 0x564f10a53570 /* 90 vars */) = 0
+697616 openat(AT_FDCWD, "/usr/lib/i386-linux-gnu/wine/x86_64-unix/ws2_32.so", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+/workspace/x64-run/lanes/B22/o1/net_probe-i386.exe: PE32 executable for MS Windows 4.00 (console), Intel i386, 16 sections
+probe exit=66
