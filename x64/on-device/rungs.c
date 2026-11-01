@@ -29,6 +29,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "input/mapping.h"
+#include "elf_load.h"
 
 #if !defined(_WIN64) || !defined(__x86_64__)
 #error rungs.exe requires an x64 Windows target.
@@ -41,6 +42,7 @@ static const char *g_ctx = "console";
 static char g_host[64] = "windows";
 static WCHAR g_state[MAX_PATH];
 static int g_big_file;
+static int g_boot;
 static int g_device;
 static int g_packaged;
 static int g_local_state;
@@ -963,6 +965,21 @@ static void run_all(IUnknown *window)
         HRESULT chr = con_attach(window);
         if (FAILED(chr)) note("on-screen log unavailable hr=0x%08lx (log file only)", hx(chr));
     }
+    if (g_boot) {
+        WCHAR path[MAX_PATH], exe[MAX_PATH];
+        if (g_log) fclose(g_log);
+        state_path(path, MAX_PATH, L"boot.log");
+        g_log = _wfopen(path, L"w");
+        if (!g_log) { note("[stage] boot-log: FAIL"); return; }
+        note("[stage] activation: PASS CoreWindow + LocalState");
+        GetModuleFileNameW(NULL, exe, MAX_PATH);
+        WCHAR *slash = wcsrchr(exe, L'\\');
+        if (slash) *slash = 0;
+        int rc = elf_load_test(exe, g_state, out_line);
+        note("[stage] elf-load: %s", rc ? "FAIL" : "PASS");
+        con_draw(1);
+        return;
+    }
     readiness_rungs();
     rung_n0();
     rung_n1();
@@ -1138,6 +1155,7 @@ static HRESULT STDMETHODCALLTYPE view_load(void *This, HSTRING entry)
     (void)This;
     UINT32 n = 0;
     const WCHAR *name = WindowsGetStringRawBuffer(entry, &n);
+    g_boot = n == 14 && !wmemcmp(name, L"Boxedwine.Boot", 14);
     static const WCHAR opt_in[] = L"Boxedwine.BigFile";
     g_big_file = n == (sizeof(opt_in) / sizeof(*opt_in) - 1) &&
                  !wmemcmp(name, opt_in, n);

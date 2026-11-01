@@ -55,7 +55,7 @@ offline-smoke: ladder
 
 $(OUT)/rungs.exe: rungs.c logview.inc logfont.h input/mapping.c input/mapping.h input/probe.inc Makefile
 	mkdir -p $(OUT)
-	$(CC_WIN) $(CFLAGS) -Wno-missing-field-initializers -m64 $(UWP_EXE_FLAGS) -static -o $@ $< input/mapping.c $(UWPH_OBJS) $(OUT)/readiness/unixside.o $(OUT)/readiness/smoke.o $(READINESS_OBJS) $(OUT)/readiness/vp_shim.o $(OUT)/readiness/libntdll_seh.a -lws2_32 -lbcrypt -lsynchronization -lwindowsapp -lole32 -lruntimeobject -luuid -ldxguid -lm
+	$(CC_WIN) $(CFLAGS) -Wno-missing-field-initializers -m64 $(UWP_EXE_FLAGS) -static -o $@ $< input/mapping.c $(UWPH_OBJS) $(OUT)/readiness/elf_load.o $(OUT)/readiness/unixside.o $(OUT)/readiness/smoke.o $(READINESS_OBJS) $(OUT)/readiness/vp_shim.o $(OUT)/readiness/libntdll_seh.a -lws2_32 -lbcrypt -lsynchronization -lwindowsapp -lole32 -lruntimeobject -luuid -ldxguid -lm
 	python3 linux/pe-appcontainer.py $@
 
 # B61: Xbox activation contract (uwp-crossbuild gotchas 18-22): GUI subsystem >= 6.02,
@@ -117,3 +117,14 @@ combo-binaries:
 	$(CC_WIN) -O1 -nostdlib -e entry -o $(OUT)/combo-guests/hello_k32.exe ../pe/tests/hello_k32.c -lkernel32
 	$(CC_WIN) -O1 -o $(OUT)/combo-guests/hello.exe ../pe/tests/hello.c
 	$(MAKE) -C ../uwp-host/harness out/libuwph_wine_shim.so out/run_via_wine prebuilt-prefix
+
+WINE_ELF_DIR ?= /workspace/Boxedwine-xbox-64/x64/uwp-host/harness/out/wine-wx/lib/x86_64-linux-gnu/wine/x86_64-unix
+$(OUT)/readiness/elf_load.o: elf_load.c elf_load.h elf_adapters.inc
+	mkdir -p $(@D)
+	$(CC_WIN) $(READINESS_FLAGS) -Wno-misleading-indentation -I$(UWPH_ROOT)/include -c $< -o $@
+$(OUT)/rungs.exe: $(OUT)/readiness/elf_load.o
+$(OUT)/elf-test.exe: elf_test.c elf_wine_compat.c $(OUT)/readiness/elf_load.o $(UWPH_OBJS)
+	$(CC_WIN) $(READINESS_FLAGS) -I$(UWPH_ROOT)/include -mcrtdll=ucrtapp -o $@ $^ -lwindowsapp -lws2_32 -lsynchronization -lm
+.PHONY: elf-test
+elf-test: $(OUT)/elf-test.exe
+	WINEDEBUG=-all wine $(OUT)/elf-test.exe 'Z:$(WINE_ELF_DIR)'
