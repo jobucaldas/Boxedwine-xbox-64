@@ -1,0 +1,117 @@
+priority	kind	symbol_or_ntdll_offset	hello_hits	hello_k32_hits	Megabonk_hits	first_hit_hello	observation
+1	import	snprintf	243	243	243	61	hit before clone entry; unsupported Linux dependency
+2	import	fopen	223	223	223	35	hit before clone entry; unsupported Linux dependency
+3	import	__isoc23_fscanf	222	222	222	60	hit before clone entry; unsupported Linux dependency
+4	import	fclose	221	221	221	37	hit before clone entry; unsupported Linux dependency
+5	import	pthread_getspecific	200	200	200	47	hit before clone entry; unsupported Linux dependency
+6	import	pthread_sigmask	171	171	171	22	hit before clone entry; unsupported Linux dependency
+7	import	feof	88	88	88	59	hit before clone entry; unsupported Linux dependency
+8	import	stat	60	60	60	30	hit before clone entry; unsupported Linux dependency
+9	import	write	51	51	51	56	hit before clone entry; unsupported Linux dependency
+10	import	pthread_mutex_lock	21	21	21	23	hit before clone entry; unsupported Linux dependency
+11	import	pthread_mutex_unlock	21	21	21	24	hit before clone entry; unsupported Linux dependency
+12	import	writev	19	19	19	57	hit before clone entry; unsupported Linux dependency
+13	import	getenv	18	18	18	5	hit before clone entry; unsupported Linux dependency
+14	import	asprintf	10	10	10	3	hit before clone entry; unsupported Linux dependency
+15	import	sigaddset	7	7	7	46	hit before clone entry; unsupported Linux dependency
+16	import	fcntl	5	5	5	39	hit before clone entry; unsupported Linux dependency
+17	import	setlocale	5	5	5	17	hit before clone entry; unsupported Linux dependency
+18	import	time	5	5	5	64	hit before clone entry; unsupported Linux dependency
+19	import	getuid	4	4	4	31	hit before clone entry; unsupported Linux dependency
+20	import	realpath	4	4	4	2	hit before clone entry; unsupported Linux dependency
+21	import	sendmsg	4	4	4	53	hit before clone entry; unsupported Linux dependency
+22	import	fstat	3	3	3	16	hit before clone entry; unsupported Linux dependency
+23	import	putenv	3	3	3	4	hit before clone entry; unsupported Linux dependency
+24	import	recvmsg	3	3	3	48	hit before clone entry; unsupported Linux dependency
+25	import	setsockopt	3	3	3	42	hit before clone entry; unsupported Linux dependency
+26	import	chdir	2	2	2	29	hit before clone entry; unsupported Linux dependency
+27	import	dladdr	2	2	2	1	hit before clone entry; unsupported Linux dependency
+28	import	execv	2	2	2	6	hit before clone entry; unsupported Linux dependency
+29	import	getrlimit	2	2	2	7	hit before clone entry; unsupported Linux dependency
+30	import	isatty	2	2	2	68	hit before clone entry; unsupported Linux dependency
+31	import	pipe2	2	2	2	52	hit before clone entry; unsupported Linux dependency
+32	import	setbuf	2	2	2	28	hit before clone entry; unsupported Linux dependency
+33	import	setrlimit	2	2	2	8	hit before clone entry; unsupported Linux dependency
+34	import	sigemptyset	2	2	2	45	hit before clone entry; unsupported Linux dependency
+35	import	sysconf	2	2	2	58	hit before clone entry; unsupported Linux dependency
+36	import	umask	2	2	2	62	hit before clone entry; unsupported Linux dependency
+37	import	__getdelim	1	1	1	36	hit before clone entry; unsupported Linux dependency
+38	import	access	1	1	1	34	hit before clone entry; unsupported Linux dependency
+39	import	connect	1	1	1	43	hit before clone entry; unsupported Linux dependency
+40	import	dlsym	1	1	1	9	hit before clone entry; unsupported Linux dependency
+41	import	dup	1	1	1	66	hit before clone entry; unsupported Linux dependency
+42	import	fchdir	1	1	1	44	hit before clone entry; unsupported Linux dependency
+43	import	fork	1	1	1	69	hit before clone entry; unsupported Linux dependency
+44	import	getcwd	1	1	1	63	hit before clone entry; unsupported Linux dependency
+45	import	getpid	1	1	1	54	hit before clone entry; unsupported Linux dependency
+46	import	lstat	1	1	1	40	hit before clone entry; unsupported Linux dependency
+47	import	mkdir	1	1	1	38	hit before clone entry; unsupported Linux dependency
+48	import	mprotect	1	1	1	25	hit before clone entry; unsupported Linux dependency
+49	import	nl_langinfo	1	1	1	18	hit before clone entry; unsupported Linux dependency
+50	import	opendir	1	1	1	32	hit before clone entry; unsupported Linux dependency
+51	import	prctl	1	1	1	49	hit before clone entry; unsupported Linux dependency
+52	import	pthread_key_create	1	1	1	26	hit before clone entry; unsupported Linux dependency
+53	import	pthread_mutex_init	1	1	1	12	hit before clone entry; unsupported Linux dependency
+54	import	pthread_mutexattr_destroy	1	1	1	13	hit before clone entry; unsupported Linux dependency
+55	import	pthread_mutexattr_init	1	1	1	10	hit before clone entry; unsupported Linux dependency
+56	import	pthread_mutexattr_settype	1	1	1	11	hit before clone entry; unsupported Linux dependency
+57	import	pthread_setspecific	1	1	1	27	hit before clone entry; unsupported Linux dependency
+58	import	secure_getenv	1	1	1	33	hit before clone entry; unsupported Linux dependency
+59	import	sigaction	1	1	1	50	hit before clone entry; unsupported Linux dependency
+60	import	sigaltstack	1	1	1	51	hit before clone entry; unsupported Linux dependency
+61	import	socket	1	1	1	41	hit before clone entry; unsupported Linux dependency
+62	import	socketpair	1	1	1	67	hit before clone entry; unsupported Linux dependency
+63	import	syscall	1	1	1	55	hit before clone entry; unsupported Linux dependency
+64	import	vsnprintf	1	1	1	65	hit before clone entry; unsupported Linux dependency
+-	direct-syscall	0x3ad92	0	0	0	-	breakpoint armed; not hit before child gate
+-	direct-syscall	0x3b05d	0	0	0	-	breakpoint armed; not hit before child gate
+-	uwph-trace	__getdelim	-	-	1	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=0
+-	uwph-trace	__isoc23_fscanf	-	-	193	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=0
+-	uwph-trace	access	-	-	828	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=0
+-	uwph-trace	asprintf	-	-	28	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=0
+-	uwph-trace	chdir	-	-	4	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=0
+-	uwph-trace	connect	-	-	11	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=0
+-	uwph-trace	dladdr	-	-	198470	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=0
+-	uwph-trace	dlsym	-	-	649	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=0
+-	uwph-trace	dup	-	-	141	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=0
+-	uwph-trace	execv	-	-	0	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=0
+-	uwph-trace	fchdir	-	-	29	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=0
+-	uwph-trace	fclose	-	-	18910	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=0
+-	uwph-trace	fcntl	-	-	4022	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=0
+-	uwph-trace	feof	-	-	167	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=0
+-	uwph-trace	fopen	-	-	269	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=0
+-	uwph-trace	fork	-	-	0	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=0
+-	uwph-trace	fstat	-	-	8606	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=0
+-	uwph-trace	getcwd	-	-	3	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=0
+-	uwph-trace	getenv	-	-	14397	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=0
+-	uwph-trace	getpid	-	-	52477	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=0
+-	uwph-trace	getrlimit	-	-	2	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=0
+-	uwph-trace	getuid	-	-	25	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=0
+-	uwph-trace	isatty	-	-	0	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=0
+-	uwph-trace	lstat	-	-	233	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=0
+-	uwph-trace	mkdir	-	-	71	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=0
+-	uwph-trace	mprotect	-	-	3309	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=0
+-	uwph-trace	nl_langinfo	-	-	4	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=0
+-	uwph-trace	opendir	-	-	861	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=0
+-	uwph-trace	pipe2	-	-	125	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=0
+-	uwph-trace	pthread_getspecific	-	-	755071	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=0
+-	uwph-trace	pthread_mutex_lock	-	-	12315483	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=0
+-	uwph-trace	pthread_mutex_unlock	-	-	12315461	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=0
+-	uwph-trace	pthread_sigmask	-	-	113483	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=0
+-	uwph-trace	putenv	-	-	1	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=0
+-	uwph-trace	realpath	-	-	256	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=0
+-	uwph-trace	recvmsg	-	-	11604	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=0
+-	uwph-trace	sendmsg	-	-	370	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=0
+-	uwph-trace	setbuf	-	-	2	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=0
+-	uwph-trace	setlocale	-	-	30910	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=0
+-	uwph-trace	setrlimit	-	-	2	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=0
+-	uwph-trace	setsockopt	-	-	12	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=0
+-	uwph-trace	sigaddset	-	-	8	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=0
+-	uwph-trace	sigemptyset	-	-	3	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=0
+-	uwph-trace	snprintf	-	-	254174	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=0
+-	uwph-trace	stat	-	-	40116	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=0
+-	uwph-trace	sysconf	-	-	1662	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=0
+-	uwph-trace	time	-	-	3721	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=0
+-	uwph-trace	umask	-	-	12	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=0
+-	uwph-trace	write	-	-	91821	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=0
+-	uwph-trace	writev	-	-	27175	-	B12 megabonk nofork,wx,noproc; uwph entry counter, all reports, exit=0

@@ -1,0 +1,78 @@
+pid 1747542
+total open 2 0
+total read 18 0
+total close 4 0
+total mmap 27 0
+total munmap 1 0
+total mprotect 1 0
+module 2f776f726b73706163652f77742f4231372f7836342f7577702d686f73742f6861726e6573732f6f75742f77696e652d77782f6c69622f77696e652f2e2e2f7838365f36342d6c696e75782d676e752f77696e652f7838365f36342d756e69782f6e74646c6c2e736f open 2 2
+module 2f776f726b73706163652f77742f4231372f7836342f7577702d686f73742f6861726e6573732f6f75742f77696e652d77782f6c69622f77696e652f2e2e2f7838365f36342d6c696e75782d676e752f77696e652f7838365f36342d756e69782f6e74646c6c2e736f read 18 18
+module 2f776f726b73706163652f77742f4231372f7836342f7577702d686f73742f6861726e6573732f6f75742f77696e652d77782f6c69622f77696e652f2e2e2f7838365f36342d6c696e75782d676e752f77696e652f7838365f36342d756e69782f6e74646c6c2e736f close 4 4
+module 2f776f726b73706163652f77742f4231372f7836342f7577702d686f73742f6861726e6573732f6f75742f77696e652d77782f6c69622f77696e652f2e2e2f7838365f36342d6c696e75782d676e752f77696e652f7838365f36342d756e69782f6e74646c6c2e736f mmap 27 27
+module 2f776f726b73706163652f77742f4231372f7836342f7577702d686f73742f6861726e6573732f6f75742f77696e652d77782f6c69622f77696e652f2e2e2f7838365f36342d6c696e75782d676e752f77696e652f7838365f36342d756e69782f6e74646c6c2e736f munmap 1 1
+module 2f776f726b73706163652f77742f4231372f7836342f7577702d686f73742f6861726e6573732f6f75742f77696e652d77782f6c69622f77696e652f2e2e2f7838365f36342d6c696e75782d676e752f77696e652f7838365f36342d756e69782f6e74646c6c2e736f mprotect 1 1
+trace snprintf 250
+trace fopen 222
+trace __isoc23_fscanf 222
+trace fclose 220
+trace pthread_getspecific 47
+trace pthread_sigmask 39
+trace feof 88
+trace stat 64
+trace write 8
+trace pthread_mutex_lock 135
+trace pthread_mutex_unlock 134
+trace writev 4
+trace getenv 17
+trace asprintf 4
+trace sigaddset 7
+trace fcntl 3
+trace setlocale 5
+trace time 4
+trace getuid 0
+trace realpath 3
+trace sendmsg 2
+trace fstat 3
+trace putenv 1
+trace recvmsg 2
+trace setsockopt 1
+trace chdir 0
+trace dladdr 54
+trace execv 0
+trace getrlimit 2
+trace isatty 0
+trace pipe2 2
+trace setbuf 2
+trace setrlimit 2
+trace sigemptyset 2
+trace sysconf 2
+trace umask 2
+trace __getdelim 0
+trace access 0
+trace connect 0
+trace dlsym 2
+trace dup 0
+trace fchdir 0
+trace fork 0
+trace getcwd 0
+trace getpid 1
+trace lstat 0
+trace mkdir 0
+trace mprotect 1
+trace nl_langinfo 1
+trace opendir 0
+trace prctl 1
+trace pthread_key_create 1
+trace pthread_mutex_init 1
+trace pthread_mutexattr_destroy 1
+trace pthread_mutexattr_init 1
+trace pthread_mutexattr_settype 1
+trace pthread_setspecific 1
+trace secure_getenv 0
+trace sigaction 1
+trace sigaltstack 1
+trace socket 0
+trace socketpair 0
+trace syscall 1
+trace vsnprintf 0
+classification recursion=0 unattributed=0 module_overflow=0 instrumentation_raw_io=1
