@@ -68,3 +68,30 @@ UWPH_API int uwph_arch_prctl(int code, uint64_t addr)
         return UWPH_FAIL(UWPH_EINVAL);
     }
 }
+
+/* No CRT or system calls while guest fields are installed. */
+UWPH_API uintptr_t uwph_host_call(void *teb,
+    const struct uwph_host_teb_state *host,
+    uintptr_t (*callback)(void *), void *arg)
+{
+    struct uwph_host_teb_state guest;
+    uintptr_t result;
+    volatile uint32_t *error = (volatile uint32_t *)((char *)teb + UWPH_TEB_LASTERROR);
+    guest.peb = TEB_FIELD(teb, UWPH_TEB_PEB);
+    guest.tls_pointer = TEB_FIELD(teb, UWPH_TEB_TLSPOINTER);
+    guest.last_error = *error;
+    for (int i = 0; i < 64; ++i) {
+        guest.tls_slots[i] = TEB_FIELD(teb, 0x1480 + i * 8);
+        TEB_FIELD(teb, 0x1480 + i * 8) = host->tls_slots[i];
+    }
+    TEB_FIELD(teb, UWPH_TEB_PEB) = host->peb;
+    TEB_FIELD(teb, UWPH_TEB_TLSPOINTER) = host->tls_pointer;
+    *error = host->last_error;
+    result = callback(arg);
+    TEB_FIELD(teb, UWPH_TEB_PEB) = guest.peb;
+    TEB_FIELD(teb, UWPH_TEB_TLSPOINTER) = guest.tls_pointer;
+    for (int i = 0; i < 64; ++i)
+        TEB_FIELD(teb, 0x1480 + i * 8) = guest.tls_slots[i];
+    *error = guest.last_error;
+    return result;
+}

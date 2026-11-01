@@ -40,6 +40,18 @@ void uwph_teb_leave_guest(void *teb, struct uwph_teb_swap *s);
 /* Fill s->guest from a Wine TEB (reads the same offsets from it). */
 void uwph_teb_capture_guest(const void *wine_teb, struct uwph_teb_swap *s);
 
+/* Snapshot these fields while host state is installed, before entering guest.
+ * This bounded helper supplements the original five-field swap with inline TLS
+ * and LastError. Normal-return callbacks only; exceptions must not escape it.
+ * TLS expansion slots and other TEB fields are not covered. */
+struct uwph_host_teb_state {
+    uint64_t peb, tls_pointer, tls_slots[64];
+    uint32_t last_error;
+};
+UWPH_API uintptr_t uwph_host_call(void *teb,
+    const struct uwph_host_teb_state *host,
+    uintptr_t (*callback)(void *), void *arg);
+
 /* Base of the current thread's gs block (host TEB on Windows, 0 on Linux stub). */
 void *uwph_teb_current(void);
 
